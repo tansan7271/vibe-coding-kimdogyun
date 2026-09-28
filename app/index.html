@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>오토플랜 – 할 일 자동 스케줄러</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>🗓️ 오토플랜</h1>
+      <p class="subtitle">할 일과 마감일을 넣으면 언제 무엇을 할지 자동으로 짜드려요.</p>
+    </header>
+
+    <section class="settings card">
+      <h2>작업 시간 설정</h2>
+      <div class="settings-grid">
+        <label>
+          하루 시작 시간
+          <input type="time" id="workStart" value="09:00" />
+        </label>
+        <label>
+          하루 종료 시간
+          <input type="time" id="workEnd" value="22:00" />
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="includeWeekend" />
+          주말도 작업일에 포함
+        </label>
+      </div>
+    </section>
+
+    <section class="task-form card">
+      <h2>할 일 추가</h2>
+      <form id="taskForm">
+        <div class="form-grid">
+          <label class="grow">
+            할 일 이름
+            <input type="text" id="taskTitle" placeholder="예: 보고서 작성" required />
+          </label>
+          <label>
+            마감일
+            <input type="date" id="taskDeadlineDate" required />
+          </label>
+          <label>
+            마감 시간
+            <input type="time" id="taskDeadlineTime" value="18:00" />
+          </label>
+          <label>
+            예상 소요시간(시간)
+            <input type="number" id="taskDuration" min="0.25" step="0.25" value="1" required />
+          </label>
+          <label>
+            우선순위
+            <select id="taskPriority">
+              <option value="1">낮음</option>
+              <option value="2" selected>보통</option>
+              <option value="3">높음</option>
+            </select>
+          </label>
+        </div>
+        <button type="submit" class="btn-primary">할 일 추가</button>
+      </form>
+    </section>
+
+    <section class="task-list card">
+      <h2>할 일 목록</h2>
+      <ul id="taskList" class="task-items"></ul>
+      <p id="emptyTasksMsg" class="empty-msg">아직 추가된 할 일이 없어요.</p>
+    </section>
+
+    <div class="actions">
+      <button id="generateBtn" class="btn-primary btn-large">✨ 일정 자동 생성</button>
+      <button id="clearBtn" class="btn-secondary">전체 초기화</button>
+    </div>
+
+    <section class="schedule card">
+      <h2>자동 생성된 일정</h2>
+      <div id="scheduleOutput" class="schedule-output"></div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
