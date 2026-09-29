@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAD CARPET</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: #f5f2ee;
+    color: #222;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #b8203a;
+    color: #fff;
+  }
+
+  nav {
+    display: flex;
+    gap: 8px;
+  }
+
+  nav button {
+    border: none;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  nav button.active {
+    background: #fff;
+    color: #b8203a;
+    font-weight: bold;
+  }
+
+  .place-mode-toggle {
+    font-size: 12px;
+    color: #fff;
+    background: rgba(255,255,255,0.15);
+    padding: 6px 10px;
+    border-radius: 6px;
+  }
+
+  main {
+    padding: 24px 16px;
+  }
+
+  .screen {
+    display: none;
+  }
+
+  .screen.active {
+    display: block;
+  }
+
+  .screen h1 {
+    font-size: 18px;
+    color: #444;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <nav>
+    <button data-screen="carpet" class="active">카펫</button>
+    <button data-screen="goals">할 일</button>
+    <button data-screen="settings">일정과 설정</button>
+  </nav>
+  <div class="place-mode-toggle">깔기 방식: 채우기 우선 / 고르게</div>
+</header>
+
+<main>
+  <section id="screen-carpet" class="screen active">
+    <h1>카펫</h1>
+  </section>
+
+  <section id="screen-goals" class="screen">
+    <h1>할 일</h1>
+  </section>
+
+  <section id="screen-settings" class="screen">
+    <h1>일정과 설정</h1>
+  </section>
+</main>
+
+<script>
+  const navButtons = document.querySelectorAll('nav button');
+  const screens = document.querySelectorAll('.screen');
+
+  navButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.screen;
+
+      navButtons.forEach(b => b.classList.toggle('active', b === btn));
+      screens.forEach(s => s.classList.toggle('active', s.id === `screen-${target}`));
+    });
+  });
+</script>
+
+</body>
+</html>
