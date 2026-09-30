@@ -75,6 +75,7 @@
   /**
    * @param {object} input
    * @param {Array} input.steps 미완료 중간 단계 전체 (고정 포함)
+   * @param {Array} input.doneSteps 완료된 단계 ({load, minutes, doneDate}). 배치 대상이 아니고 완료일의 부하·시간으로만 센다 (SPEC 6장)
    * @param {Array} input.goals 할 일 목록 ({id, deadline})
    * @param {Array} input.events 일정 목록
    * @param {string} input.today 오늘 날짜 "YYYY-MM-DD"
@@ -86,7 +87,7 @@
    * @returns {Array<{stepId:string, date:string|null, pinned:boolean, exceeded:boolean, overLoad:boolean, overTime:boolean, overdue:boolean}>}
    * overLoad: 초과가 부하(안전선) 때문인지, overTime: 초과가 시간 때문인지. 둘 다 true일 수 있다.
    */
-  function placeSteps({ steps, goals, events, today, capacity, safeRatio, sleepHours, lifeHours, placeMode }) {
+  function placeSteps({ steps, doneSteps = [], goals, events, today, capacity, safeRatio, sleepHours, lifeHours, placeMode }) {
     const goalById = new Map(goals.map(g => [g.id, g]));
     const safeLimit = capacity * safeRatio;
     const availableMinutes = (24 - sleepHours - lifeHours) * 60;
@@ -146,6 +147,9 @@
         return a.localeCompare(b);
       })[0];
     }
+
+    // 완료된 단계는 실제로 한 날에 속한다
+    doneSteps.forEach(step => addToLedger(step.doneDate, step.load, step.minutes));
 
     // 1. 고정된 단계 먼저 반영 (규칙이 옮기지 않는다)
     const pinnedSteps = steps.filter(s => s.pinnedDate);
@@ -220,20 +224,23 @@
    * @param {string} input.date "YYYY-MM-DD"
    * @param {Array} input.steps placeSteps에 넣은 단계들
    * @param {Array} input.placements placeSteps 결과
+   * @param {Array} input.doneSteps 완료된 단계. doneDate가 그날이면 그날에 속한다
    * @param {Array} input.events 일정 목록
    */
-  function dayStats({ date, steps, placements, events, capacity, safeRatio, sleepHours, lifeHours }) {
+  function dayStats({ date, steps, doneSteps = [], placements, events, capacity, safeRatio, sleepHours, lifeHours }) {
     const stepById = new Map(steps.map(s => [s.id, s]));
     const dayEvents = eventsOnDate(events, date);
     const daySteps = placements
       .filter(p => p.date === date)
       .map(p => ({ step: stepById.get(p.stepId), placement: p }));
 
+    const dayDone = doneSteps.filter(st => st.doneDate === date);
+
     const eventLoad = dayEvents.reduce((sum, ev) => sum + ev.load, 0);
-    const stepLoad = daySteps.reduce((sum, x) => sum + x.step.load, 0);
+    const stepLoad = daySteps.reduce((sum, x) => sum + x.step.load, 0) + dayDone.reduce((sum, st) => sum + st.load, 0);
     const load = eventLoad + stepLoad;
     const eventMinutes = dayEvents.reduce((sum, ev) => sum + eventDurationMinutes(ev), 0);
-    const stepMinutes = daySteps.reduce((sum, x) => sum + x.step.minutes, 0);
+    const stepMinutes = daySteps.reduce((sum, x) => sum + x.step.minutes, 0) + dayDone.reduce((sum, st) => sum + st.minutes, 0);
     const availableMinutes = (24 - sleepHours - lifeHours) * 60;
     const minutesLeft = availableMinutes - eventMinutes - stepMinutes;
 
@@ -241,6 +248,7 @@
       date,
       events: dayEvents,
       steps: daySteps,
+      doneSteps: dayDone,
       load,
       capacity,
       safeLimit: capacity * safeRatio,

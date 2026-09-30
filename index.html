@@ -375,6 +375,26 @@
   }
 
   .overdue-box { margin-top: 20px; }
+
+  .day-item.clickable { cursor: pointer; }
+  .day-item.clickable:hover { background: #f1cfd6; }
+  .day-item.done { background: #dfeede; text-decoration: none; }
+  .day-item.pinned .tag-pin { color: #333; }
+
+  .step-menu {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 6px;
+    margin-bottom: 6px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .step-menu button { text-align: left; }
+  .step-menu input[type="date"] { width: 100%; font-size: 12px; }
+  .step-menu .menu-hint { color: #777; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -967,6 +987,41 @@
     return tags.length ? ` <span class="tag">${tags.join('·')}</span>` : '';
   }
 
+  let openMenu = null; // { stepId, mode: 'menu' | 'done' | 'pin' }
+
+  function stepMenuHtml(step, overdue) {
+    if (!openMenu || openMenu.stepId !== step.id) return '';
+    const id = step.id;
+    const today = todayStr();
+    const btn = (action, label, cls = 'btn-plain') => `<button type="button" class="btn ${cls}" data-action="${action}" data-step-id="${id}">${label}</button>`;
+    let body;
+    if (openMenu.mode === 'done') {
+      body = `<span class="menu-hint">한 날짜 (오늘까지)</span>
+        <input type="date" id="step-menu-date" max="${today}" value="${today}">
+        ${btn('step-done-confirm', '완료 기록', '')}${btn('close-step-menu', '취소')}`;
+    } else if (openMenu.mode === 'pin') {
+      body = `<span class="menu-hint">고정할 날짜 (오늘부터)</span>
+        <input type="date" id="step-menu-date" min="${today}" value="${step.pinnedDate || Placement.addDays(today, 1)}">
+        ${btn('step-pin-confirm', '이 날에 고정', '')}${btn('close-step-menu', '취소')}`;
+    } else {
+      body = btn('step-done-open', '완료', '')
+        + (overdue ? '' : (step.pinnedDate ? '' : btn('step-push', '오늘 안 함'))
+          + btn('step-pin-open', '다른 날에 고정')
+          + (step.pinnedDate ? btn('step-unpin', '고정 해제') : ''))
+        + btn('close-step-menu', '닫기');
+    }
+    return `<div class="step-menu">${body}</div>`;
+  }
+
+  function clickableStepHtml(step, goalTitle, placement, overdue) {
+    const tags = [];
+    if (placement && placement.pinned) tags.push('<span class="tag tag-pin">고정</span>');
+    const over = placement ? stepTagHtml(placement) : '';
+    const deadline = overdue ? ` · 마감 ${state.goals.find(g => g.id === step.goalId).deadline}` : '';
+    const pushed = step.pushCount ? ` · 밀림 ${step.pushCount}회` : '';
+    return `<div class="day-item step clickable${placement && placement.exceeded ? ' exceeded' : ''}" data-action="open-step-menu" data-step-id="${step.id}">${escapeHtml(step.title)} ${tags.join('')}${over}<br><small>${escapeHtml(goalTitle)} · 부하 ${step.load} · ${formatMinutes(step.minutes)}${pushed}${deadline}</small></div>${stepMenuHtml(step, overdue)}`;
+  }
+
   function dayCardHtml(st, today, goalTitleById) {
     const s = state.settings;
     const loadPct = Math.min(100, (st.load / st.capacity) * 100);
@@ -981,9 +1036,12 @@
       .map(ev => `<div class="day-item event">${escapeHtml(ev.title)} <small>${ev.start}~${ev.end} · 부하 ${ev.load}</small></div>`)
       .join('');
     const stepsHtml = st.steps
-      .map(({ step, placement }) => `<div class="day-item step${placement.exceeded ? ' exceeded' : ''}">${escapeHtml(step.title)}${stepTagHtml(placement)}<br><small>${escapeHtml(goalTitleById.get(step.goalId) || '')} · 부하 ${step.load} · ${formatMinutes(step.minutes)}</small></div>`)
+      .map(({ step, placement }) => clickableStepHtml(step, goalTitleById.get(step.goalId) || '', placement, false))
       .join('');
-    const itemsHtml = eventsHtml + stepsHtml || '<div class="empty-hint">비어 있음</div>';
+    const doneHtml = st.doneSteps
+      .map(step => `<div class="day-item step done"><span class="tag">완료</span> ${escapeHtml(step.title)}<br><small>${escapeHtml(goalTitleById.get(step.goalId) || '')} · 부하 ${step.load} · ${formatMinutes(step.minutes)}</small></div>`)
+      .join('');
+    const itemsHtml = eventsHtml + stepsHtml + doneHtml || '<div class="empty-hint">비어 있음</div>';
     const [, m, d] = st.date.split('-').map(Number);
 
     return `
@@ -1008,8 +1066,9 @@
     const s = state.settings;
     const today = todayStr();
     const activeSteps = state.steps.filter(st => !st.done);
+    const doneSteps = state.steps.filter(st => st.done && st.doneDate);
     const params = {
-      steps: activeSteps, goals: state.goals, events: state.events, today,
+      steps: activeSteps, doneSteps, goals: state.goals, events: state.events, today,
       capacity: s.capacity, safeRatio: s.safeRatio, sleepHours: s.sleepHours, lifeHours: s.lifeHours, placeMode: s.placeMode,
     };
     const placements = Placement.placeSteps(params);
@@ -1027,7 +1086,7 @@
       .map(p => activeSteps.find(st => st.id === p.stepId));
     document.getElementById('overdue-box').innerHTML = overdueSteps.length
       ? `<h2>지남 (마감이 지나 깔리지 않은 단계)</h2>` + overdueSteps
-          .map(st => `<div class="day-item step">${escapeHtml(st.title)} <small>${escapeHtml(goalTitleById.get(st.goalId) || '')} · 마감 ${state.goals.find(g => g.id === st.goalId).deadline}</small></div>`)
+          .map(st => clickableStepHtml(st, goalTitleById.get(st.goalId) || '', null, true))
           .join('')
       : '';
   }
@@ -1035,6 +1094,53 @@
   document.getElementById('week-prev').addEventListener('click', () => { weekOffset--; renderCarpet(); });
   document.getElementById('week-next').addEventListener('click', () => { weekOffset++; renderCarpet(); });
   document.getElementById('week-today').addEventListener('click', () => { weekOffset = 0; renderCarpet(); });
+
+  document.getElementById('screen-carpet').addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    const step = state.steps.find(st => st.id === target.dataset.stepId);
+    const today = todayStr();
+    const dateValue = () => { const el = document.getElementById('step-menu-date'); return el ? el.value : ''; };
+
+    if (action === 'open-step-menu') {
+      openMenu = openMenu && openMenu.stepId === step.id ? null : { stepId: step.id, mode: 'menu' };
+    } else if (action === 'close-step-menu') {
+      openMenu = null;
+    } else if (action === 'step-done-open') {
+      openMenu = { stepId: step.id, mode: 'done' };
+    } else if (action === 'step-pin-open') {
+      openMenu = { stepId: step.id, mode: 'pin' };
+    } else if (action === 'step-done-confirm') {
+      const date = dateValue();
+      if (!date) { alert('날짜를 입력하세요.'); return; }
+      if (date > today) { alert('아직 오지 않은 날짜는 완료일로 기록할 수 없습니다.'); return; }
+      step.done = true;
+      step.doneDate = date;
+      openMenu = null;
+      saveState();
+    } else if (action === 'step-push') {
+      const tomorrow = Placement.addDays(today, 1);
+      step.earliestDate = step.earliestDate && step.earliestDate > tomorrow ? step.earliestDate : tomorrow;
+      step.pushCount = (step.pushCount || 0) + 1;
+      openMenu = null;
+      saveState();
+    } else if (action === 'step-pin-confirm') {
+      const date = dateValue();
+      if (!date) { alert('날짜를 입력하세요.'); return; }
+      if (date < today) { alert('지난 날짜에는 고정할 수 없습니다.'); return; }
+      step.pinnedDate = date;
+      openMenu = null;
+      saveState();
+    } else if (action === 'step-unpin') {
+      delete step.pinnedDate;
+      openMenu = null;
+      saveState();
+    } else {
+      return;
+    }
+    renderCarpet();
+  });
 
   renderCarpet();
 

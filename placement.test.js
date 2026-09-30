@@ -238,3 +238,43 @@ test('dayStats: 매주 반복 일정은 해당 요일에 들어간다', () => {
   assert.equal(dayStats({ date: '2026-09-30', steps: [], placements: [], events, ...defaultSettings }).load, 2); // 수
   assert.equal(dayStats({ date: '2026-10-01', steps: [], placements: [], events, ...defaultSettings }).load, 0);
 });
+
+test('완료된 단계는 완료일의 부하와 시간으로 들어가 배치에 영향을 준다', () => {
+  const goals = [goal('g1', '2026-10-10')];
+  // 오늘 이미 부하 8(안전선)을 완료로 채움 -> 새 단계(3)는 오늘 못 들어가고 다음 날로
+  const doneSteps = [{ load: 5, minutes: 60, doneDate: '2026-10-01' }, { load: 3, minutes: 60, doneDate: '2026-10-01' }];
+  const steps = [step({ id: 's1' })];
+  const result = placeSteps({ steps, doneSteps, goals, events: [], today: '2026-10-01', ...defaultSettings });
+  assert.equal(result.length, 1); // 결과에는 완료된 단계가 나오지 않는다
+  assert.equal(result[0].date, '2026-10-02');
+});
+
+test('완료된 단계: 깔린 날보다 먼저 했으면 완료일에 속하고 깔린 날에서는 빠진다', () => {
+  const done = [{ id: 'd1', load: 4, minutes: 90, doneDate: '2026-10-01' }];
+  const at = date => dayStats({ date, steps: [], doneSteps: done, placements: [], events: [], ...defaultSettings });
+  assert.equal(at('2026-10-01').load, 4);
+  assert.equal(at('2026-10-01').minutesLeft, 720 - 90);
+  assert.equal(at('2026-10-01').doneSteps.length, 1);
+  assert.equal(at('2026-10-05').load, 0); // 원래 깔렸던 날
+});
+
+test('doneSteps를 안 넘기면 기존과 같다', () => {
+  const goals = [goal('g1', '2026-10-10')];
+  const r = placeSteps({ steps: [step({})], goals, events: [], today: '2026-10-01', ...defaultSettings });
+  assert.equal(r[0].date, '2026-10-01');
+});
+
+test('earliestDate(오늘 안 함)가 내일이면 오늘에 깔리지 않는다', () => {
+  const goals = [goal('g1', '2026-10-10')];
+  const r = placeSteps({ steps: [step({ earliestDate: '2026-10-02' })], goals, events: [], today: '2026-10-01', ...defaultSettings });
+  assert.equal(r[0].date, '2026-10-02');
+});
+
+test('고정된 단계는 그 날짜에 남고 다른 단계 배치에 부하로 반영된다', () => {
+  const goals = [goal('g1', '2026-10-10')];
+  const steps = [step({ id: 'p', load: 5, pinnedDate: '2026-10-01' }), step({ id: 'a', load: 4, order: 1 })];
+  const r = placeSteps({ steps, goals, events: [], today: '2026-10-01', ...defaultSettings });
+  assert.equal(r[0].date, '2026-10-01');
+  assert.equal(r[0].pinned, true);
+  assert.equal(r[1].date, '2026-10-02'); // 5+4=9 > 8
+});
