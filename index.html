@@ -721,6 +721,7 @@
     const start = document.getElementById('new-event-start').value;
     const end = document.getElementById('new-event-end').value;
     if (!title || !start || !end) return;
+    if (start >= end) { alert('시작 시각은 종료 시각보다 빨라야 합니다.'); return; }
 
     const ev = { id: uid('event'), title, load: newEventDraft.load, start, end, repeat };
     if (repeat === 'weekly') {
@@ -794,8 +795,10 @@
     } else if (field === 'repeatUntil') {
       if (e.target.value) ev.repeatUntil = e.target.value; else delete ev.repeatUntil;
     } else if (field === 'start') {
+      if (e.target.value >= ev.end) { alert('시작 시각은 종료 시각보다 빨라야 합니다.'); renderEvents(); return; }
       ev.start = e.target.value;
     } else if (field === 'end') {
+      if (ev.start >= e.target.value) { alert('시작 시각은 종료 시각보다 빨라야 합니다.'); renderEvents(); return; }
       ev.end = e.target.value;
     }
     saveState();
@@ -806,10 +809,17 @@
 
   function bindSettingField(id, key, transformIn, transformOut) {
     const el = document.getElementById(id);
-    el.value = transformOut ? transformOut(state.settings[key]) : state.settings[key];
+    const displayValue = () => transformOut ? transformOut(state.settings[key]) : state.settings[key];
+    el.value = displayValue();
     el.addEventListener('change', () => {
-      const v = Number(el.value);
-      if (Number.isNaN(v)) { el.value = transformOut ? transformOut(state.settings[key]) : state.settings[key]; return; }
+      const raw = el.value.trim();
+      const v = Number(raw);
+      const min = el.min !== '' ? Number(el.min) : -Infinity;
+      const max = el.max !== '' ? Number(el.max) : Infinity;
+      if (raw === '' || Number.isNaN(v) || v < min || v > max) {
+        el.value = displayValue();
+        return;
+      }
       state.settings[key] = transformIn ? transformIn(v) : v;
       saveState();
     });
