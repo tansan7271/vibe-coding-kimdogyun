@@ -95,6 +95,42 @@
 </main>
 
 <script>
+  const STORAGE_KEY = 'radcarpet-data';
+
+  function defaultState() {
+    return {
+      version: 1,
+      goals: [],
+      steps: [],
+      events: [],
+      settings: {
+        capacity: 10,
+        safeRatio: 0.8,
+        sleepHours: 8,
+        lifeHours: 4,
+        placeMode: 'fill',
+      },
+    };
+  }
+
+  function loadState() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultState();
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || !parsed.version) return defaultState();
+      return parsed;
+    } catch (e) {
+      return defaultState();
+    }
+  }
+
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  const state = loadState();
+
   const navButtons = document.querySelectorAll('nav button');
   const screens = document.querySelectorAll('.screen');
 
