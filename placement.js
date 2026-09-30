@@ -83,7 +83,8 @@
    * @param {number} input.sleepHours 수면 시간
    * @param {number} input.lifeHours 생활 시간
    * @param {string} input.placeMode "fill" | "even"
-   * @returns {Array<{stepId:string, date:string|null, pinned:boolean, exceeded:boolean, overdue:boolean}>}
+   * @returns {Array<{stepId:string, date:string|null, pinned:boolean, exceeded:boolean, overLoad:boolean, overTime:boolean, overdue:boolean}>}
+   * overLoad: 초과가 부하(안전선) 때문인지, overTime: 초과가 시간 때문인지. 둘 다 true일 수 있다.
    */
   function placeSteps({ steps, goals, events, today, capacity, safeRatio, sleepHours, lifeHours, placeMode }) {
     const goalById = new Map(goals.map(g => [g.id, g]));
@@ -112,10 +113,16 @@
       return capacity - dayLoad(dateStr);
     }
 
+    function overLoadOnDate(dateStr, step) {
+      return dayLoad(dateStr) + step.load > safeLimit;
+    }
+
+    function overTimeOnDate(dateStr, step) {
+      return availableMinutes - dayMinutesUsed(dateStr) - step.minutes < 0;
+    }
+
     function fitsOnDate(dateStr, step) {
-      const loadOk = dayLoad(dateStr) + step.load <= safeLimit;
-      const timeOk = availableMinutes - dayMinutesUsed(dateStr) - step.minutes >= 0;
-      return loadOk && timeOk;
+      return !overLoadOnDate(dateStr, step) && !overTimeOnDate(dateStr, step);
     }
 
     function pickByPlaceMode(candidates, step) {
@@ -148,7 +155,7 @@
 
     pinnedSteps.forEach(step => {
       addToLedger(step.pinnedDate, step.load, step.minutes);
-      results.set(step.id, { stepId: step.id, date: step.pinnedDate, pinned: true, exceeded: false, overdue: false });
+      results.set(step.id, { stepId: step.id, date: step.pinnedDate, pinned: true, exceeded: false, overLoad: false, overTime: false, overdue: false });
     });
 
     // 2. 할 일 마감 빠른 순, 같은 할 일 안에서는 순서대로
@@ -167,7 +174,7 @@
 
       // 7. 마감이 이미 지난 할 일의 단계는 지남으로 표시하고 깔지 않는다
       if (goal.deadline < today) {
-        results.set(step.id, { stepId: step.id, date: null, pinned: false, exceeded: false, overdue: true });
+        results.set(step.id, { stepId: step.id, date: null, pinned: false, exceeded: false, overLoad: false, overTime: false, overdue: true });
         return;
       }
 
@@ -181,6 +188,8 @@
 
       let chosenDate;
       let exceeded;
+      let overLoad = false;
+      let overTime = false;
       if (fitting.length) {
         chosenDate = pickByPlaceMode(fitting, step);
         exceeded = false;
@@ -188,11 +197,13 @@
         // 6. 들어가는 날이 없으면 여유가 가장 큰 날에 깔고 초과 표시
         chosenDate = pickOverflowDate(candidates);
         exceeded = true;
+        overLoad = overLoadOnDate(chosenDate, step);
+        overTime = overTimeOnDate(chosenDate, step);
       }
 
       addToLedger(chosenDate, step.load, step.minutes);
       lastPlacedDateByGoal.set(step.goalId, chosenDate);
-      results.set(step.id, { stepId: step.id, date: chosenDate, pinned: false, exceeded, overdue: false });
+      results.set(step.id, { stepId: step.id, date: chosenDate, pinned: false, exceeded, overLoad, overTime, overdue: false });
     });
 
     return steps.map(s => results.get(s.id));

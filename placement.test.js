@@ -59,6 +59,8 @@ test('안전선 초과: 들어갈 날이 없으면 여유가 가장 큰 날에 �
   const steps = [step({ id: 's1', load: 3, minutes: 30 })];
   const result = placeSteps({ steps, goals, events, today: '2026-10-01', ...defaultSettings });
   assert.equal(result[0].exceeded, true);
+  assert.equal(result[0].overLoad, true);
+  assert.equal(result[0].overTime, false);
   assert.ok(['2026-10-01', '2026-10-02'].includes(result[0].date));
 });
 
@@ -71,7 +73,21 @@ test('시간 초과: 부하는 여유 있어도 남은 시간이 모자라면 �
     capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 20, placeMode: 'fill',
   });
   assert.equal(result[0].exceeded, true);
+  assert.equal(result[0].overLoad, false);
+  assert.equal(result[0].overTime, true);
   assert.equal(result[0].date, '2026-10-01');
+});
+
+test('부하와 시간 둘 다 초과하면 둘 다 표시된다', () => {
+  const goals = [goal('g1', '2026-10-01')]; // 후보가 오늘 하루뿐
+  const events = [
+    { id: 'e1', title: '알바', load: 8, start: '09:00', end: '20:00', repeat: 'none', date: '2026-10-01' },
+  ];
+  const steps = [step({ id: 's1', load: 3, minutes: 120 })];
+  const result = placeSteps({ steps, goals, events, today: '2026-10-01', ...defaultSettings });
+  assert.equal(result[0].exceeded, true);
+  assert.equal(result[0].overLoad, true);
+  assert.equal(result[0].overTime, true);
 });
 
 test('마감이 이미 지난 할 일의 단계는 지남으로 표시하고 깔지 않는다', () => {
