@@ -21,11 +21,14 @@
    * @param {number} input.maxSag 예산만큼 찼을 때 처지는 깊이
    * @param {number} [input.safeRatio] 안전선 비율. 있으면 safeLine을 돌려준다
    * @param {number} [input.flatRatio] 카드 폭 중 평평한 바닥이 차지하는 비율 (기본 0.6, 카드 가운데 기준)
+   * @param {number} [input.curve] 바닥 사이 곡선의 제어점 위치 (간격 대비 0~0.5, 기본 0.5. 0이면 직선, 0.5면 S자)
+   * @param {number} [input.gridMaxLines] 가로 격자 선 최대 개수 (기본 10)
+   * @param {number} [input.gridLabelEvery] 격자 몇 줄마다 숫자를 적을지 (기본 5)
    * @returns {{points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, gridLines:Array<{value:number,y:number,isBudget:boolean,label:boolean}>, safeLine:{value:number,y:number}|null, sags:number[], linePath:string, dividers:number[]}}
    * 날짜마다 평평한 바닥, 바닥 사이는 S자 곡선으로 잇는다. 양 끝은 baseY에 묶인다.
    * 처짐은 예산에서 멈춘다 (카펫은 잘 늘어나지 않는다).
    */
-  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, safeRatio, flatRatio = 0.6 }) {
+  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, safeRatio, flatRatio = 0.6, curve = 0.5, gridMaxLines = 10, gridLabelEvery = 5 }) {
     const sags = loads.map(load => {
       if (!(capacity > 0)) return 0;
       return Math.min(1, Math.max(0, load / capacity));
@@ -46,9 +49,9 @@
     for (let i = 1; i < nodes.length; i++) {
       const prev = nodes[i - 1];
       const cur = nodes[i];
-      const midX = (prev.x2 + cur.x1) / 2;
+      const handle = (cur.x1 - prev.x2) * Math.min(0.5, Math.max(0, curve));
       // 양 끝 접선이 수평인 S자 곡선
-      parts.push(`C ${round(midX)} ${round(prev.y)} ${round(midX)} ${round(cur.y)} ${round(cur.x1)} ${round(cur.y)}`);
+      parts.push(`C ${round(prev.x2 + handle)} ${round(prev.y)} ${round(cur.x1 - handle)} ${round(cur.y)} ${round(cur.x1)} ${round(cur.y)}`);
       if (cur.x2 > cur.x1) parts.push(`L ${round(cur.x2)} ${round(cur.y)}`);
     }
     const linePath = parts.join(' ');
@@ -63,9 +66,9 @@
     let safeLine = null;
     if (capacity > 0) {
       const yOf = value => baseY + (value / capacity) * maxSag;
-      const step = Math.max(1, Math.ceil(capacity / 10)); // 예산이 크면 선이 촘촘해지지 않게 간격을 벌린다
+      const step = Math.max(1, Math.ceil(capacity / Math.max(1, gridMaxLines))); // 예산이 크면 선이 촘촘해지지 않게 간격을 벌린다
       for (let v = 0; v < capacity; v += step) {
-        gridLines.push({ value: v, y: yOf(v), isBudget: false, label: v % (5 * step) === 0 && capacity - v >= step });
+        gridLines.push({ value: v, y: yOf(v), isBudget: false, label: v % (Math.max(1, gridLabelEvery) * step) === 0 && capacity - v >= step });
       }
       gridLines.push({ value: capacity, y: yOf(capacity), isBudget: true, label: true });
       if (safeRatio > 0 && safeRatio < 1) {

@@ -94,3 +94,17 @@ test('격자: 예산이 작거나 크거나 0이어도 깨지지 않는다', () 
   assert.equal(zero.safeLine, null);
   assert.equal(carpetShape({ ...base, loads: [0, 0, 0, 0, 0, 0, 0] }).safeLine, null); // safeRatio 없음
 });
+
+test('곡선·격자 인자를 안 주면 기본 모양이 그대로다', () => {
+  const loads = [0, 5, 10, 3, 0, 0, 0];
+  const a = carpetShape({ ...base, loads });
+  const b = carpetShape({ ...base, loads, curve: 0.5, flatRatio: 0.6, gridMaxLines: 10, gridLabelEvery: 5 });
+  assert.deepEqual(a, b);
+});
+
+test('curve가 0이면 제어점이 끝점에 붙어 직선이 되고, 격자 인자가 간격을 바꾼다', () => {
+  const s = carpetShape({ ...base, loads: [0, 10, 0, 0, 0, 0, 0], curve: 0 });
+  assert.match(s.linePath, /C 0 10 /);
+  const g = carpetShape({ ...base, capacity: 20, loads: [0, 0, 0, 0, 0, 0, 0], gridMaxLines: 5 });
+  assert.equal(g.gridLines.length, 6); // 0,4,...,16 + 예산선
+});
