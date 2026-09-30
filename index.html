@@ -222,6 +222,55 @@
     color: #999;
     font-size: 13px;
   }
+
+  .screen h2 {
+    font-size: 15px;
+    color: #444;
+    margin-top: 28px;
+  }
+
+  .event-add-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .event-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    flex-wrap: wrap;
+  }
+
+  .event-row .event-title-input {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 260px;
+  }
+
+  .settings-form label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+  }
+
+  .settings-form input {
+    width: 90px;
+  }
 </style>
 </head>
 <body>
@@ -252,6 +301,44 @@
 
   <section id="screen-settings" class="screen">
     <h1>일정과 설정</h1>
+
+    <h2>일정</h2>
+    <div class="event-add-form">
+      <input type="text" id="new-event-title" placeholder="일정 제목">
+      <select id="new-event-repeat">
+        <option value="none">반복 없음</option>
+        <option value="weekly">매주</option>
+      </select>
+      <span id="new-event-date-wrap"><input type="date" id="new-event-date"></span>
+      <span id="new-event-weekday-wrap" style="display:none">
+        <select id="new-event-weekday">
+          <option value="0">월</option>
+          <option value="1">화</option>
+          <option value="2">수</option>
+          <option value="3">목</option>
+          <option value="4">금</option>
+          <option value="5">토</option>
+          <option value="6">일</option>
+        </select>
+      </span>
+      <span id="new-event-repeat-until-wrap" style="display:none">
+        종료 <input type="date" id="new-event-repeat-until">
+      </span>
+      <input type="time" id="new-event-start" value="09:00">
+      <span>~</span>
+      <input type="time" id="new-event-end" value="10:00">
+      <span id="new-event-load-picker"></span>
+      <button class="btn" id="add-event-btn" type="button">일정 추가</button>
+    </div>
+    <div id="event-list"></div>
+
+    <h2>기본값</h2>
+    <div class="settings-form">
+      <label>하루 예산 <input type="number" id="setting-capacity" min="1"></label>
+      <label>안전선(%) <input type="number" id="setting-safe-ratio" min="1" max="100"></label>
+      <label>수면 시간(시간) <input type="number" id="setting-sleep-hours" min="0" max="24"></label>
+      <label>생활 시간(시간) <input type="number" id="setting-life-hours" min="0" max="24"></label>
+    </div>
   </section>
 </main>
 
@@ -561,6 +648,177 @@
   });
 
   renderGoals();
+
+  // ---- 일정과 설정 화면 ----
+
+  const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+  const newEventDraft = { load: 3 };
+  const eventList = document.getElementById('event-list');
+
+  function eventSortKey(ev) {
+    return ev.repeat === 'weekly' ? `1-${ev.weekday}` : `0-${ev.date}`;
+  }
+
+  function eventRepeatFieldsHtml(ev) {
+    if (ev.repeat === 'weekly') {
+      const options = WEEKDAY_LABELS.map((label, i) => `<option value="${i}"${Number(ev.weekday) === i ? ' selected' : ''}>${label}</option>`).join('');
+      return `
+        <select data-field="weekday" data-event-id="${ev.id}">${options}</select>
+        종료 <input type="date" data-field="repeatUntil" data-event-id="${ev.id}" value="${ev.repeatUntil || ''}">`;
+    }
+    return `<input type="date" data-field="date" data-event-id="${ev.id}" value="${ev.date || ''}">`;
+  }
+
+  function eventRowHtml(ev) {
+    return `
+      <div class="event-row" data-event-id="${ev.id}">
+        <input type="text" class="event-title-input" data-field="title" data-event-id="${ev.id}" value="${escapeAttr(ev.title)}">
+        <select data-field="repeat" data-event-id="${ev.id}">
+          <option value="none"${ev.repeat === 'none' ? ' selected' : ''}>반복 없음</option>
+          <option value="weekly"${ev.repeat === 'weekly' ? ' selected' : ''}>매주</option>
+        </select>
+        ${eventRepeatFieldsHtml(ev)}
+        <input type="time" data-field="start" data-event-id="${ev.id}" value="${ev.start}">
+        <span>~</span>
+        <input type="time" data-field="end" data-event-id="${ev.id}" value="${ev.end}">
+        ${loadPickerHtml(ev.id, ev.load)}
+        <button type="button" class="btn btn-danger" data-action="delete-event" data-event-id="${ev.id}">삭제</button>
+      </div>`;
+  }
+
+  function renderEvents() {
+    const sorted = [...state.events].sort((a, b) => eventSortKey(a).localeCompare(eventSortKey(b)));
+    eventList.innerHTML = sorted.length
+      ? sorted.map(eventRowHtml).join('')
+      : '<div class="empty-hint">아직 일정이 없습니다.</div>';
+  }
+
+  function renderNewEventLoadPicker() {
+    document.getElementById('new-event-load-picker').innerHTML = loadPickerHtml('new-event', newEventDraft.load);
+  }
+
+  function syncNewEventRepeatFields() {
+    const repeat = document.getElementById('new-event-repeat').value;
+    document.getElementById('new-event-date-wrap').style.display = repeat === 'none' ? '' : 'none';
+    document.getElementById('new-event-weekday-wrap').style.display = repeat === 'weekly' ? '' : 'none';
+    document.getElementById('new-event-repeat-until-wrap').style.display = repeat === 'weekly' ? '' : 'none';
+  }
+
+  document.getElementById('new-event-repeat').addEventListener('change', syncNewEventRepeatFields);
+  syncNewEventRepeatFields();
+  renderNewEventLoadPicker();
+
+  document.getElementById('new-event-load-picker').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="select-load"]');
+    if (!btn) return;
+    newEventDraft.load = Number(btn.dataset.load);
+    renderNewEventLoadPicker();
+  });
+
+  document.getElementById('add-event-btn').addEventListener('click', () => {
+    const title = document.getElementById('new-event-title').value.trim();
+    const repeat = document.getElementById('new-event-repeat').value;
+    const start = document.getElementById('new-event-start').value;
+    const end = document.getElementById('new-event-end').value;
+    if (!title || !start || !end) return;
+
+    const ev = { id: uid('event'), title, load: newEventDraft.load, start, end, repeat };
+    if (repeat === 'weekly') {
+      ev.weekday = Number(document.getElementById('new-event-weekday').value);
+      const repeatUntil = document.getElementById('new-event-repeat-until').value;
+      if (repeatUntil) ev.repeatUntil = repeatUntil;
+    } else {
+      const date = document.getElementById('new-event-date').value;
+      if (!date) return;
+      ev.date = date;
+    }
+
+    state.events.push(ev);
+    saveState();
+
+    document.getElementById('new-event-title').value = '';
+    document.getElementById('new-event-date').value = '';
+    document.getElementById('new-event-repeat-until').value = '';
+    newEventDraft.load = 3;
+    renderNewEventLoadPicker();
+    renderEvents();
+  });
+
+  eventList.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+
+    if (target.dataset.action === 'delete-event') {
+      if (!confirm('이 일정을 삭제할까요?')) return;
+      state.events = state.events.filter(ev => ev.id !== target.dataset.eventId);
+      saveState();
+      renderEvents();
+      return;
+    }
+
+    if (target.dataset.action === 'select-load') {
+      const ev = state.events.find(ev => ev.id === target.dataset.loadKey);
+      if (ev) {
+        ev.load = Number(target.dataset.load);
+        saveState();
+        renderEvents();
+      }
+      return;
+    }
+  });
+
+  eventList.addEventListener('change', (e) => {
+    const field = e.target.dataset.field;
+    const eventId = e.target.dataset.eventId;
+    if (!field || !eventId) return;
+    const ev = state.events.find(ev => ev.id === eventId);
+    if (!ev) return;
+
+    if (field === 'title') {
+      const v = e.target.value.trim();
+      ev.title = v || ev.title;
+    } else if (field === 'repeat') {
+      ev.repeat = e.target.value;
+      if (ev.repeat === 'weekly') {
+        delete ev.date;
+        if (ev.weekday === undefined) ev.weekday = 0;
+      } else {
+        delete ev.weekday;
+        delete ev.repeatUntil;
+        if (!ev.date) ev.date = todayStr();
+      }
+    } else if (field === 'weekday') {
+      ev.weekday = Number(e.target.value);
+    } else if (field === 'date') {
+      ev.date = e.target.value;
+    } else if (field === 'repeatUntil') {
+      if (e.target.value) ev.repeatUntil = e.target.value; else delete ev.repeatUntil;
+    } else if (field === 'start') {
+      ev.start = e.target.value;
+    } else if (field === 'end') {
+      ev.end = e.target.value;
+    }
+    saveState();
+    renderEvents();
+  });
+
+  renderEvents();
+
+  function bindSettingField(id, key, transformIn, transformOut) {
+    const el = document.getElementById(id);
+    el.value = transformOut ? transformOut(state.settings[key]) : state.settings[key];
+    el.addEventListener('change', () => {
+      const v = Number(el.value);
+      if (Number.isNaN(v)) { el.value = transformOut ? transformOut(state.settings[key]) : state.settings[key]; return; }
+      state.settings[key] = transformIn ? transformIn(v) : v;
+      saveState();
+    });
+  }
+
+  bindSettingField('setting-capacity', 'capacity');
+  bindSettingField('setting-safe-ratio', 'safeRatio', v => v / 100, v => Math.round(v * 100));
+  bindSettingField('setting-sleep-hours', 'sleepHours');
+  bindSettingField('setting-life-hours', 'lifeHours');
 
   const navButtons = document.querySelectorAll('nav button');
   const screens = document.querySelectorAll('.screen');
