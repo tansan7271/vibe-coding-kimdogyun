@@ -4,7 +4,7 @@ const { carpetShape } = require('./carpet.js');
 
 // 폭 700, 7칸, 칸 사이 간격 10 (칸 폭 90)
 const columns = Array.from({ length: 7 }, (_, i) => ({ left: i * 100, right: i * 100 + 90 }));
-const base = { capacity: 10, columns, width: 690, baseY: 10, maxSag: 60, thickness: 12 };
+const base = { capacity: 10, columns, width: 690, baseY: 10, maxSag: 60 };
 
 test('부하가 전부 0이면 카펫은 평평하다 (첫 사용)', () => {
   const s = carpetShape({ ...base, loads: [0, 0, 0, 0, 0, 0, 0] });
@@ -41,18 +41,11 @@ test('예산이 0 이하여도 깨지지 않고 평평하다', () => {
   assert.ok(s.points.every(p => p.y === 10));
 });
 
-test('구분선은 칸 사이 가운데, 경로는 닫힌 도형이고 숫자가 유한하다', () => {
+test('구분선은 칸 사이 가운데, 경로는 직선으로만 이어진 열린 선이고 숫자가 유한하다', () => {
   const s = carpetShape({ ...base, loads: [1, 2, 3, 4, 5, 6, 7] });
   assert.deepEqual(s.dividers, [95, 195, 295, 395, 495, 595]);
-  assert.ok(s.ribbonPath.startsWith('M 0 10'));
-  assert.ok(s.ribbonPath.endsWith('Z'));
-  assert.ok(!/NaN|Infinity/.test(s.ribbonPath));
-});
-
-test('곡선이 묶인 높이 위로 솟거나 최대 처짐 아래로 넘치지 않는다', () => {
-  const s = carpetShape({ ...base, loads: [0, 10, 0, 10, 0, 10, 0] });
-  const nums = s.ribbonPath.split('M')[1].split(/[CLZ]/).join(' ').trim().split(/\s+/).map(Number);
-  const ys = nums.filter((_, i) => i % 2 === 1); // x y 쌍에서 y만
-  assert.ok(Math.min(...ys) >= 10 - 1e-9);
-  assert.ok(Math.max(...ys) <= 10 + 60 + 12 + 1e-9);
+  assert.ok(s.linePath.startsWith('M 0 10'));
+  assert.ok(!s.linePath.includes('C') && !s.linePath.includes('Z'));
+  assert.equal((s.linePath.match(/L/g) || []).length, 8);
+  assert.ok(!/NaN|Infinity/.test(s.linePath));
 });

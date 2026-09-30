@@ -1079,7 +1079,7 @@
 
   // 카펫 SVG: 카드 위치를 재서 가로를 맞춘다. 화면이 숨겨져 있으면 폭이 0이라 그리지 않는다
   const carpetSvg = document.getElementById('carpet-svg');
-  const CARPET = { height: 110, baseY: 14, maxSag: 70, thickness: 16 };
+  const CARPET = { height: 110, baseY: 14, maxSag: 70 };
   let lastCarpet = null; // { loads, capacity, todayIndex }
 
   function drawCarpet() {
@@ -1098,7 +1098,7 @@
     carpetSvg.innerHTML =
       (todayCol ? `<rect x="${todayCol.left}" y="0" width="${todayCol.right - todayCol.left}" height="${CARPET.height}" fill="rgba(184,32,58,0.08)"/>` : '')
       + shape.dividers.map(x => `<line x1="${x}" y1="0" x2="${x}" y2="${CARPET.height}" stroke="#d8d2ca" stroke-width="1" stroke-dasharray="3 4"/>`).join('')
-      + `<path d="${shape.ribbonPath}" fill="#b8203a" stroke="#8f1830" stroke-width="1.5" stroke-linejoin="round"/>`;
+      + `<path d="${shape.linePath}" fill="none" stroke="#b8203a" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`;
   }
 
   window.addEventListener('resize', drawCarpet);
