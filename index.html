@@ -426,6 +426,9 @@
       <div class="week-strip" id="week-strip"></div>
     </div>
     <div class="overdue-box" id="overdue-box"></div>
+    <!-- DEV-PANEL 시작 -->
+    <div id="dev-panel"></div>
+    <!-- DEV-PANEL 끝 -->
   </section>
 
   <section id="screen-goals" class="screen">
@@ -1237,6 +1240,59 @@
     });
   });
 </script>
+
+<!-- DEV-PANEL 시작: 카펫 모양 조정용 임시 도구. 이 구간과 위의 #dev-panel 구간을 지우면 된다 -->
+<script>
+  (function () {
+    const RANGES = { // [최소, 최대, 간격]
+      height: [60, 400, 1], baseY: [0, 100, 1], maxSag: [0, 300, 1], lineWidth: [1, 20, 1],
+      flatRatio: [0, 1, 0.05], curve: [0, 0.5, 0.01], gridMaxLines: [1, 30, 1], gridLabelEvery: [1, 10, 1],
+      gridWidth: [0, 5, 0.5], labelSize: [6, 20, 1], safeWidth: [0, 5, 0.5], dividerWidth: [0, 5, 0.5],
+    };
+    const defaults = JSON.parse(JSON.stringify(CARPET_STYLE));
+    const panel = document.getElementById('dev-panel');
+    const out = document.createElement('pre');
+
+    function showOut() { out.textContent = 'const CARPET_STYLE = ' + JSON.stringify(CARPET_STYLE, null, 2) + ';'; }
+    function set(key, value) { CARPET_STYLE[key] = value; showOut(); renderCarpet(); }
+
+    function build() {
+      panel.innerHTML = '';
+      Object.keys(defaults).forEach(key => {
+        const v = CARPET_STYLE[key];
+        const row = document.createElement('div');
+        const label = document.createElement('label');
+        label.textContent = key + ' ';
+        const input = document.createElement('input');
+        if (RANGES[key]) {
+          const [min, max, step] = RANGES[key];
+          Object.assign(input, { type: 'range', min, max, step, value: v });
+          const num = document.createElement('span');
+          num.textContent = ' ' + v;
+          input.addEventListener('input', () => { num.textContent = ' ' + input.value; set(key, Number(input.value)); });
+          label.append(input, num);
+        } else if (/^#[0-9a-f]{6}$/i.test(v)) {
+          Object.assign(input, { type: 'color', value: v });
+          input.addEventListener('input', () => set(key, input.value));
+          label.append(input);
+        } else {
+          Object.assign(input, { type: 'text', value: v });
+          input.addEventListener('input', () => set(key, input.value));
+          label.append(input);
+        }
+        row.append(label);
+        panel.append(row);
+      });
+      const reset = document.createElement('button');
+      reset.textContent = '기본값으로';
+      reset.addEventListener('click', () => { Object.assign(CARPET_STYLE, defaults); build(); showOut(); renderCarpet(); });
+      panel.append(reset, out);
+      showOut();
+    }
+    build();
+  })();
+</script>
+<!-- DEV-PANEL 끝 -->
 
 </body>
 </html>
