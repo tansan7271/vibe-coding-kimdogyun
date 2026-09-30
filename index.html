@@ -70,6 +70,156 @@
     font-size: 18px;
     color: #444;
   }
+
+  .goal-add-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .goal-add-form input[type="text"] {
+    flex: 1;
+    min-width: 160px;
+  }
+
+  input, select {
+    font-family: inherit;
+    font-size: 14px;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+
+  button.btn {
+    border: none;
+    background: #b8203a;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  button.btn-danger {
+    background: #888;
+  }
+
+  button.btn-plain {
+    background: none;
+    color: #333;
+    border: 1px solid #ccc;
+  }
+
+  .goal-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .goal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .goal-header-info {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .goal-title {
+    font-weight: bold;
+  }
+
+  .goal-deadline {
+    font-size: 13px;
+    color: #b8203a;
+  }
+
+  .goal-actions button {
+    margin-left: 6px;
+  }
+
+  .goal-body {
+    margin-top: 12px;
+    border-top: 1px solid #eee;
+    padding-top: 12px;
+  }
+
+  .goal-edit-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .step-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+    flex-wrap: wrap;
+  }
+
+  .step-title-input {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .step-minutes-input {
+    width: 70px;
+  }
+
+  .load-picker {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .load-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .load-btn.selected {
+    background: #b8203a;
+    color: #fff;
+    border-color: #b8203a;
+  }
+
+  .load-more-toggle {
+    font-size: 12px;
+    color: #888;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .step-add-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .empty-hint {
+    color: #999;
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
@@ -90,6 +240,12 @@
 
   <section id="screen-goals" class="screen">
     <h1>할 일</h1>
+    <div class="goal-add-form">
+      <input type="text" id="new-goal-title" placeholder="할 일 제목">
+      <input type="date" id="new-goal-deadline">
+      <button class="btn" id="add-goal-btn" type="button">할 일 추가</button>
+    </div>
+    <div id="goal-list"></div>
   </section>
 
   <section id="screen-settings" class="screen">
@@ -152,6 +308,266 @@
   });
 
   renderPlaceModeToggle();
+
+  function pad2(n) {
+    return String(n).padStart(2, '0');
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  function uid(prefix) {
+    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  // ---- 할 일 화면 ----
+
+  const MAIN_LOADS = [1, 3, 5];
+  const EXTRA_LOADS = [2, 4];
+  const expandedGoals = new Set();
+  const expandedLoadPickers = new Set(); // key: goalId('new') 또는 stepId
+
+  function stepsForGoal(goalId) {
+    return state.steps
+      .filter(s => s.goalId === goalId)
+      .sort((a, b) => a.order - b.order);
+  }
+
+  function loadPickerHtml(key, selected, expanded) {
+    const loads = expanded ? [...MAIN_LOADS, ...EXTRA_LOADS].sort((a, b) => a - b) : MAIN_LOADS;
+    const buttons = loads
+      .map(l => `<button type="button" class="load-btn${l === selected ? ' selected' : ''}" data-action="select-load" data-load-key="${key}" data-load="${l}">${l}</button>`)
+      .join('');
+    const toggle = `<button type="button" class="load-more-toggle" data-action="toggle-load-more" data-load-key="${key}">${expanded ? '접기' : '2·4'}</button>`;
+    return `<div class="load-picker" data-load-key="${key}">${buttons}${toggle}</div>`;
+  }
+
+  function stepRowHtml(step) {
+    const expanded = expandedLoadPickers.has(step.id);
+    return `
+      <div class="step-row" data-step-id="${step.id}">
+        <button type="button" class="btn-plain" data-action="move-step-up" data-step-id="${step.id}">▲</button>
+        <button type="button" class="btn-plain" data-action="move-step-down" data-step-id="${step.id}">▼</button>
+        <input type="text" class="step-title-input" data-field="title" data-step-id="${step.id}" value="${escapeAttr(step.title)}" placeholder="중간 단계 제목">
+        ${loadPickerHtml(step.id, step.load, expanded)}
+        <input type="number" class="step-minutes-input" data-field="minutes" data-step-id="${step.id}" value="${step.minutes}" step="30" min="30"> 분
+        <button type="button" class="btn btn-danger" data-action="delete-step" data-step-id="${step.id}">삭제</button>
+      </div>`;
+  }
+
+  function stepAddFormHtml(goalId) {
+    const key = `new-${goalId}`;
+    const expanded = expandedLoadPickers.has(key);
+    const draft = newStepDrafts[goalId] || {};
+    const selected = draft.load || 3;
+    const title = draft.title || '';
+    const minutes = draft.minutes || 60;
+    return `
+      <div class="step-add-form" data-goal-id="${goalId}">
+        <input type="text" class="step-title-input" id="new-step-title-${goalId}" data-draft="title" data-goal-id="${goalId}" value="${escapeAttr(title)}" placeholder="새 중간 단계 제목">
+        ${loadPickerHtml(key, selected, expanded)}
+        <input type="number" class="step-minutes-input" id="new-step-minutes-${goalId}" data-draft="minutes" data-goal-id="${goalId}" value="${minutes}" step="30" min="30"> 분
+        <button type="button" class="btn" data-action="add-step" data-goal-id="${goalId}">단계 추가</button>
+      </div>`;
+  }
+
+  function goalCardHtml(goal) {
+    const expanded = expandedGoals.has(goal.id);
+    const steps = stepsForGoal(goal.id);
+    const stepsHtml = steps.length
+      ? steps.map(stepRowHtml).join('')
+      : '<div class="empty-hint">아직 중간 단계가 없습니다.</div>';
+
+    return `
+      <div class="goal-card" data-goal-id="${goal.id}">
+        <div class="goal-header">
+          <div class="goal-header-info" data-action="toggle-expand" data-goal-id="${goal.id}">
+            <span class="goal-title">${escapeHtml(goal.title)}</span>
+            <span class="goal-deadline">마감 ${goal.deadline}</span>
+            <span>${expanded ? '▲' : '▼'}</span>
+          </div>
+          <div class="goal-actions">
+            <button type="button" class="btn btn-danger" data-action="delete-goal" data-goal-id="${goal.id}">삭제</button>
+          </div>
+        </div>
+        ${expanded ? `
+          <div class="goal-body">
+            <div class="goal-edit-row">
+              <input type="text" data-field="title" data-goal-id="${goal.id}" value="${escapeAttr(goal.title)}" placeholder="제목">
+              <input type="date" data-field="deadline" data-goal-id="${goal.id}" value="${goal.deadline}">
+            </div>
+            ${stepsHtml}
+            ${stepAddFormHtml(goal.id)}
+          </div>` : ''}
+      </div>`;
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function escapeAttr(str) {
+    return escapeHtml(str);
+  }
+
+  const goalList = document.getElementById('goal-list');
+  const newStepDrafts = {}; // goalId -> { load }
+
+  function renderGoals() {
+    const sorted = [...state.goals].sort((a, b) => a.deadline.localeCompare(b.deadline));
+    goalList.innerHTML = sorted.length
+      ? sorted.map(goalCardHtml).join('')
+      : '<div class="empty-hint">아직 할 일이 없습니다. 위에서 추가하세요.</div>';
+  }
+
+  document.getElementById('add-goal-btn').addEventListener('click', () => {
+    const titleInput = document.getElementById('new-goal-title');
+    const deadlineInput = document.getElementById('new-goal-deadline');
+    const title = titleInput.value.trim();
+    const deadline = deadlineInput.value;
+    if (!title || !deadline) return;
+
+    state.goals.push({ id: uid('goal'), title, deadline, createdAt: todayStr() });
+    saveState();
+    titleInput.value = '';
+    deadlineInput.value = '';
+    renderGoals();
+  });
+
+  goalList.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+
+    if (action === 'toggle-expand') {
+      const goalId = target.dataset.goalId;
+      expandedGoals.has(goalId) ? expandedGoals.delete(goalId) : expandedGoals.add(goalId);
+      renderGoals();
+      return;
+    }
+
+    if (action === 'delete-goal') {
+      const goalId = target.dataset.goalId;
+      if (!confirm('이 할 일과 모든 중간 단계를 삭제할까요?')) return;
+      state.goals = state.goals.filter(g => g.id !== goalId);
+      state.steps = state.steps.filter(s => s.goalId !== goalId);
+      saveState();
+      renderGoals();
+      return;
+    }
+
+    if (action === 'delete-step') {
+      const stepId = target.dataset.stepId;
+      if (!confirm('이 중간 단계를 삭제할까요?')) return;
+      state.steps = state.steps.filter(s => s.id !== stepId);
+      saveState();
+      renderGoals();
+      return;
+    }
+
+    if (action === 'move-step-up' || action === 'move-step-down') {
+      const stepId = target.dataset.stepId;
+      const step = state.steps.find(s => s.id === stepId);
+      const siblings = stepsForGoal(step.goalId);
+      const idx = siblings.findIndex(s => s.id === stepId);
+      const swapIdx = action === 'move-step-up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= siblings.length) return;
+      const other = siblings[swapIdx];
+      const tmp = step.order;
+      step.order = other.order;
+      other.order = tmp;
+      saveState();
+      renderGoals();
+      return;
+    }
+
+    if (action === 'toggle-load-more') {
+      const key = target.dataset.loadKey;
+      expandedLoadPickers.has(key) ? expandedLoadPickers.delete(key) : expandedLoadPickers.add(key);
+      renderGoals();
+      return;
+    }
+
+    if (action === 'select-load') {
+      const key = target.dataset.loadKey;
+      const load = Number(target.dataset.load);
+      if (key.startsWith('new-')) {
+        const goalId = key.slice(4);
+        newStepDrafts[goalId] = { ...(newStepDrafts[goalId] || {}), load };
+      } else {
+        const step = state.steps.find(s => s.id === key);
+        if (step) { step.load = load; saveState(); }
+      }
+      renderGoals();
+      return;
+    }
+
+    if (action === 'add-step') {
+      const goalId = target.dataset.goalId;
+      const titleInput = document.getElementById(`new-step-title-${goalId}`);
+      const minutesInput = document.getElementById(`new-step-minutes-${goalId}`);
+      const title = titleInput.value.trim();
+      if (!title) return;
+      const minutes = Number(minutesInput.value) || 60;
+      const load = (newStepDrafts[goalId] && newStepDrafts[goalId].load) || 3;
+      const order = stepsForGoal(goalId).length;
+      state.steps.push({
+        id: uid('step'), goalId, title, load, minutes, order,
+        done: false, pushCount: 0,
+      });
+      saveState();
+      delete newStepDrafts[goalId];
+      renderGoals();
+      return;
+    }
+  });
+
+  goalList.addEventListener('input', (e) => {
+    const draftField = e.target.dataset.draft;
+    if (!draftField) return;
+    const goalId = e.target.dataset.goalId;
+    const current = newStepDrafts[goalId] || {};
+    current[draftField] = draftField === 'minutes' ? Number(e.target.value) || 60 : e.target.value;
+    newStepDrafts[goalId] = current;
+  });
+
+  goalList.addEventListener('change', (e) => {
+    const field = e.target.dataset.field;
+    if (!field) return;
+
+    if (e.target.dataset.goalId) {
+      const goal = state.goals.find(g => g.id === e.target.dataset.goalId);
+      if (!goal) return;
+      if (field === 'title') {
+        const v = e.target.value.trim();
+        if (!v) { e.target.value = goal.title; return; }
+        goal.title = v;
+      } else if (field === 'deadline') {
+        if (!e.target.value) { e.target.value = goal.deadline; return; }
+        goal.deadline = e.target.value;
+      }
+      saveState();
+      renderGoals();
+      return;
+    }
+
+    if (e.target.dataset.stepId) {
+      const step = state.steps.find(s => s.id === e.target.dataset.stepId);
+      if (!step) return;
+      if (field === 'title') {
+        const v = e.target.value.trim();
+        if (!v) { e.target.value = step.title; return; }
+        step.title = v;
+      } else if (field === 'minutes') {
+        step.minutes = Number(e.target.value) || 60;
+      }
+      saveState();
+    }
+  });
+
+  renderGoals();
 
   const navButtons = document.querySelectorAll('nav button');
   const screens = document.querySelectorAll('.screen');
