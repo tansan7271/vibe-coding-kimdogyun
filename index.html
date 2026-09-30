@@ -989,7 +989,14 @@
 
   let openMenu = null; // { stepId, mode: 'menu' | 'done' | 'pin' }
 
-  function stepMenuHtml(step, overdue) {
+  function pushButtonHtml(step, placement) {
+    const goal = state.goals.find(g => g.id === step.goalId);
+    const can = Placement.canPush({ placedDate: placement.date, deadline: goal.deadline });
+    const button = `<button type="button" class="btn btn-plain" data-action="step-push" data-step-id="${step.id}" data-date="${placement.date}"${can.ok ? '' : ' disabled'}>이 날 안 함</button>`;
+    return can.ok ? button : `${button}<span class="menu-hint">${can.reason}</span>`;
+  }
+
+  function stepMenuHtml(step, overdue, placement) {
     if (!openMenu || openMenu.stepId !== step.id) return '';
     const id = step.id;
     const today = todayStr();
@@ -1005,7 +1012,7 @@
         ${btn('step-pin-confirm', '이 날에 고정', '')}${btn('close-step-menu', '취소')}`;
     } else {
       body = btn('step-done-open', '완료', '')
-        + (overdue ? '' : (step.pinnedDate ? '' : btn('step-push', '오늘 안 함'))
+        + (overdue ? '' : (step.pinnedDate ? '' : pushButtonHtml(step, placement))
           + btn('step-pin-open', '다른 날에 고정')
           + (step.pinnedDate ? btn('step-unpin', '고정 해제') : ''))
         + btn('close-step-menu', '닫기');
@@ -1019,7 +1026,7 @@
     const over = placement ? stepTagHtml(placement) : '';
     const deadline = overdue ? ` · 마감 ${state.goals.find(g => g.id === step.goalId).deadline}` : '';
     const pushed = step.pushCount ? ` · 밀림 ${step.pushCount}회` : '';
-    return `<div class="day-item step clickable${placement && placement.exceeded ? ' exceeded' : ''}" data-action="open-step-menu" data-step-id="${step.id}">${escapeHtml(step.title)} ${tags.join('')}${over}<br><small>${escapeHtml(goalTitle)} · 부하 ${step.load} · ${formatMinutes(step.minutes)}${pushed}${deadline}</small></div>${stepMenuHtml(step, overdue)}`;
+    return `<div class="day-item step clickable${placement && placement.exceeded ? ' exceeded' : ''}" data-action="open-step-menu" data-step-id="${step.id}">${escapeHtml(step.title)} ${tags.join('')}${over}<br><small>${escapeHtml(goalTitle)} · 부하 ${step.load} · ${formatMinutes(step.minutes)}${pushed}${deadline}</small></div>${stepMenuHtml(step, overdue, placement)}`;
   }
 
   function dayCardHtml(st, today, goalTitleById) {
@@ -1101,6 +1108,7 @@
     const action = target.dataset.action;
     const step = state.steps.find(st => st.id === target.dataset.stepId);
     const today = todayStr();
+    if (target.disabled) return;
     const dateValue = () => { const el = document.getElementById('step-menu-date'); return el ? el.value : ''; };
 
     if (action === 'open-step-menu') {
@@ -1120,8 +1128,7 @@
       openMenu = null;
       saveState();
     } else if (action === 'step-push') {
-      const tomorrow = Placement.addDays(today, 1);
-      step.earliestDate = step.earliestDate && step.earliestDate > tomorrow ? step.earliestDate : tomorrow;
+      step.earliestDate = Placement.pushEarliestDate(target.dataset.date);
       step.pushCount = (step.pushCount || 0) + 1;
       openMenu = null;
       saveState();

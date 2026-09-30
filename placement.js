@@ -218,6 +218,19 @@
     return addDays(dateStr, -weekdayOf(dateStr));
   }
 
+  // 밀림 (SPEC 5장): "이 날 안 함"이면 시작 가능일이 깔린 날의 다음 날이 된다
+  function pushEarliestDate(placedDate) {
+    return addDays(placedDate, 1);
+  }
+
+  // 마감일에 깔려 있으면 더 미룰 수 없다
+  function canPush({ placedDate, deadline }) {
+    if (placedDate >= deadline) {
+      return { ok: false, reason: '마감일에 깔려 있어 더 미룰 수 없습니다' };
+    }
+    return { ok: true, reason: null };
+  }
+
   /**
    * 하루치 집계 (SPEC 4장). placeSteps 결과를 받아 그날의 부하, 여유, 남은 시간을 계산한다.
    * @param {object} input
@@ -265,6 +278,8 @@
     placeSteps,
     dayStats,
     weekStart,
+    pushEarliestDate,
+    canPush,
     addDays,
     weekdayOf,
     dateRange,

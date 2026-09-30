@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { placeSteps, dayStats, weekStart, addDays, weekdayOf, eventsOnDate } = require('./placement.js');
+const { placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate } = require('./placement.js');
 
 const defaultSettings = {
   capacity: 10,
@@ -277,4 +277,27 @@ test('고정된 단계는 그 날짜에 남고 다른 단계 배치에 부하로
   assert.equal(r[0].date, '2026-10-01');
   assert.equal(r[0].pinned, true);
   assert.equal(r[1].date, '2026-10-02'); // 5+4=9 > 8
+});
+
+test('pushEarliestDate: 깔린 날의 다음 날 (월말·연말 경계 포함)', () => {
+  assert.equal(pushEarliestDate('2026-10-01'), '2026-10-02');
+  assert.equal(pushEarliestDate('2026-09-30'), '2026-10-01');
+  assert.equal(pushEarliestDate('2026-12-31'), '2027-01-01');
+});
+
+test('canPush: 마감 전 날에 깔렸으면 가능, 마감일이면 이유와 함께 불가', () => {
+  assert.deepEqual(canPush({ placedDate: '2026-10-01', deadline: '2026-10-02' }), { ok: true, reason: null });
+  const r = canPush({ placedDate: '2026-10-02', deadline: '2026-10-02' });
+  assert.equal(r.ok, false);
+  assert.ok(r.reason.includes('마감일'));
+});
+
+test('이 날 안 함: 미래 날에 깔린 단계를 밀면 그 날 다음 날부터 다시 깔린다', () => {
+  const goals = [goal('g1', '2026-10-10')];
+  // 오늘(10/1)이 가득 차서 10/2에 깔린 단계 -> 10/2 기준으로 밀면 10/3
+  const done = [{ load: 8, minutes: 60, doneDate: '2026-10-01' }];
+  const before = placeSteps({ steps: [step({})], doneSteps: done, goals, events: [], today: '2026-10-01', ...defaultSettings });
+  assert.equal(before[0].date, '2026-10-02');
+  const after = placeSteps({ steps: [step({ earliestDate: pushEarliestDate(before[0].date) })], doneSteps: done, goals, events: [], today: '2026-10-01', ...defaultSettings });
+  assert.equal(after[0].date, '2026-10-03');
 });
