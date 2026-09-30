@@ -422,7 +422,7 @@
       <button class="btn btn-plain" id="week-today" type="button">이번 주</button>
     </div>
     <div class="week-scroll">
-      <svg id="carpet-svg" height="110" aria-label="이번 주 카펫: 부하만큼 아래로 처집니다"></svg>
+      <svg id="carpet-svg" height="170" aria-label="이번 주 카펫: 부하만큼 아래로 처집니다"></svg>
       <div class="week-strip" id="week-strip"></div>
     </div>
     <div class="overdue-box" id="overdue-box"></div>
@@ -1079,8 +1079,8 @@
 
   // 카펫 SVG: 카드 위치를 재서 가로를 맞춘다. 화면이 숨겨져 있으면 폭이 0이라 그리지 않는다
   const carpetSvg = document.getElementById('carpet-svg');
-  const CARPET = { height: 110, baseY: 14, maxSag: 70 };
-  let lastCarpet = null; // { loads, capacity, todayIndex }
+  const CARPET = { height: 170, baseY: 14, maxSag: 130 };
+  let lastCarpet = null; // { loads, capacity, safeRatio, todayIndex }
 
   function drawCarpet() {
     if (!lastCarpet) return;
@@ -1091,12 +1091,15 @@
       return { left: r.left - stripRect.left, right: r.right - stripRect.left };
     });
     const width = stripRect.width;
-    const shape = Carpet.carpetShape({ loads: lastCarpet.loads, capacity: lastCarpet.capacity, columns, width, ...CARPET });
+    const shape = Carpet.carpetShape({ loads: lastCarpet.loads, capacity: lastCarpet.capacity, safeRatio: lastCarpet.safeRatio, columns, width, ...CARPET });
     const todayCol = lastCarpet.todayIndex >= 0 ? columns[lastCarpet.todayIndex] : null;
     carpetSvg.setAttribute('width', width);
     carpetSvg.setAttribute('viewBox', `0 0 ${width} ${CARPET.height}`);
     carpetSvg.innerHTML =
       (todayCol ? `<rect x="${todayCol.left}" y="0" width="${todayCol.right - todayCol.left}" height="${CARPET.height}" fill="rgba(184,32,58,0.08)"/>` : '')
+      + shape.gridLines.map(g => `<line x1="0" y1="${g.y}" x2="${width}" y2="${g.y}" stroke="${g.isBudget ? '#b9b2a8' : '#e6e1da'}" stroke-width="1"/>`).join('')
+      + (shape.safeLine ? `<line x1="0" y1="${shape.safeLine.y}" x2="${width}" y2="${shape.safeLine.y}" stroke="#e0a030" stroke-width="1" stroke-dasharray="5 4"/>` : '')
+      + shape.gridLines.filter(g => g.label).map(g => `<text x="3" y="${g.y - 2}" font-size="9" fill="#9a938a">${g.value}</text>`).join('')
       + shape.dividers.map(x => `<line x1="${x}" y1="0" x2="${x}" y2="${CARPET.height}" stroke="#d8d2ca" stroke-width="1" stroke-dasharray="3 4"/>`).join('')
       + `<path d="${shape.linePath}" fill="none" stroke="#b8203a" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`;
   }
@@ -1120,7 +1123,7 @@
     document.getElementById('week-label').textContent = `${dates[0]} ~ ${dates[6]}`;
     const weekStats = dates.map(date => Placement.dayStats({ ...params, date, placements }));
     weekStrip.innerHTML = weekStats.map(st => dayCardHtml(st, today, goalTitleById)).join('');
-    lastCarpet = { loads: weekStats.map(st => st.load), capacity: s.capacity, todayIndex: dates.indexOf(today) };
+    lastCarpet = { loads: weekStats.map(st => st.load), capacity: s.capacity, safeRatio: s.safeRatio, todayIndex: dates.indexOf(today) };
     drawCarpet();
 
     const overdueSteps = placements

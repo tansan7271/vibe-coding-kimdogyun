@@ -19,12 +19,13 @@
    * @param {number} input.width 그림 전체 폭
    * @param {number} input.baseY 처지지 않았을 때 카펫 높이
    * @param {number} input.maxSag 예산만큼 찼을 때 처지는 깊이
+   * @param {number} [input.safeRatio] 안전선 비율. 있으면 safeLine을 돌려준다
    * @param {number} [input.flatRatio] 카드 폭 중 평평한 바닥이 차지하는 비율 (기본 0.6, 카드 가운데 기준)
-   * @returns {{points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, sags:number[], linePath:string, dividers:number[]}}
+   * @returns {{points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, gridLines:Array<{value:number,y:number,isBudget:boolean,label:boolean}>, safeLine:{value:number,y:number}|null, sags:number[], linePath:string, dividers:number[]}}
    * 날짜마다 평평한 바닥, 바닥 사이는 S자 곡선으로 잇는다. 양 끝은 baseY에 묶인다.
    * 처짐은 예산에서 멈춘다 (카펫은 잘 늘어나지 않는다).
    */
-  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, flatRatio = 0.6 }) {
+  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, safeRatio, flatRatio = 0.6 }) {
     const sags = loads.map(load => {
       if (!(capacity > 0)) return 0;
       return Math.min(1, Math.max(0, load / capacity));
@@ -57,7 +58,22 @@
       dividers.push((columns[i - 1].right + columns[i].left) / 2);
     }
 
-    return { points, floors, sags, linePath, dividers };
+    // 가로 격자: 부하 눈금. 카펫 바닥과 같은 식(baseY + 부하/예산 * maxSag)으로 높이를 잡는다
+    const gridLines = [];
+    let safeLine = null;
+    if (capacity > 0) {
+      const yOf = value => baseY + (value / capacity) * maxSag;
+      const step = Math.max(1, Math.ceil(capacity / 10)); // 예산이 크면 선이 촘촘해지지 않게 간격을 벌린다
+      for (let v = 0; v < capacity; v += step) {
+        gridLines.push({ value: v, y: yOf(v), isBudget: false, label: v % (5 * step) === 0 && capacity - v >= step });
+      }
+      gridLines.push({ value: capacity, y: yOf(capacity), isBudget: true, label: true });
+      if (safeRatio > 0 && safeRatio < 1) {
+        safeLine = { value: capacity * safeRatio, y: yOf(capacity * safeRatio) };
+      }
+    }
+
+    return { points, floors, gridLines, safeLine, sags, linePath, dividers };
   }
 
   return { carpetShape };

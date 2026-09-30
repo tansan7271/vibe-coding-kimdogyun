@@ -67,3 +67,30 @@ test('구분선은 칸 사이 가운데, 경로 숫자가 유한하다', () => {
   assert.ok(s.linePath.startsWith('M 0 10'));
   assert.ok(!/NaN|Infinity/.test(s.linePath));
 });
+
+test('격자: 눈금 높이는 카펫 바닥 높이와 같은 식이고 예산선이 맨 아래다', () => {
+  const s = carpetShape({ ...base, loads: [5, 0, 0, 0, 0, 0, 0], safeRatio: 0.8 });
+  assert.equal(s.gridLines.length, 11); // 0..10
+  assert.equal(s.gridLines[0].y, 10);
+  const five = s.gridLines.find(g => g.value === 5);
+  assert.equal(five.y, s.floors[0].y); // 부하 5인 날의 바닥과 눈금 5가 일치
+  const last = s.gridLines[s.gridLines.length - 1];
+  assert.equal(last.value, 10);
+  assert.equal(last.isBudget, true);
+  assert.equal(last.y, 70);
+  assert.deepEqual(s.gridLines.filter(g => g.label).map(g => g.value), [0, 5, 10]);
+  assert.equal(s.safeLine.value, 8);
+  assert.equal(s.safeLine.y, 10 + 0.8 * 60);
+});
+
+test('격자: 예산이 작거나 크거나 0이어도 깨지지 않는다', () => {
+  const small = carpetShape({ ...base, capacity: 7, loads: [0, 0, 0, 0, 0, 0, 0] });
+  assert.deepEqual(small.gridLines.map(g => g.value), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(small.gridLines.filter(g => g.label).map(g => g.value), [0, 5, 7]);
+  const big = carpetShape({ ...base, capacity: 20, loads: [0, 0, 0, 0, 0, 0, 0] });
+  assert.equal(big.gridLines[1].value, 2);
+  const zero = carpetShape({ ...base, capacity: 0, loads: [0, 0, 0, 0, 0, 0, 0] });
+  assert.deepEqual(zero.gridLines, []);
+  assert.equal(zero.safeLine, null);
+  assert.equal(carpetShape({ ...base, loads: [0, 0, 0, 0, 0, 0, 0] }).safeLine, null); // safeRatio 없음
+});
