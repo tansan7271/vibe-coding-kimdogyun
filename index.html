@@ -45,10 +45,13 @@
 
   .place-mode-toggle {
     font-size: 12px;
+    font-family: inherit;
     color: #fff;
     background: rgba(255,255,255,0.15);
     padding: 6px 10px;
     border-radius: 6px;
+    border: none;
+    cursor: pointer;
   }
 
   main {
@@ -77,7 +80,7 @@
     <button data-screen="goals">할 일</button>
     <button data-screen="settings">일정과 설정</button>
   </nav>
-  <div class="place-mode-toggle">깔기 방식: 채우기 우선 / 고르게</div>
+  <button id="place-mode-toggle" class="place-mode-toggle" type="button">깔기 방식: 채우기 우선</button>
 </header>
 
 <main>
@@ -130,6 +133,25 @@
   }
 
   const state = loadState();
+
+  const PLACE_MODE_LABELS = {
+    fill: '깔기 방식: 채우기 우선',
+    even: '깔기 방식: 고르게',
+  };
+
+  const placeModeToggle = document.getElementById('place-mode-toggle');
+
+  function renderPlaceModeToggle() {
+    placeModeToggle.textContent = PLACE_MODE_LABELS[state.settings.placeMode];
+  }
+
+  placeModeToggle.addEventListener('click', () => {
+    state.settings.placeMode = state.settings.placeMode === 'fill' ? 'even' : 'fill';
+    saveState();
+    renderPlaceModeToggle();
+  });
+
+  renderPlaceModeToggle();
 
   const navButtons = document.querySelectorAll('nav button');
   const screens = document.querySelectorAll('.screen');
