@@ -19,30 +19,45 @@
    * @param {number} input.width 그림 전체 폭
    * @param {number} input.baseY 처지지 않았을 때 카펫 높이
    * @param {number} input.maxSag 예산만큼 찼을 때 처지는 깊이
-   * @returns {{points:Array<{x:number,y:number}>, sags:number[], linePath:string, dividers:number[]}}
-   * 날짜 지점끼리 직선으로 잇는다 (꺾은선). 양 끝은 baseY에 묶인다. 처짐은 예산에서 멈춘다 (카펫은 잘 늘어나지 않는다).
+   * @param {number} [input.flatRatio] 카드 폭 중 평평한 바닥이 차지하는 비율 (기본 0.6, 카드 가운데 기준)
+   * @returns {{points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, sags:number[], linePath:string, dividers:number[]}}
+   * 날짜마다 평평한 바닥, 바닥 사이는 S자 곡선으로 잇는다. 양 끝은 baseY에 묶인다.
+   * 처짐은 예산에서 멈춘다 (카펫은 잘 늘어나지 않는다).
    */
-  function carpetShape({ loads, capacity, columns, width, baseY, maxSag }) {
+  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, flatRatio = 0.6 }) {
     const sags = loads.map(load => {
       if (!(capacity > 0)) return 0;
       return Math.min(1, Math.max(0, load / capacity));
     });
     const points = [{ x: 0, y: baseY }];
-    columns.forEach((col, i) => {
-      points.push({ x: (col.left + col.right) / 2, y: baseY + sags[i] * maxSag });
+    const floors = columns.map((col, i) => {
+      const mid = (col.left + col.right) / 2;
+      const half = ((col.right - col.left) * flatRatio) / 2;
+      const y = baseY + sags[i] * maxSag;
+      points.push({ x: mid, y });
+      return { x1: mid - half, x2: mid + half, y };
     });
     points.push({ x: width, y: baseY });
 
-    const linePath = points
-      .map((p, i) => `${i === 0 ? 'M' : 'L'} ${round(p.x)} ${round(p.y)}`)
-      .join(' ');
+    // 시작(왼쪽 끝) -> 첫 바닥 -> ... -> 마지막 바닥 -> 끝(오른쪽 끝)
+    const nodes = [{ x1: 0, x2: 0, y: baseY }, ...floors, { x1: width, x2: width, y: baseY }];
+    const parts = [`M ${round(nodes[0].x2)} ${round(nodes[0].y)}`];
+    for (let i = 1; i < nodes.length; i++) {
+      const prev = nodes[i - 1];
+      const cur = nodes[i];
+      const midX = (prev.x2 + cur.x1) / 2;
+      // 양 끝 접선이 수평인 S자 곡선
+      parts.push(`C ${round(midX)} ${round(prev.y)} ${round(midX)} ${round(cur.y)} ${round(cur.x1)} ${round(cur.y)}`);
+      if (cur.x2 > cur.x1) parts.push(`L ${round(cur.x2)} ${round(cur.y)}`);
+    }
+    const linePath = parts.join(' ');
 
     const dividers = [];
     for (let i = 1; i < columns.length; i++) {
       dividers.push((columns[i - 1].right + columns[i].left) / 2);
     }
 
-    return { points, sags, linePath, dividers };
+    return { points, floors, sags, linePath, dividers };
   }
 
   return { carpetShape };

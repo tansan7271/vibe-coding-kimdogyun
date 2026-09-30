@@ -41,11 +41,29 @@ test('예산이 0 이하여도 깨지지 않고 평평하다', () => {
   assert.ok(s.points.every(p => p.y === 10));
 });
 
-test('구분선은 칸 사이 가운데, 경로는 직선으로만 이어진 열린 선이고 숫자가 유한하다', () => {
+test('날짜마다 카드 가운데 기준 평평한 바닥이 있고 높이는 부하를 따른다', () => {
+  const s = carpetShape({ ...base, loads: [0, 5, 10, 0, 0, 0, 0] });
+  // 칸 폭 90, 비율 0.6 -> 바닥 폭 54, 칸 가운데 45 -> 18 ~ 72
+  assert.equal(s.floors[1].x1, 118);
+  assert.equal(s.floors[1].x2, 172);
+  assert.equal(s.floors[0].y, 10);
+  assert.equal(s.floors[1].y, 40);
+  assert.equal(s.floors[2].y, 70);
+  assert.ok(s.linePath.includes('L 172 40'));
+});
+
+test('바닥 사이는 곡선이고 수평 접선이라 두 바닥 높이 밖으로 넘치지 않는다', () => {
+  const s = carpetShape({ ...base, loads: [0, 10, 0, 10, 0, 10, 0] });
+  const ys = s.linePath.split(/[MCL]/).join(' ').trim().split(/\s+/).map(Number).filter((_, i) => i % 2 === 1);
+  assert.ok(Math.min(...ys) >= 10 - 1e-9);
+  assert.ok(Math.max(...ys) <= 70 + 1e-9);
+  assert.ok(s.linePath.includes('C'));
+  assert.ok(!s.linePath.includes('Z'));
+});
+
+test('구분선은 칸 사이 가운데, 경로 숫자가 유한하다', () => {
   const s = carpetShape({ ...base, loads: [1, 2, 3, 4, 5, 6, 7] });
   assert.deepEqual(s.dividers, [95, 195, 295, 395, 495, 595]);
   assert.ok(s.linePath.startsWith('M 0 10'));
-  assert.ok(!s.linePath.includes('C') && !s.linePath.includes('Z'));
-  assert.equal((s.linePath.match(/L/g) || []).length, 8);
   assert.ok(!/NaN|Infinity/.test(s.linePath));
 });
