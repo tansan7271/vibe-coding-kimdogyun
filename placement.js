@@ -209,8 +209,54 @@
     return steps.map(s => results.get(s.id));
   }
 
+  // 월요일 시작 주의 첫 날
+  function weekStart(dateStr) {
+    return addDays(dateStr, -weekdayOf(dateStr));
+  }
+
+  /**
+   * 하루치 집계 (SPEC 4장). placeSteps 결과를 받아 그날의 부하, 여유, 남은 시간을 계산한다.
+   * @param {object} input
+   * @param {string} input.date "YYYY-MM-DD"
+   * @param {Array} input.steps placeSteps에 넣은 단계들
+   * @param {Array} input.placements placeSteps 결과
+   * @param {Array} input.events 일정 목록
+   */
+  function dayStats({ date, steps, placements, events, capacity, safeRatio, sleepHours, lifeHours }) {
+    const stepById = new Map(steps.map(s => [s.id, s]));
+    const dayEvents = eventsOnDate(events, date);
+    const daySteps = placements
+      .filter(p => p.date === date)
+      .map(p => ({ step: stepById.get(p.stepId), placement: p }));
+
+    const eventLoad = dayEvents.reduce((sum, ev) => sum + ev.load, 0);
+    const stepLoad = daySteps.reduce((sum, x) => sum + x.step.load, 0);
+    const load = eventLoad + stepLoad;
+    const eventMinutes = dayEvents.reduce((sum, ev) => sum + eventDurationMinutes(ev), 0);
+    const stepMinutes = daySteps.reduce((sum, x) => sum + x.step.minutes, 0);
+    const availableMinutes = (24 - sleepHours - lifeHours) * 60;
+    const minutesLeft = availableMinutes - eventMinutes - stepMinutes;
+
+    return {
+      date,
+      events: dayEvents,
+      steps: daySteps,
+      load,
+      capacity,
+      safeLimit: capacity * safeRatio,
+      slack: capacity - load,
+      minutesLeft,
+      availableMinutes,
+      overSafe: load > capacity * safeRatio,
+      overBudget: load > capacity,
+      overTime: minutesLeft < 0,
+    };
+  }
+
   return {
     placeSteps,
+    dayStats,
+    weekStart,
     addDays,
     weekdayOf,
     dateRange,

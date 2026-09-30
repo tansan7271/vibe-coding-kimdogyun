@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { placeSteps, addDays, weekdayOf, eventsOnDate } = require('./placement.js');
+const { placeSteps, dayStats, weekStart, addDays, weekdayOf, eventsOnDate } = require('./placement.js');
 
 const defaultSettings = {
   capacity: 10,
@@ -185,4 +185,56 @@ test('eventsOnDate: 반복 종료일 이후에는 매칭되지 않는다', () =>
   ];
   assert.equal(eventsOnDate(events, '2026-10-05').length, 1);
   assert.equal(eventsOnDate(events, '2026-10-12').length, 0);
+});
+
+test('weekStart: 월요일 시작, 일요일은 그 주 월요일로', () => {
+  assert.equal(weekStart('2026-09-30'), '2026-09-28'); // 수
+  assert.equal(weekStart('2026-09-28'), '2026-09-28'); // 월
+  assert.equal(weekStart('2026-10-04'), '2026-09-28'); // 일
+  assert.equal(weekStart('2026-10-05'), '2026-10-05'); // 다음 월
+});
+
+test('dayStats: 기본값, 아무것도 없는 날은 여유 전체와 가용 시간 전체', () => {
+  const s = dayStats({ date: '2026-10-01', steps: [], placements: [], events: [], ...defaultSettings });
+  assert.equal(s.load, 0);
+  assert.equal(s.slack, 10);
+  assert.equal(s.minutesLeft, 720);
+  assert.equal(s.overSafe, false);
+  assert.equal(s.overTime, false);
+});
+
+test('dayStats: 일정과 단계를 합산, 그날에 깔린 단계만 센다', () => {
+  const events = [{ id: 'e1', load: 3, start: '09:00', end: '12:00', repeat: 'none', date: '2026-10-01' }];
+  const steps = [step({ id: 's1', load: 4, minutes: 90 }), step({ id: 's2', load: 5, minutes: 60, order: 1 })];
+  const placements = [
+    { stepId: 's1', date: '2026-10-01' },
+    { stepId: 's2', date: '2026-10-02' },
+  ];
+  const s = dayStats({ date: '2026-10-01', steps, placements, events, ...defaultSettings });
+  assert.equal(s.load, 7);
+  assert.equal(s.slack, 3);
+  assert.equal(s.minutesLeft, 720 - 180 - 90);
+  assert.equal(s.steps.length, 1);
+});
+
+test('dayStats: 안전선 초과와 예산 초과, 시간 초과를 구분', () => {
+  const steps = [step({ id: 's1', load: 5, minutes: 60 }), step({ id: 's2', load: 4, minutes: 60, order: 1 }), step({ id: 's3', load: 2, minutes: 60, order: 2 })];
+  const pl = ids => ids.map(id => ({ stepId: id, date: '2026-10-01' }));
+  const base = { date: '2026-10-01', steps, events: [], ...defaultSettings };
+  const safe = dayStats({ ...base, placements: pl(['s1', 's2']) }); // 9 > 8
+  assert.equal(safe.overSafe, true);
+  assert.equal(safe.overBudget, false);
+  const over = dayStats({ ...base, placements: pl(['s1', 's2', 's3']) }); // 11
+  assert.equal(over.overBudget, true);
+  assert.equal(over.slack, -1);
+  const long = dayStats({ ...base, steps: [step({ id: 'L', load: 1, minutes: 780 })], placements: pl(['L']) });
+  assert.equal(long.overTime, true);
+  assert.equal(long.overSafe, false);
+  assert.equal(long.minutesLeft, -60);
+});
+
+test('dayStats: 매주 반복 일정은 해당 요일에 들어간다', () => {
+  const events = [{ id: 'e1', load: 2, start: '10:00', end: '11:00', repeat: 'weekly', weekday: 2 }];
+  assert.equal(dayStats({ date: '2026-09-30', steps: [], placements: [], events, ...defaultSettings }).load, 2); // 수
+  assert.equal(dayStats({ date: '2026-10-01', steps: [], placements: [], events, ...defaultSettings }).load, 0);
 });

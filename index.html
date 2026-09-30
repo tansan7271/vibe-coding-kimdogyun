@@ -271,6 +271,110 @@
   .settings-form input {
     width: 90px;
   }
+
+  .week-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .week-label {
+    font-size: 14px;
+    color: #444;
+    min-width: 150px;
+    text-align: center;
+  }
+
+  .week-strip {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(120px, 1fr));
+    gap: 8px;
+    overflow-x: auto;
+  }
+
+  .day-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    font-size: 12px;
+    border: 2px solid transparent;
+  }
+
+  .day-card.today { border-color: #b8203a; }
+  .day-card.past { background: #f0eeeb; }
+
+  .day-head {
+    font-weight: bold;
+    font-size: 13px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .today-badge {
+    font-size: 11px;
+    background: #b8203a;
+    color: #fff;
+    border-radius: 8px;
+    padding: 1px 6px;
+  }
+
+  .day-item {
+    padding: 3px 6px;
+    margin-bottom: 3px;
+    border-radius: 4px;
+    background: #f5f2ee;
+    overflow-wrap: anywhere;
+  }
+
+  .day-item.event { background: #e4e9f2; }
+  .day-item.step { background: #f8e3e7; }
+  .day-item.exceeded { border: 1px solid #b8203a; }
+
+  .day-item .tag {
+    font-size: 10px;
+    color: #b8203a;
+    font-weight: bold;
+  }
+
+  .day-items { margin-bottom: 8px; min-height: 24px; }
+
+  .bar-row { margin-top: 6px; }
+
+  .bar-label {
+    display: flex;
+    justify-content: space-between;
+    color: #555;
+    margin-bottom: 2px;
+  }
+
+  .bar-label .warn { color: #b8203a; font-weight: bold; }
+
+  .bar {
+    position: relative;
+    height: 10px;
+    background: #e6e2dc;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  .bar-fill { height: 100%; background: #6b8fc7; }
+  .bar-fill.over-safe { background: #e0a030; }
+  .bar-fill.over-budget { background: #b8203a; }
+  .bar-fill.time { background: #7aa88a; }
+  .bar-fill.over-time { background: #b8203a; }
+
+  .bar-safe-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #333;
+  }
+
+  .overdue-box { margin-top: 20px; }
 </style>
 </head>
 <body>
@@ -287,6 +391,14 @@
 <main>
   <section id="screen-carpet" class="screen active">
     <h1>카펫</h1>
+    <div class="week-nav">
+      <button class="btn btn-plain" id="week-prev" type="button">◀ 이전 주</button>
+      <span class="week-label" id="week-label"></span>
+      <button class="btn btn-plain" id="week-next" type="button">다음 주 ▶</button>
+      <button class="btn btn-plain" id="week-today" type="button">이번 주</button>
+    </div>
+    <div class="week-strip" id="week-strip"></div>
+    <div class="overdue-box" id="overdue-box"></div>
   </section>
 
   <section id="screen-goals" class="screen">
@@ -342,6 +454,7 @@
   </section>
 </main>
 
+<script src="placement.js"></script>
 <script>
   const STORAGE_KEY = 'radcarpet-data';
 
@@ -394,6 +507,7 @@
     state.settings.placeMode = state.settings.placeMode === 'fill' ? 'even' : 'fill';
     saveState();
     renderPlaceModeToggle();
+    renderCarpet();
   });
 
   renderPlaceModeToggle();
@@ -830,6 +944,100 @@
   bindSettingField('setting-sleep-hours', 'sleepHours');
   bindSettingField('setting-life-hours', 'lifeHours');
 
+  // ---- 카펫 화면 (막대 버전) ----
+
+  const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+  let weekOffset = 0; // 이번 주 기준 몇 주 뒤인가
+  const weekStrip = document.getElementById('week-strip');
+
+  function formatMinutes(min) {
+    const sign = min < 0 ? '-' : '';
+    const abs = Math.abs(min);
+    const h = Math.floor(abs / 60);
+    const m = abs % 60;
+    if (h && m) return `${sign}${h}시간 ${m}분`;
+    if (h) return `${sign}${h}시간`;
+    return `${sign}${m}분`;
+  }
+
+  function stepTagHtml(p) {
+    const tags = [];
+    if (p.overLoad) tags.push('부하 초과');
+    if (p.overTime) tags.push('시간 초과');
+    return tags.length ? ` <span class="tag">${tags.join('·')}</span>` : '';
+  }
+
+  function dayCardHtml(st, today, goalTitleById) {
+    const s = state.settings;
+    const loadPct = Math.min(100, (st.load / st.capacity) * 100);
+    const usedMin = st.availableMinutes - st.minutesLeft;
+    const timePct = st.availableMinutes > 0 ? Math.min(100, Math.max(0, (usedMin / st.availableMinutes) * 100)) : 100;
+    const loadClass = st.overBudget ? ' over-budget' : st.overSafe ? ' over-safe' : '';
+    const loadWarn = st.overBudget ? '<span class="warn">예산 초과</span>' : st.overSafe ? '<span class="warn">안전선 초과</span>' : '';
+    const slackText = st.slack < 0 ? `${st.slack} (초과)` : String(st.slack);
+
+    const eventsHtml = [...st.events]
+      .sort((a, b) => a.start.localeCompare(b.start))
+      .map(ev => `<div class="day-item event">${escapeHtml(ev.title)} <small>${ev.start}~${ev.end} · 부하 ${ev.load}</small></div>`)
+      .join('');
+    const stepsHtml = st.steps
+      .map(({ step, placement }) => `<div class="day-item step${placement.exceeded ? ' exceeded' : ''}">${escapeHtml(step.title)}${stepTagHtml(placement)}<br><small>${escapeHtml(goalTitleById.get(step.goalId) || '')} · 부하 ${step.load} · ${formatMinutes(step.minutes)}</small></div>`)
+      .join('');
+    const itemsHtml = eventsHtml + stepsHtml || '<div class="empty-hint">비어 있음</div>';
+    const [, m, d] = st.date.split('-').map(Number);
+
+    return `
+      <div class="day-card${st.date === today ? ' today' : ''}${st.date < today ? ' past' : ''}" data-date="${st.date}">
+        <div class="day-head"><span>${m}/${d} (${DAY_LABELS[Placement.weekdayOf(st.date)]})</span>${st.date === today ? '<span class="today-badge">오늘</span>' : ''}</div>
+        <div class="day-items">${itemsHtml}</div>
+        <div class="bar-row">
+          <div class="bar-label"><span>부하 ${st.load} / ${st.capacity}</span>${loadWarn}</div>
+          <div class="bar"><div class="bar-fill${loadClass}" style="width:${loadPct}%"></div><div class="bar-safe-line" style="left:${s.safeRatio * 100}%"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label"><span>여유</span><span class="${st.slack < 0 ? 'warn' : ''}">${slackText}</span></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label"><span>남은 시간 ${formatMinutes(st.minutesLeft)}</span>${st.overTime ? '<span class="warn">시간 초과</span>' : ''}</div>
+          <div class="bar"><div class="bar-fill time${st.overTime ? ' over-time' : ''}" style="width:${timePct}%"></div></div>
+        </div>
+      </div>`;
+  }
+
+  function renderCarpet() {
+    const s = state.settings;
+    const today = todayStr();
+    const activeSteps = state.steps.filter(st => !st.done);
+    const params = {
+      steps: activeSteps, goals: state.goals, events: state.events, today,
+      capacity: s.capacity, safeRatio: s.safeRatio, sleepHours: s.sleepHours, lifeHours: s.lifeHours, placeMode: s.placeMode,
+    };
+    const placements = Placement.placeSteps(params);
+    const goalTitleById = new Map(state.goals.map(g => [g.id, g.title]));
+
+    const start = Placement.addDays(Placement.weekStart(today), weekOffset * 7);
+    const dates = Placement.dateRange(start, Placement.addDays(start, 6));
+    document.getElementById('week-label').textContent = `${dates[0]} ~ ${dates[6]}`;
+    weekStrip.innerHTML = dates
+      .map(date => dayCardHtml(Placement.dayStats({ ...params, date, placements }), today, goalTitleById))
+      .join('');
+
+    const overdueSteps = placements
+      .filter(p => p.overdue)
+      .map(p => activeSteps.find(st => st.id === p.stepId));
+    document.getElementById('overdue-box').innerHTML = overdueSteps.length
+      ? `<h2>지남 (마감이 지나 깔리지 않은 단계)</h2>` + overdueSteps
+          .map(st => `<div class="day-item step">${escapeHtml(st.title)} <small>${escapeHtml(goalTitleById.get(st.goalId) || '')} · 마감 ${state.goals.find(g => g.id === st.goalId).deadline}</small></div>`)
+          .join('')
+      : '';
+  }
+
+  document.getElementById('week-prev').addEventListener('click', () => { weekOffset--; renderCarpet(); });
+  document.getElementById('week-next').addEventListener('click', () => { weekOffset++; renderCarpet(); });
+  document.getElementById('week-today').addEventListener('click', () => { weekOffset = 0; renderCarpet(); });
+
+  renderCarpet();
+
   const navButtons = document.querySelectorAll('nav button');
   const screens = document.querySelectorAll('.screen');
 
@@ -839,6 +1047,7 @@
 
       navButtons.forEach(b => b.classList.toggle('active', b === btn));
       screens.forEach(s => s.classList.toggle('active', s.id === `screen-${target}`));
+      if (target === 'carpet') renderCarpet();
     });
   });
 </script>
