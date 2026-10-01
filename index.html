@@ -83,6 +83,20 @@
     min-width: 160px;
   }
 
+  #ai-panel, #ai-draft {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 20px;
+  }
+  #ai-panel textarea { width: 100%; box-sizing: border-box; min-height: 120px; font-family: inherit; font-size: 14px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+  #ai-draft .ai-step-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  #ai-draft .ai-step-row input[type="text"] { flex: 1; min-width: 140px; }
+  #ai-draft .ai-step-row input[type="number"] { width: 70px; }
+  .ai-warn { color: #b8203a; font-size: 12px; }
+  .ai-note { color: #666; font-size: 12px; margin: 6px 0; }
+
   input, select {
     font-family: inherit;
     font-size: 14px;
@@ -434,7 +448,17 @@
       <input type="text" id="new-goal-title" placeholder="할 일 제목">
       <input type="date" id="new-goal-deadline">
       <button class="btn" id="add-goal-btn" type="button">할 일 추가</button>
+      <button class="btn btn-plain" id="ai-open-btn" type="button" style="display:none">텍스트로 만들기</button>
     </div>
+    <div id="ai-panel" style="display:none">
+      <div>요건을 붙여넣으면 AI가 할 일 초안을 만듭니다. 만든 뒤 고쳐서 확정해야 저장됩니다.</div>
+      <textarea id="ai-text" placeholder="과제 안내, 메모 등을 붙여넣으세요"></textarea>
+      <div class="ai-note">붙여넣은 글은 Anthropic API로 전송됩니다.</div>
+      <button class="btn" id="ai-run-btn" type="button">초안 만들기</button>
+      <button class="btn btn-plain" id="ai-cancel-btn" type="button">닫기</button>
+      <div id="ai-message" class="ai-warn" style="margin-top:8px"></div>
+    </div>
+    <div id="ai-draft" style="display:none"></div>
     <div id="goal-list"></div>
   </section>
 
@@ -479,6 +503,17 @@
       <label>생활 시간(시간) <input type="number" id="setting-life-hours" min="0" max="24"></label>
     </div>
 
+    <h2>AI 분해</h2>
+    <div class="settings-form">
+      <div class="ai-note">Anthropic API 키를 넣으면 할 일 화면에 "텍스트로 만들기"가 나타납니다. 키는 이 브라우저(localStorage)에만 저장되고 내보내기 파일에는 들어가지 않습니다. 키 없이도 앱은 모두 동작합니다.</div>
+      <div>
+        <input type="password" id="ai-key-input" placeholder="API 키" autocomplete="off" style="min-width:240px">
+        <button class="btn" id="ai-key-save" type="button">저장</button>
+        <button class="btn btn-plain" id="ai-key-delete" type="button">삭제</button>
+      </div>
+      <div id="ai-key-status" style="font-size:13px;color:#555"></div>
+    </div>
+
     <h2>데이터</h2>
     <div class="settings-form">
       <div>
@@ -494,6 +529,7 @@
 <script src="placement.js"></script>
 <script src="carpet.js"></script>
 <script src="data.js"></script>
+<script src="ai.js"></script>
 <script>
   // 카펫 모양 값. 숫자나 색을 바꾸고 새로고침하면 바로 보인다
   const CARPET_STYLE = {
@@ -1031,6 +1067,164 @@
   bindSettingField('setting-safe-ratio', 'safeRatio', v => v / 100, v => Math.round(v * 100));
   bindSettingField('setting-sleep-hours', 'sleepHours');
   bindSettingField('setting-life-hours', 'lifeHours');
+
+  // ---- AI 분해: 텍스트로 만들기 (SPEC 9장) ----
+
+  const aiOpenBtn = document.getElementById('ai-open-btn');
+  const aiPanel = document.getElementById('ai-panel');
+  const aiDraftBox = document.getElementById('ai-draft');
+  const aiMessage = document.getElementById('ai-message');
+  const aiKeyInput = document.getElementById('ai-key-input');
+  const aiKeyStatus = document.getElementById('ai-key-status');
+  let aiDraft = null; // 편집 중인 초안. 확정 전에는 state에 넣지 않는다
+  let aiBusy = false;
+
+  function hasAiKey() {
+    return !!(state.settings.apiKey && state.settings.apiKey.trim());
+  }
+
+  function renderAiKeyUi() {
+    aiOpenBtn.style.display = hasAiKey() ? '' : 'none';
+    aiKeyStatus.textContent = hasAiKey() ? 'API 키가 저장되어 있습니다.' : 'API 키가 없습니다. AI 기능은 숨겨져 있습니다.';
+    if (!hasAiKey()) { aiPanel.style.display = 'none'; closeAiDraft(); }
+  }
+
+  document.getElementById('ai-key-save').addEventListener('click', () => {
+    const v = aiKeyInput.value.trim();
+    if (!v) return;
+    state.settings.apiKey = v;
+    saveState();
+    aiKeyInput.value = '';
+    renderAiKeyUi();
+  });
+
+  document.getElementById('ai-key-delete').addEventListener('click', () => {
+    delete state.settings.apiKey;
+    saveState();
+    aiKeyInput.value = '';
+    renderAiKeyUi();
+  });
+
+  aiOpenBtn.addEventListener('click', () => {
+    aiPanel.style.display = aiPanel.style.display === 'none' ? '' : 'none';
+  });
+
+  document.getElementById('ai-cancel-btn').addEventListener('click', () => {
+    aiPanel.style.display = 'none';
+    aiMessage.textContent = '';
+  });
+
+  function closeAiDraft() {
+    aiDraft = null;
+    aiDraftBox.style.display = 'none';
+    aiDraftBox.innerHTML = '';
+  }
+
+  document.getElementById('ai-run-btn').addEventListener('click', async () => {
+    if (aiBusy) return;
+    const text = document.getElementById('ai-text').value.trim();
+    if (!text) { aiMessage.textContent = '붙여넣을 글이 비어 있습니다.'; return; }
+    if (text.length > Ai.MAX_TEXT_LENGTH) { aiMessage.textContent = `글이 너무 깁니다 (${Ai.MAX_TEXT_LENGTH}자까지). 줄여서 다시 시도하세요.`; return; }
+    if (!hasAiKey()) { renderAiKeyUi(); return; }
+
+    const runBtn = document.getElementById('ai-run-btn');
+    aiBusy = true;
+    runBtn.disabled = true;
+    aiMessage.textContent = 'AI가 나누는 중... (최대 30초)';
+    const today = todayStr();
+    const req = Ai.buildRequest({ text, today, apiKey: state.settings.apiKey.trim() });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    const manual = ' 할 일은 위의 입력칸에서 직접 추가할 수 있습니다.';
+    try {
+      const res = await fetch(req.url, { ...req.init, signal: controller.signal });
+      if (!res.ok) { aiMessage.textContent = Ai.describeHttpError(res.status) + manual; return; }
+      let json;
+      try { json = await res.json(); } catch (e) { aiMessage.textContent = '응답을 읽지 못했습니다.' + manual; return; }
+      const parsed = Ai.parseDraft(json, today);
+      if (!parsed.ok) { aiMessage.textContent = parsed.error + manual; return; }
+      aiMessage.textContent = '';
+      aiDraft = parsed.draft;
+      renderAiDraft();
+    } catch (e) {
+      aiMessage.textContent = (e.name === 'AbortError' ? '30초 안에 응답이 오지 않았습니다.' : '네트워크 오류로 AI를 부르지 못했습니다.') + manual;
+    } finally {
+      clearTimeout(timer);
+      aiBusy = false;
+      runBtn.disabled = false;
+    }
+  });
+
+  function renderAiDraft() {
+    const d = aiDraft;
+    aiDraftBox.style.display = '';
+    aiDraftBox.innerHTML = `
+      <div><strong>초안 (고쳐서 확정하면 저장됩니다)</strong></div>
+      <div class="ai-step-row" style="margin-top:8px">
+        <input type="text" id="ai-draft-title" value="${escapeAttr(d.title)}" placeholder="할 일 제목">
+        <input type="date" id="ai-draft-deadline" value="${escapeAttr(d.deadline)}">
+        ${d.deadlineWarn ? '<span class="ai-warn">마감일을 정해 주세요</span>' : ''}
+      </div>
+      ${d.steps.map((s, i) => `
+        <div class="ai-step-row">
+          <span>${i + 1}.</span>
+          <input type="text" data-ai-step="${i}" data-ai-field="title" value="${escapeAttr(s.title)}" placeholder="단계 제목">
+          <select data-ai-step="${i}" data-ai-field="load">${[1, 2, 3, 4, 5].map(l => `<option value="${l}"${s.load === l ? ' selected' : ''}>부하 ${l}</option>`).join('')}</select>
+          <input type="number" data-ai-step="${i}" data-ai-field="minutes" value="${s.minutes}" min="30" step="30"> 분
+          <button class="btn btn-plain" type="button" data-ai-del="${i}">지우기</button>
+          ${s.warn ? `<span class="ai-warn">${escapeHtml(s.warn)}</span>` : ''}
+        </div>`).join('')}
+      <div id="ai-draft-error" class="ai-warn"></div>
+      <button class="btn" id="ai-confirm-btn" type="button">확정해서 저장</button>
+      <button class="btn btn-plain" id="ai-discard-btn" type="button">버리기</button>`;
+  }
+
+  aiDraftBox.addEventListener('input', (e) => {
+    if (!aiDraft) return;
+    const t = e.target;
+    if (t.id === 'ai-draft-title') aiDraft.title = t.value;
+    else if (t.id === 'ai-draft-deadline') { aiDraft.deadline = t.value; aiDraft.deadlineWarn = false; }
+    else if (t.dataset.aiStep !== undefined) {
+      const step = aiDraft.steps[Number(t.dataset.aiStep)];
+      const f = t.dataset.aiField;
+      step[f] = f === 'title' ? t.value : Number(t.value);
+    }
+  });
+
+  aiDraftBox.addEventListener('click', (e) => {
+    if (!aiDraft) return;
+    const del = e.target.closest('[data-ai-del]');
+    if (del) { aiDraft.steps.splice(Number(del.dataset.aiDel), 1); renderAiDraft(); return; }
+    if (e.target.id === 'ai-discard-btn') { closeAiDraft(); return; }
+    if (e.target.id !== 'ai-confirm-btn') return;
+
+    const d = aiDraft;
+    const err = document.getElementById('ai-draft-error');
+    const title = d.title.trim();
+    if (!title) { err.textContent = '할 일 제목을 입력하세요.'; return; }
+    if (!Data.isDateStr(d.deadline)) { err.textContent = '마감일을 입력하세요.'; return; }
+    if (d.steps.length === 0) { err.textContent = '단계가 하나도 없습니다.'; return; }
+    for (const [i, s] of d.steps.entries()) {
+      if (!s.title.trim()) { err.textContent = `${i + 1}번 단계의 제목을 입력하세요.`; return; }
+      if (!(Number.isInteger(s.load) && s.load >= 1 && s.load <= 5)) { err.textContent = `${i + 1}번 단계의 부하는 1~5여야 합니다.`; return; }
+      if (!(s.minutes > 0)) { err.textContent = `${i + 1}번 단계의 예상 시간은 0보다 커야 합니다.`; return; }
+    }
+
+    const goalId = uid('goal');
+    state.goals.push({ id: goalId, title, deadline: d.deadline, createdAt: todayStr() });
+    d.steps.forEach((s, i) => {
+      state.steps.push({ id: uid('step'), goalId, title: s.title.trim(), load: s.load, minutes: s.minutes, order: i, done: false, pushCount: 0 });
+    });
+    saveState();
+    expandedGoals.add(goalId);
+    closeAiDraft();
+    aiPanel.style.display = 'none';
+    document.getElementById('ai-text').value = '';
+    renderGoals();
+    renderCarpet();
+  });
+
+  renderAiKeyUi();
 
   // ---- 데이터 내보내기/가져오기 (JSON 파일) ----
 
