@@ -131,7 +131,7 @@
 
 - 일정 목록과 추가: 제목, 요일 또는 날짜, 시작·종료 시각, 부하, 반복(없음 / 매주), 반복 종료일(선택)
 - 하루 예산, 안전선 비율, 수면 시간, 생활 시간
-- API 키 입력 (localStorage에만 저장, 화면에서 삭제 가능)
+- API 키 입력. **키는 어디에도 저장하지 않는다.** 페이지가 열려 있는 동안 메모리에만 두고, 새로고침하거나 탭을 닫으면 사라진다. 화면에서 바로 지울 수도 있다
 - 데이터 내보내기/가져오기 (JSON 파일)
 
 ## 8. 데이터
@@ -148,12 +148,13 @@ Event    { id, title, load: 1..5, weekday?: 0..6, date?: "YYYY-MM-DD",
            start: "HH:MM", end: "HH:MM",
            repeat: "none"|"weekly", repeatUntil?: "YYYY-MM-DD" }
 Settings { capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 4,
-           placeMode: "fill"|"even", apiKey?: string }
+           placeMode: "fill"|"even" }
 ```
 
 ## 9. AI 분해 (선택 기능, 마지막에)
 
-- 사용자 키 필요. 키는 localStorage. 저장소에 절대 커밋하지 않는다
+- 사용자 키 필요. 키는 저장하지 않는다(localStorage, sessionStorage, 내보내기 파일 어디에도 쓰지 않는다). 메모리에만 둔다. 저장소에 절대 커밋하지 않는다
+- 이전 버전이 localStorage에 남긴 키가 있으면 앱을 열 때 지운다
 - 입력: 붙여넣은 텍스트 (+ 오늘 날짜). 출력: JSON {title, deadline, steps:[{title, load, minutes}]}
 - 결과는 항상 편집 화면을 거친 뒤 저장. 자동 저장 없음
 - 브라우저에서 직접 호출할 때 필요한 헤더와 CORS 조건은 구현 전에 공식 문서로 확인한다
