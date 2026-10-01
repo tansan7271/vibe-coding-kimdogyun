@@ -119,3 +119,15 @@ test('격주·매월 일정: 시작 날짜 필수, 매주 시작 날짜는 선�
   assert.match(parse(mod(o => { o.events[0] = { ...event, date: '10/05' }; })).error, /시작 날짜/);
   assert.equal(parse(mod(() => {})).ok, true); // 시작일 없는 옛 매주 데이터
 });
+
+test('skipDates: 반복 일정의 날짜 목록만 허용, 중복은 정리해 날짜순으로', () => {
+  const ok = parse(mod(o => { o.events[0].skipDates = ['2026-10-12', '2026-10-05', '2026-10-12']; }));
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.state.events[0].skipDates, ['2026-10-05', '2026-10-12']);
+  assert.equal(parse(mod(o => { o.events[0].skipDates = []; })).ok, true);
+  assert.match(parse(mod(o => { o.events[0].skipDates = ['10/05']; })).error, /skipDates/);
+  assert.match(parse(mod(o => { o.events[0].skipDates = '2026-10-05'; })).error, /skipDates/);
+  assert.match(parse(mod(o => { o.events[0] = { ...event, repeat: 'none', date: '2026-10-03', skipDates: ['2026-10-03'] }; })).error, /반복 일정이 아닌데/);
+  const r = parse(mod(() => {}));
+  assert.equal('skipDates' in r.state.events[0], false); // 없으면 만들지 않는다
+});

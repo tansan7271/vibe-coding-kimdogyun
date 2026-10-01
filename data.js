@@ -120,6 +120,10 @@
       } else {
         return fail(`${at}의 반복(repeat)은 none, weekly, biweekly, monthly 중 하나여야 합니다.`);
       }
+      if (ev.skipDates !== undefined) {
+        if (ev.repeat === 'none') return fail(`${at}은 반복 일정이 아닌데 뺀 날(skipDates)이 있습니다.`);
+        if (!Array.isArray(ev.skipDates) || !ev.skipDates.every(isDateStr)) return fail(`${at}의 뺀 날(skipDates)이 YYYY-MM-DD 날짜의 목록이 아닙니다.`);
+      }
     }
 
     const inSettings = raw.settings === undefined ? {} : raw.settings;
@@ -137,8 +141,14 @@
 
     return {
       ok: true,
-      state: { version: 1, goals: raw.goals, steps: raw.steps, events: raw.events, settings },
+      state: { version: 1, goals: raw.goals, steps: raw.steps, events: raw.events.map(normalizeSkipDates), settings },
     };
+  }
+
+  // 뺀 날은 중복 없이 날짜순으로
+  function normalizeSkipDates(ev) {
+    if (ev.skipDates === undefined) return ev;
+    return { ...ev, skipDates: [...new Set(ev.skipDates)].sort() };
   }
 
   function fail(error) {

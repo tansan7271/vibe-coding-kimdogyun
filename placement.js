@@ -70,13 +70,14 @@
   }
 
   /**
-   * 일정이 그 날에 있는가. 반복은 시작일(ev.date) 이전에는 없다. 날짜는 전부 YYYY-MM-DD 문자열로 다룬다.
+   * 일정이 그 날에 있는가. 반복은 시작일(ev.date) 이전에는 없고, skipDates에 든 날도 없다. 날짜는 전부 YYYY-MM-DD 문자열로 다룬다.
    * - weekly: ev.weekday 요일마다. 시작일은 선택 (옛 데이터에는 없다 -> 처음부터 있는 것으로 본다)
    * - biweekly: 시작일과 같은 요일, 2주마다
    * - monthly: 시작일의 '일'마다. 그 달에 그 날이 없으면 그 달의 마지막 날 (31일 -> 4월 30일, 2월 28/29일)
    */
   function eventMatchesDate(ev, dateStr) {
     if (ev.repeat === 'none' || !ev.repeat) return ev.date === dateStr;
+    if (ev.skipDates && ev.skipDates.includes(dateStr)) return false; // 반복 예외: 이 날만 뺀다
     if (ev.date && dateStr < ev.date) return false;
     if (ev.repeatUntil && dateStr > ev.repeatUntil) return false;
     if (ev.repeat === 'weekly') return weekdayOf(dateStr) === ev.weekday;

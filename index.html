@@ -263,6 +263,7 @@
     flex-wrap: wrap;
   }
 
+  .event-row .skipped-dates { flex-basis: 100%; font-size: 12px; color: #555; }
   .event-row .event-title-input {
     flex: 1;
     min-width: 120px;
@@ -359,6 +360,16 @@
   }
 
   .day-item.event { background: #e4e9f2; }
+  .skip-btn {
+    font-size: 11px;
+    padding: 1px 6px;
+    margin-left: 4px;
+    border: 1px solid #aab4c8;
+    border-radius: 4px;
+    background: #fff;
+    color: #445;
+    cursor: pointer;
+  }
   .day-item.step { background: #f8e3e7; }
   .day-item.exceeded { border: 1px solid #b8203a; }
 
@@ -940,6 +951,13 @@
     return dateInput;
   }
 
+  // 뺀 날 목록과 되돌리기 (SPEC에는 없는 실수 복구용)
+  function skippedDatesHtml(ev) {
+    if (!ev.skipDates || ev.skipDates.length === 0) return '';
+    const items = ev.skipDates.map(d => `${d.slice(5).replace('-', '/')} <button type="button" class="skip-btn" data-action="unskip-event-day" data-event-id="${ev.id}" data-date="${d}">되돌리기</button>`).join(' · ');
+    return `<div class="skipped-dates">뺀 날: ${items}</div>`;
+  }
+
   function eventRowHtml(ev) {
     return `
       <div class="event-row" data-event-id="${ev.id}">
@@ -954,6 +972,7 @@
         <input type="time" data-field="end" data-event-id="${ev.id}" value="${ev.end}">
         ${loadPickerHtml(ev.id, ev.load)}
         <button type="button" class="btn btn-danger" data-action="delete-event" data-event-id="${ev.id}">삭제</button>
+        ${skippedDatesHtml(ev)}
       </div>`;
   }
 
@@ -1032,6 +1051,17 @@
       return;
     }
 
+    if (target.dataset.action === 'unskip-event-day') {
+      const ev = state.events.find(x => x.id === target.dataset.eventId);
+      if (!ev || !ev.skipDates) return;
+      ev.skipDates = ev.skipDates.filter(d => d !== target.dataset.date);
+      if (ev.skipDates.length === 0) delete ev.skipDates;
+      saveState();
+      renderEvents();
+      renderCarpet();
+      return;
+    }
+
     if (target.dataset.action === 'select-load') {
       const ev = state.events.find(ev => ev.id === target.dataset.loadKey);
       if (ev) {
@@ -1059,6 +1089,7 @@
       if (ev.repeat === 'none') {
         delete ev.weekday;
         delete ev.repeatUntil;
+        delete ev.skipDates;
         if (!ev.date) ev.date = todayStr();
       } else if (ev.repeat === 'weekly') {
         if (ev.weekday === undefined) ev.weekday = Placement.weekdayOf(ev.date || todayStr());
@@ -1399,7 +1430,7 @@
 
     const eventsHtml = [...st.events]
       .sort((a, b) => a.start.localeCompare(b.start))
-      .map(ev => `<div class="day-item event">${escapeHtml(ev.title)} <small>${ev.start}~${ev.end} · 부하 ${ev.load}</small></div>`)
+      .map(ev => `<div class="day-item event">${escapeHtml(ev.title)} <small>${ev.start}~${ev.end} · 부하 ${ev.load}</small>${ev.repeat !== 'none' ? ` <button type="button" class="skip-btn" data-action="skip-event-day" data-event-id="${ev.id}" data-date="${st.date}">이 날만 빼기</button>` : ''}</div>`)
       .join('');
     const stepsHtml = st.steps
       .map(({ step, placement }) => clickableStepHtml(step, goalTitleById.get(step.goalId) || '', placement, false))
@@ -1534,6 +1565,18 @@
     const today = todayStr();
     if (target.disabled) return;
     const dateValue = () => { const el = document.getElementById('step-menu-date'); return el ? el.value : ''; };
+
+    if (action === 'skip-event-day') {
+      // 반복 예외: 그 날 하루만 뺀다 (SPEC 10장). 개별 회차 편집은 하지 않는다
+      const ev = state.events.find(x => x.id === target.dataset.eventId);
+      const date = target.dataset.date;
+      if (!ev || ev.repeat === 'none' || !date) return;
+      ev.skipDates = [...new Set([...(ev.skipDates || []), date])].sort();
+      saveState();
+      renderCarpet();
+      renderEvents();
+      return;
+    }
 
     if (action === 'open-step-menu') {
       openMenu = openMenu && openMenu.stepId === step.id ? null : { stepId: step.id, mode: 'menu' };

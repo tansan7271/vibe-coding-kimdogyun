@@ -421,3 +421,21 @@ test('weekSummary: 완료한 단계만 있는 주도 기록이 있다', () => {
   const r = weekSummary(weekOf([], [done1('2026-09-27', 2, 1)]));
   assert.deepEqual(r, { empty: false, totalLoad: 2, overBudgetDays: 0, overSafeOnlyDays: 0, overTimeDays: 0, pushCount: 1 });
 });
+
+test('반복 예외: skipDates의 날만 빠지고 다음 회차는 남는다 (매주·격주·매월)', () => {
+  const weekly = rep({ repeat: 'weekly', weekday: 0, date: '2026-10-05', skipDates: ['2026-10-12'] });
+  assert.deepEqual(evOn(weekly, '2026-10-01', '2026-10-26'), ['2026-10-05', '2026-10-19', '2026-10-26']);
+  const bi = rep({ repeat: 'biweekly', date: '2026-10-01', skipDates: ['2026-10-15'] });
+  assert.deepEqual(evOn(bi, '2026-10-01', '2026-11-12'), ['2026-10-01', '2026-10-29', '2026-11-12']);
+  const mo = rep({ repeat: 'monthly', date: '2026-01-31', skipDates: ['2026-02-28'] });
+  assert.deepEqual(evOn(mo, '2026-01-01', '2026-04-30'), ['2026-01-31', '2026-03-31', '2026-04-30']);
+});
+
+test('반복 예외: 빈 목록·없는 목록은 영향 없고, 뺀 날은 그 날 부하에서 빠진다', () => {
+  assert.deepEqual(evOn(rep({ repeat: 'weekly', weekday: 0, date: '2026-10-05', skipDates: [] }), '2026-10-01', '2026-10-12'), ['2026-10-05', '2026-10-12']);
+  const mk = skip => dayStats({ date: '2026-10-15', steps: [], placements: [], events: [rep({ repeat: 'biweekly', date: '2026-10-01', load: 4, skipDates: skip })], capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 4 });
+  assert.equal(mk([]).load, 4);
+  assert.equal(mk(['2026-10-15']).load, 0);
+  assert.equal(mk(['2026-10-15']).minutesLeft, 720);
+  assert.equal(mk(['2026-10-01']).load, 4); // 다른 날을 뺐으면 그대로
+});
