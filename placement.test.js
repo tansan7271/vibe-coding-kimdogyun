@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate } = require('./placement.js');
+const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate } = require('./placement.js');
 
 const defaultSettings = {
   capacity: 10,
@@ -300,4 +300,38 @@ test('이 날 안 함: 미래 날에 깔린 단계를 밀면 그 날 다음 날�
   assert.equal(before[0].date, '2026-10-02');
   const after = placeSteps({ steps: [step({ earliestDate: pushEarliestDate(before[0].date) })], doneSteps: done, goals, events: [], today: '2026-10-01', ...defaultSettings });
   assert.equal(after[0].date, '2026-10-03');
+});
+
+test('autoPush: 깔린 날이 어제 이전인 미완료 단계만 오늘부터로 밀고 밀림 +1', () => {
+  const steps = [
+    step({ id: 'y', placedDate: '2026-09-30', pushCount: 1 }),
+    step({ id: 't', placedDate: '2026-10-01' }),
+    step({ id: 'f', placedDate: '2026-10-02' }),
+    step({ id: 'n' }),
+    step({ id: 'd', placedDate: '2026-09-01', done: true, doneDate: '2026-09-01' }),
+  ];
+  const r = autoPush({ steps, today: '2026-10-01' });
+  assert.deepEqual(r.pushedIds, ['y']);
+  assert.equal(r.steps[0].earliestDate, '2026-10-01');
+  assert.equal(r.steps[0].pushCount, 2);
+  assert.equal(r.steps[0].placedDate, undefined);
+  assert.equal(r.steps[1], steps[1]);
+  assert.equal(r.steps[3], steps[3]);
+  assert.equal(r.steps[4], steps[4]);
+  assert.equal(steps[0].pushCount, 1); // 원본 그대로
+});
+
+test('autoPush: 연말 경계, 이미 있던 earliestDate가 오늘보다 이르면 오늘로, 고정은 풀린다', () => {
+  const r = autoPush({ steps: [step({ placedDate: '2026-12-31', earliestDate: '2026-12-31', pinnedDate: '2026-12-31' })], today: '2027-01-01' });
+  assert.equal(r.steps[0].earliestDate, '2027-01-01');
+  assert.equal(r.steps[0].pushCount, 1);
+  assert.equal('pinnedDate' in r.steps[0], false);
+  assert.deepEqual(autoPush({ steps: [], today: '2026-10-01' }), { steps: [], pushedIds: [] });
+});
+
+test('autoPush 뒤에 다시 깔면 오늘 이후에 깔린다', () => {
+  const goals = [goal('g1', '2026-10-10')];
+  const { steps } = autoPush({ steps: [step({ placedDate: '2026-09-30' })], today: '2026-10-01' });
+  const r = placeSteps({ steps, goals, events: [], today: '2026-10-01', ...defaultSettings });
+  assert.equal(r[0].date, '2026-10-01');
 });

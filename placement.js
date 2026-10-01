@@ -274,8 +274,26 @@
     };
   }
 
+  /**
+   * 앱을 열었을 때: 깔린 날이 오늘보다 이전인데 미완료인 단계는 밀린 것으로 처리한다 (SPEC 5장 밀림).
+   * 시작 가능일 = 오늘, 밀린 횟수 +1. 고정된 단계는 고정을 풀고 같이 처리한다.
+   * 깔린 날을 모르는 단계(placedDate 없음)와 완료된 단계는 건드리지 않는다.
+   * @returns {{steps: object[], pushedIds: string[]}} 원본은 바꾸지 않는다
+   */
+  function autoPush({ steps, today }) {
+    const pushedIds = [];
+    const next = steps.map(step => {
+      if (step.done || !step.placedDate || step.placedDate >= today) return step;
+      pushedIds.push(step.id);
+      const { pinnedDate, ...rest } = step;
+      return { ...rest, earliestDate: maxDateStr(today, step.earliestDate), pushCount: (step.pushCount || 0) + 1, placedDate: undefined };
+    });
+    return { steps: next, pushedIds };
+  }
+
   return {
     placeSteps,
+    autoPush,
     dayStats,
     weekStart,
     pushEarliestDate,

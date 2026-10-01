@@ -550,6 +550,14 @@
 
   const state = loadState();
 
+  // 앱을 열었을 때: 깔린 날이 지난 미완료 단계는 밀린 것으로 처리한다 (SPEC 5장 밀림)
+  (function applyAutoPush() {
+    const r = Placement.autoPush({ steps: state.steps, today: todayStr() });
+    if (r.pushedIds.length === 0) return;
+    state.steps = r.steps;
+    saveState();
+  })();
+
   const PLACE_MODE_LABELS = {
     fill: '깔기 방식: 채우기 우선',
     even: '깔기 방식: 고르게',
@@ -1151,6 +1159,14 @@
       capacity: s.capacity, safeRatio: s.safeRatio, sleepHours: s.sleepHours, lifeHours: s.lifeHours, placeMode: s.placeMode,
     };
     const placements = Placement.placeSteps(params);
+    // 마지막 배치 결과를 저장해 둔다 (다음에 앱을 열 때 자동 밀림 판정에 쓴다)
+    let placedChanged = false;
+    placements.forEach(p => {
+      const st = activeSteps.find(x => x.id === p.stepId);
+      const date = p.date || undefined;
+      if (st.placedDate !== date) { st.placedDate = date; placedChanged = true; }
+    });
+    if (placedChanged) saveState();
     const goalTitleById = new Map(state.goals.map(g => [g.id, g.title]));
 
     const start = Placement.addDays(Placement.weekStart(today), weekOffset * 7);
