@@ -293,6 +293,17 @@
     margin-bottom: 12px;
   }
 
+  .week-summary {
+    font-size: 13px;
+    color: #444;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+  }
+  .week-summary .note { color: #888; font-size: 12px; }
+
   .week-label {
     font-size: 14px;
     color: #444;
@@ -435,6 +446,7 @@
       <button class="btn btn-plain" id="week-next" type="button">다음 주 ▶</button>
       <button class="btn btn-plain" id="week-today" type="button">이번 주</button>
     </div>
+    <div id="week-summary" class="week-summary" style="display:none"></div>
     <div class="week-scroll">
       <svg id="carpet-svg" height="170" aria-label="이번 주 카펫: 부하만큼 아래로 처집니다"></svg>
       <div class="week-strip" id="week-strip"></div>
@@ -1455,6 +1467,19 @@
 
   window.addEventListener('resize', drawCarpet);
 
+  // 지난 주(이번 주보다 이전)를 보고 있을 때만 주간 요약을 보여 준다 (SPEC 10장)
+  function renderWeekSummary(weekStats) {
+    const box = document.getElementById('week-summary');
+    if (weekOffset >= 0) { box.style.display = 'none'; return; }
+    const r = Placement.weekSummary(weekStats);
+    box.style.display = '';
+    box.innerHTML = r.empty
+      ? '이 주는 기록이 없습니다.'
+      : `총 부하 <strong>${r.totalLoad}</strong>`
+        + ` · 예산 초과 <strong>${r.overBudgetDays}</strong>일 · 안전선만 넘음 <strong>${r.overSafeOnlyDays}</strong>일 · 시간 초과 <strong>${r.overTimeDays}</strong>일`
+        + ` · 밀림 <strong>${r.pushCount}</strong>회 <span class="note">(완료한 단계 기준)</span>`;
+  }
+
   function renderCarpet() {
     const s = state.settings;
     const today = todayStr();
@@ -1480,6 +1505,7 @@
     document.getElementById('week-label').textContent = `${dates[0]} ~ ${dates[6]}`;
     const weekStats = dates.map(date => Placement.dayStats({ ...params, date, placements }));
     weekStrip.innerHTML = weekStats.map(st => dayCardHtml(st, today, goalTitleById)).join('');
+    renderWeekSummary(weekStats);
     lastCarpet = {
       loads: weekStats.map(st => st.load),
       pushes: weekStats.map(st => st.steps.reduce((sum, x) => sum + (x.step.pushCount || 0), 0)),

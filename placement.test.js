@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange } = require('./placement.js');
+const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange, weekSummary } = require('./placement.js');
 
 const defaultSettings = {
   capacity: 10,
@@ -376,4 +376,48 @@ test('nextWeekday: 오늘 포함, 월말·연말 경계', () => {
 test('일정 부하는 반복 종류와 상관없이 그날 부하에 들어간다', () => {
   const stats = dayStats({ date: '2026-10-15', steps: [], placements: [], events: [rep({ repeat: 'biweekly', date: '2026-10-01', load: 4 })], capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 4 });
   assert.equal(stats.load, 4);
+});
+
+const settings = { capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 4 };
+const weekOf = (events, doneSteps) => dateRange('2026-09-21', '2026-09-27').map(date => dayStats({ date, steps: [], placements: [], events, doneSteps, ...settings }));
+const ev1 = (id, date, load, start = '09:00', end = '10:00') => ({ id, title: id, load, start, end, repeat: 'none', date });
+const done1 = (date, load, pushCount, minutes = 60) => ({ id: `d${date}${load}`, load, minutes, doneDate: date, pushCount });
+
+test('weekSummary: 기록이 없는 주는 empty (첫 사용·빈 주)', () => {
+  const r = weekSummary(weekOf([], []));
+  assert.equal(r.empty, true);
+  assert.equal(r.totalLoad, 0);
+  assert.equal(r.pushCount, 0);
+});
+
+test('weekSummary: 일정만 있는 주도 기록이 있다. 총 부하는 일정 부하 합', () => {
+  const r = weekSummary(weekOf([ev1('a', '2026-09-22', 3), ev1('b', '2026-09-24', 2)], []));
+  assert.equal(r.empty, false);
+  assert.equal(r.totalLoad, 5);
+  assert.equal(r.pushCount, 0);
+});
+
+test('weekSummary: 예산 정확히는 초과가 아니고, 안전선과 같으면 안전선도 아니다', () => {
+  const r = weekSummary(weekOf([ev1('a', '2026-09-21', 5), ev1('b', '2026-09-21', 5), ev1('c', '2026-09-22', 5), ev1('d', '2026-09-22', 3)], []));
+  // 월: 10 (예산과 같음 -> 안전선만 초과), 화: 8 (안전선과 같음 -> 초과 아님)
+  assert.equal(r.overBudgetDays, 0);
+  assert.equal(r.overSafeOnlyDays, 1);
+  assert.equal(r.totalLoad, 18);
+});
+
+test('weekSummary: 예산·안전선·시간 초과를 따로 세고 완료 단계의 밀림 횟수를 합한다', () => {
+  const events = [ev1('a', '2026-09-21', 5), ev1('b', '2026-09-21', 5), ev1('c', '2026-09-21', 1), ev1('long', '2026-09-23', 1, '08:00', '21:00')];
+  const done = [done1('2026-09-22', 5, 2), done1('2026-09-22', 4, 0), done1('2026-09-25', 1, 3), done1('2026-09-26', 1, undefined)];
+  const r = weekSummary(weekOf(events, done));
+  assert.equal(r.overBudgetDays, 1); // 월 11
+  assert.equal(r.overSafeOnlyDays, 1); // 화 9
+  assert.equal(r.overTimeDays, 1); // 수 13시간 일정 > 가용 12시간
+  assert.equal(r.pushCount, 5);
+  assert.equal(r.totalLoad, 11 + 9 + 1 + 1 + 1);
+  assert.equal(r.empty, false);
+});
+
+test('weekSummary: 완료한 단계만 있는 주도 기록이 있다', () => {
+  const r = weekSummary(weekOf([], [done1('2026-09-27', 2, 1)]));
+  assert.deepEqual(r, { empty: false, totalLoad: 2, overBudgetDays: 0, overSafeOnlyDays: 0, overTimeDays: 0, pushCount: 1 });
 });
