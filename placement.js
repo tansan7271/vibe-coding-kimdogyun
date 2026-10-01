@@ -248,6 +248,17 @@
   }
 
   // 마감일에 깔려 있으면 더 미룰 수 없다
+  /**
+   * 카펫에서 단계를 끌어 놓았을 때 고정할 수 있는가 (SPEC 10장 드래그로 옮기기).
+   * 같은 날은 아무 일도 없다(reason 없음). 지난 날짜에는 고정할 수 없다. 마감 이후 날은 기존 고정 규칙처럼 막지 않는다.
+   * @returns {{ok:boolean, reason:string|null}}
+   */
+  function canDropPin({ fromDate, toDate, today }) {
+    if (toDate === fromDate) return { ok: false, reason: null };
+    if (toDate < today) return { ok: false, reason: '지난 날짜에는 고정할 수 없습니다.' };
+    return { ok: true, reason: null };
+  }
+
   function canPush({ placedDate, deadline }) {
     if (placedDate >= deadline) {
       return { ok: false, reason: '마감일에 깔려 있어 더 미룰 수 없습니다' };
@@ -344,6 +355,7 @@
     weekStart,
     pushEarliestDate,
     canPush,
+    canDropPin,
     addDays,
     weekdayOf,
     nextWeekday,

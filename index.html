@@ -360,6 +360,14 @@
   }
 
   .day-item.event { background: #e4e9f2; }
+  /* 끌어서 옮기기 */
+  .week-strip .day-item.step.clickable { cursor: grab; }
+  body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-select: none; cursor: grabbing !important; }
+  .drag-ghost { position: fixed; z-index: 1000; pointer-events: none; opacity: 0.85; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 220px; }
+  .day-card.drop-ok { outline: 2px solid #b8203a; outline-offset: -2px; }
+  .day-card.drop-bad { opacity: 0.5; }
+  .day-item.step.drag-source { opacity: 0.4; }
+  .drag-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 1001; }
   .skip-btn {
     font-size: 11px;
     padding: 1px 6px;
@@ -1556,6 +1564,125 @@
   document.getElementById('week-prev').addEventListener('click', () => { weekOffset--; renderCarpet(); });
   document.getElementById('week-next').addEventListener('click', () => { weekOffset++; renderCarpet(); });
   document.getElementById('week-today').addEventListener('click', () => { weekOffset = 0; renderCarpet(); });
+
+  // ---- 카펫에서 단계를 끌어 다른 날에 놓으면 그 날에 고정 (SPEC 10장). 포인터 이벤트라 마우스·터치·펜이 같다 ----
+  // 마우스·펜: 6px 넘게 움직이면 끌기 시작. 터치: 0.3초 길게 눌러야 시작하고, 그 전에 움직이면 좌우 스크롤로 둔다
+  const DRAG_MOVE_PX = 6;
+  const DRAG_LONG_PRESS_MS = 300;
+  let drag = null; // { stepEl, stepId, fromDate, startX, startY, pointerId, touch, started, timer, ghost }
+  let suppressClick = false;
+
+  function dropTargetCard(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const card = el && el.closest('.day-card');
+    return card && weekStrip.contains(card) ? card : null;
+  }
+
+  function showDragToast(text) {
+    const t = document.createElement('div');
+    t.className = 'drag-toast';
+    t.textContent = text;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2000);
+  }
+
+  function startDrag(x, y) {
+    drag.started = true;
+    document.body.classList.add('dragging-step');
+    drag.stepEl.classList.add('drag-source');
+    const g = drag.stepEl.cloneNode(true);
+    g.classList.add('drag-ghost');
+    g.removeAttribute('data-action');
+    g.style.width = `${drag.stepEl.getBoundingClientRect().width}px`;
+    document.body.appendChild(g);
+    drag.ghost = g;
+    moveDrag(x, y);
+  }
+
+  function moveDrag(x, y) {
+    drag.ghost.style.left = `${x + 8}px`;
+    drag.ghost.style.top = `${y + 8}px`;
+    const today = todayStr();
+    weekStrip.querySelectorAll('.day-card').forEach(c => c.classList.remove('drop-ok', 'drop-bad'));
+    const card = dropTargetCard(x, y);
+    if (!card || card.dataset.date === drag.fromDate) return;
+    const r = Placement.canDropPin({ fromDate: drag.fromDate, toDate: card.dataset.date, today });
+    card.classList.add(r.ok ? 'drop-ok' : 'drop-bad');
+  }
+
+  function endDrag(x, y, cancelled) {
+    const d = drag;
+    drag = null;
+    clearTimeout(d.timer);
+    document.removeEventListener('pointermove', onDragPointerMove);
+    document.removeEventListener('pointerup', onDragPointerUp);
+    document.removeEventListener('pointercancel', onDragPointerCancel);
+    if (!d.started) return;
+    suppressClick = true; // 끌고 난 직후의 클릭이 메뉴를 열지 않게
+    setTimeout(() => { suppressClick = false; }, 0);
+    document.body.classList.remove('dragging-step');
+    d.ghost.remove();
+    d.stepEl.classList.remove('drag-source');
+    weekStrip.querySelectorAll('.day-card').forEach(c => c.classList.remove('drop-ok', 'drop-bad'));
+    if (cancelled) return;
+    const card = dropTargetCard(x, y);
+    if (!card) return;
+    const r = Placement.canDropPin({ fromDate: d.fromDate, toDate: card.dataset.date, today: todayStr() });
+    if (!r.ok) { if (r.reason) showDragToast(r.reason); return; }
+    const step = state.steps.find(s => s.id === d.stepId);
+    if (!step || step.done) return;
+    step.pinnedDate = card.dataset.date;
+    openMenu = null;
+    saveState();
+    renderCarpet();
+  }
+
+  function onDragPointerMove(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    if (!drag.started) {
+      const moved = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+      if (drag.touch) {
+        // 길게 누르기 전에 움직였으면 스크롤하려는 것이니 끌기를 포기한다
+        if (moved > DRAG_MOVE_PX * 2) { clearTimeout(drag.timer); drag = null; removeDragListeners(); }
+      } else if (moved > DRAG_MOVE_PX) {
+        startDrag(e.clientX, e.clientY);
+      }
+      return;
+    }
+    e.preventDefault();
+    moveDrag(e.clientX, e.clientY);
+  }
+  function onDragPointerUp(e) { if (drag && e.pointerId === drag.pointerId) endDrag(e.clientX, e.clientY, false); }
+  function onDragPointerCancel(e) { if (drag && e.pointerId === drag.pointerId) endDrag(e.clientX, e.clientY, true); }
+  function removeDragListeners() {
+    document.removeEventListener('pointermove', onDragPointerMove);
+    document.removeEventListener('pointerup', onDragPointerUp);
+    document.removeEventListener('pointercancel', onDragPointerCancel);
+  }
+
+  weekStrip.addEventListener('pointerdown', (e) => {
+    if (drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const stepEl = e.target.closest('.day-item.step.clickable');
+    if (!stepEl || e.target.closest('button, input, select')) return;
+    const card = stepEl.closest('.day-card');
+    drag = {
+      stepEl, stepId: stepEl.dataset.stepId, fromDate: card.dataset.date,
+      startX: e.clientX, startY: e.clientY, pointerId: e.pointerId,
+      touch: e.pointerType === 'touch', started: false, timer: null, ghost: null,
+    };
+    if (drag.touch) {
+      const pending = drag;
+      drag.timer = setTimeout(() => { if (drag === pending) startDrag(pending.startX, pending.startY); }, DRAG_LONG_PRESS_MS);
+    }
+    document.addEventListener('pointermove', onDragPointerMove);
+    document.addEventListener('pointerup', onDragPointerUp);
+    document.addEventListener('pointercancel', onDragPointerCancel);
+  });
+
+  // 끌기가 시작된 뒤에는 터치가 화면을 스크롤하지 않게 막는다 (passive: false여야 막을 수 있다)
+  document.addEventListener('touchmove', (e) => { if (drag && drag.started) e.preventDefault(); }, { passive: false });
+  weekStrip.addEventListener('contextmenu', (e) => { if (drag) e.preventDefault(); }); // 길게 누르면 뜨는 메뉴 막기
+  document.addEventListener('click', (e) => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
 
   document.getElementById('screen-carpet').addEventListener('click', (e) => {
     const target = e.target.closest('[data-action]');

@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange, weekSummary } = require('./placement.js');
+const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange, weekSummary, canDropPin } = require('./placement.js');
 
 const defaultSettings = {
   capacity: 10,
@@ -438,4 +438,17 @@ test('반복 예외: 빈 목록·없는 목록은 영향 없고, 뺀 날은 그 
   assert.equal(mk(['2026-10-15']).load, 0);
   assert.equal(mk(['2026-10-15']).minutesLeft, 720);
   assert.equal(mk(['2026-10-01']).load, 4); // 다른 날을 뺐으면 그대로
+});
+
+test('canDropPin: 같은 날은 조용히 무시, 지난 날은 이유와 함께 불가, 오늘·미래는 가능 (월말·연말 경계)', () => {
+  const today = '2026-10-01';
+  assert.deepEqual(canDropPin({ fromDate: today, toDate: today, today }), { ok: false, reason: null });
+  assert.deepEqual(canDropPin({ fromDate: '2026-10-03', toDate: '2026-10-03', today }), { ok: false, reason: null });
+  const past = canDropPin({ fromDate: '2026-10-03', toDate: '2026-09-30', today });
+  assert.equal(past.ok, false);
+  assert.ok(past.reason.includes('지난'));
+  assert.deepEqual(canDropPin({ fromDate: '2026-10-03', toDate: today, today }), { ok: true, reason: null });
+  assert.deepEqual(canDropPin({ fromDate: today, toDate: '2026-10-02', today }), { ok: true, reason: null });
+  assert.equal(canDropPin({ fromDate: '2026-12-31', toDate: '2026-12-30', today: '2027-01-01' }).ok, false);
+  assert.equal(canDropPin({ fromDate: '2026-12-30', toDate: '2027-01-01', today: '2026-12-31' }).ok, true);
 });
