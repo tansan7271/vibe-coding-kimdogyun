@@ -108,3 +108,32 @@ test('curve가 0이면 제어점이 끝점에 붙어 직선이 되고, 격자 �
   const g = carpetShape({ ...base, capacity: 20, loads: [0, 0, 0, 0, 0, 0, 0], gridMaxLines: 5 });
   assert.equal(g.gridLines.length, 6); // 0,4,...,16 + 예산선
 });
+
+test('매듭: 안전선 이하는 기본 간격, 넘으면 벌어지고 예산에서 최대, 예산 초과만 흔들린다', () => {
+  const s = carpetShape({ ...base, safeRatio: 0.8, knotSpacing: 10, knotStretch: 3, loads: [0, 8, 9, 10, 12, 0, 0] });
+  const gap = seg => seg.knots[1] - seg.knots[0];
+  assert.deepEqual(s.segments.map(x => x.stretch), [0, 0, 0.5, 1, 1, 0, 0]);
+  assert.deepEqual(s.segments.map(x => x.overBudget), [false, false, false, false, true, false, false]);
+  assert.equal(gap(s.segments[1]), 10); // 안전선과 같으면 아직 초과 아님
+  assert.equal(gap(s.segments[2]), 20);
+  assert.equal(s.segments[3].knots.length, 2); // 예산: 간격 30, 바닥 폭 54
+  assert.equal(s.segments[3].knots[1] - s.segments[3].knots[0], 30);
+  assert.equal(s.segments[4].knots[1] - s.segments[4].knots[0], 30); // 예산을 넘어도 더 벌어지지 않는다
+});
+
+test('매듭: 칸 가운데 기준 대칭, 안전선·예산 정보가 없으면 벌어지지 않는다 (첫 사용)', () => {
+  const s = carpetShape({ ...base, loads: [0, 0, 0, 0, 0, 0, 0] });
+  s.segments.forEach((seg, i) => {
+    assert.equal(seg.stretch, 0);
+    assert.equal(seg.knots[0] + seg.knots.at(-1), 2 * (i * 100 + 45));
+  });
+  const z = carpetShape({ ...base, capacity: 0, loads: [5, 5, 5, 5, 5, 5, 5] });
+  assert.ok(z.segments.every(x => !x.overBudget && x.stretch === 0));
+});
+
+test('구간 경로는 날짜 수만큼이고 꼬리 경로가 오른쪽 끝에 닿는다', () => {
+  const s = carpetShape({ ...base, loads: [1, 2, 3, 4, 5, 6, 7] });
+  assert.equal(s.segments.length, 7);
+  assert.match(s.segments[0].path, /^M 0 10 C /);
+  assert.match(s.tailPath, / 690 10$/);
+});

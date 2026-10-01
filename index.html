@@ -296,6 +296,19 @@
   }
 
   #carpet-svg { display: block; min-width: 888px; }
+  /* 예산을 넘은 날의 카펫 구간이 끊어질 듯 흔들린다. 값은 CARPET_STYLE의 wobble* */
+  .carpet-wobble {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: carpet-wobble var(--wobble-duration, 0.6s) ease-in-out infinite;
+  }
+  @keyframes carpet-wobble {
+    0%, 100% { transform: rotate(0deg) translateY(0); }
+    25% { transform: rotate(calc(var(--wobble-angle, 1.5deg) * -1)) translateY(var(--wobble-shift, 2px)); }
+    50% { transform: rotate(0deg) translateY(calc(var(--wobble-shift, 2px) * -1)); }
+    75% { transform: rotate(var(--wobble-angle, 1.5deg)) translateY(var(--wobble-shift, 2px)); }
+  }
+  @media (prefers-reduced-motion: reduce) { .carpet-wobble { animation: none; } }
 
   .day-card {
     background: #fff;
@@ -495,6 +508,16 @@
     lineColor: '#b8203a', // 카펫 선 색
     flatRatio: 0.5,       // 날짜 칸 폭 중 평평한 바닥 비율(0~1). 키우면 바닥이 길고 경사가 급해진다. 0이면 점처럼 뾰족하다
     curve: 0.5,           // 바닥 사이 곡선 모양(0~0.5). 0이면 비스듬한 직선, 0.5면 완만한 S자
+    // --- 매듭 (안전선을 넘으면 간격이 벌어진다) ---
+    knotSpacing: 12,      // 안전선 이하인 날의 매듭 사이 간격(px). 키우면 매듭이 드물어진다
+    knotStretch: 2.5,     // 예산만큼 찼을 때 간격이 기본의 몇 배가 되는지. 키우면 초과한 날 매듭이 더 휑해진다. 1이면 벌어지지 않는다
+    knotSize: 2.5,        // 매듭 점 반지름(px). 키우면 굵은 매듭이 된다
+    knotColor: '#f3d9a4', // 매듭 색
+    // --- 흔들림 (예산을 넘은 날) ---
+    wobbleAngle: 1.5,     // 흔들릴 때 기울기(도). 키우면 크게 휘청인다. 0이면 기울지 않는다
+    wobbleShift: 2,       // 흔들릴 때 위아래 떨림(px). 키우면 더 덜컹거린다. 0이면 떨지 않는다
+    wobbleDuration: 0.6,  // 한 번 흔들리는 시간(초). 줄이면 빠르게 떨고, 늘리면 천천히 출렁인다
+    wobbleColor: '#b8203a', // 예산 초과 구간의 카펫 선 색. lineColor와 다르게 하면 위험한 날이 눈에 띈다
     // --- 격자 ---
     gridMaxLines: 5,     // 가로 눈금선 최대 개수. 줄이면 간격이 넓어지고, 예산이 이보다 작으면 1단위마다 그린다
     gridLabelEvery: 10,    // 눈금 몇 줄마다 숫자를 적을지. 키우면 숫자가 드물어진다
@@ -1119,6 +1142,8 @@
   const carpetSvg = document.getElementById('carpet-svg');
   let lastCarpet = null; // { loads, capacity, safeRatio, todayIndex }
 
+  const round2 = n => Math.round(n * 100) / 100;
+
   function drawCarpet() {
     if (!lastCarpet) return;
     const stripRect = weekStrip.getBoundingClientRect();
@@ -1131,10 +1156,13 @@
     const C = CARPET_STYLE;
     const shape = Carpet.carpetShape({
       loads: lastCarpet.loads, capacity: lastCarpet.capacity, safeRatio: lastCarpet.safeRatio, columns, width,
-      baseY: C.baseY, maxSag: C.maxSag, flatRatio: C.flatRatio, curve: C.curve,
+      baseY: C.baseY, maxSag: C.maxSag, flatRatio: C.flatRatio, curve: C.curve, knotSpacing: C.knotSpacing, knotStretch: C.knotStretch,
       gridMaxLines: C.gridMaxLines, gridLabelEvery: C.gridLabelEvery,
     });
     const todayCol = lastCarpet.todayIndex >= 0 ? columns[lastCarpet.todayIndex] : null;
+    carpetSvg.style.setProperty('--wobble-angle', `${C.wobbleAngle}deg`);
+    carpetSvg.style.setProperty('--wobble-shift', `${C.wobbleShift}px`);
+    carpetSvg.style.setProperty('--wobble-duration', `${C.wobbleDuration}s`);
     carpetSvg.setAttribute('width', width);
     carpetSvg.setAttribute('height', C.height);
     carpetSvg.setAttribute('viewBox', `0 0 ${width} ${C.height}`);
@@ -1144,7 +1172,12 @@
       + (shape.safeLine ? `<line x1="0" y1="${shape.safeLine.y}" x2="${width}" y2="${shape.safeLine.y}" stroke="${C.safeColor}" stroke-width="${C.safeWidth}" stroke-dasharray="${C.safeDash}"/>` : '')
       + shape.gridLines.filter(g => g.label).map(g => `<text x="3" y="${g.y - 2}" font-size="${C.labelSize}" fill="${C.labelColor}">${g.value}</text>`).join('')
       + shape.dividers.map(x => `<line x1="${x}" y1="0" x2="${x}" y2="${C.height}" stroke="${C.dividerColor}" stroke-width="${C.dividerWidth}" stroke-dasharray="${C.dividerDash}"/>`).join('')
-      + `<path d="${shape.linePath}" fill="none" stroke="${C.lineColor}" stroke-width="${C.lineWidth}" stroke-linejoin="round" stroke-linecap="round"/>`;
+      + shape.segments.map((seg, i) => {
+        const knots = seg.knots.map(x => `<circle cx="${x}" cy="${shape.floors[i].y}" r="${C.knotSize}" fill="${C.knotColor}"/>`).join('');
+        const line = `<path d="${seg.path}" fill="none" stroke="${seg.overBudget ? C.wobbleColor : C.lineColor}" stroke-width="${C.lineWidth}" stroke-linejoin="round" stroke-linecap="round"/>`;
+        return seg.overBudget ? `<g class="carpet-wobble" style="animation-delay:-${round2(i * 0.17)}s">${line}${knots}</g>` : line + knots;
+      }).join('')
+      + `<path d="${shape.tailPath}" fill="none" stroke="${C.lineColor}" stroke-width="${C.lineWidth}" stroke-linejoin="round" stroke-linecap="round"/>`;
   }
 
   window.addEventListener('resize', drawCarpet);

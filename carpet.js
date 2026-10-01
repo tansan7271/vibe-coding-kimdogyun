@@ -22,13 +22,15 @@
    * @param {number} [input.safeRatio] 안전선 비율. 있으면 safeLine을 돌려준다
    * @param {number} [input.flatRatio] 카드 폭 중 평평한 바닥이 차지하는 비율 (기본 0.6, 카드 가운데 기준)
    * @param {number} [input.curve] 바닥 사이 곡선의 제어점 위치 (간격 대비 0~0.5, 기본 0.5. 0이면 직선, 0.5면 S자)
+   * @param {number} [input.knotSpacing] 매듭 사이 기본 간격 (기본 12). 안전선 이하인 날의 간격
+   * @param {number} [input.knotStretch] 예산에서 매듭 간격이 기본의 몇 배가 되는지 (기본 2.5). 안전선에서 예산까지 선형으로 벌어진다
    * @param {number} [input.gridMaxLines] 가로 격자 선 최대 개수 (기본 10)
    * @param {number} [input.gridLabelEvery] 격자 몇 줄마다 숫자를 적을지 (기본 5)
-   * @returns {{points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, gridLines:Array<{value:number,y:number,isBudget:boolean,label:boolean}>, safeLine:{value:number,y:number}|null, sags:number[], linePath:string, dividers:number[]}}
+   * @returns {{segments:Array<{path:string,overBudget:boolean,stretch:number,knots:number[]}>, tailPath:string, points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, gridLines:Array<{value:number,y:number,isBudget:boolean,label:boolean}>, safeLine:{value:number,y:number}|null, sags:number[], linePath:string, dividers:number[]}}
    * 날짜마다 평평한 바닥, 바닥 사이는 S자 곡선으로 잇는다. 양 끝은 baseY에 묶인다.
    * 처짐은 예산에서 멈춘다 (카펫은 잘 늘어나지 않는다).
    */
-  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, safeRatio, flatRatio = 0.6, curve = 0.5, gridMaxLines = 10, gridLabelEvery = 5 }) {
+  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, safeRatio, flatRatio = 0.6, knotSpacing = 12, knotStretch = 2.5, curve = 0.5, gridMaxLines = 10, gridLabelEvery = 5 }) {
     const sags = loads.map(load => {
       if (!(capacity > 0)) return 0;
       return Math.min(1, Math.max(0, load / capacity));
@@ -46,15 +48,30 @@
     // 시작(왼쪽 끝) -> 첫 바닥 -> ... -> 마지막 바닥 -> 끝(오른쪽 끝)
     const nodes = [{ x1: 0, x2: 0, y: baseY }, ...floors, { x1: width, x2: width, y: baseY }];
     const parts = [`M ${round(nodes[0].x2)} ${round(nodes[0].y)}`];
+    const segPaths = [];
     for (let i = 1; i < nodes.length; i++) {
       const prev = nodes[i - 1];
       const cur = nodes[i];
+      const segStart = parts.length;
       const handle = (cur.x1 - prev.x2) * Math.min(0.5, Math.max(0, curve));
       // 양 끝 접선이 수평인 S자 곡선
       parts.push(`C ${round(prev.x2 + handle)} ${round(prev.y)} ${round(cur.x1 - handle)} ${round(cur.y)} ${round(cur.x1)} ${round(cur.y)}`);
       if (cur.x2 > cur.x1) parts.push(`L ${round(cur.x2)} ${round(cur.y)}`);
+      segPaths.push(`M ${round(prev.x2)} ${round(prev.y)} ` + parts.slice(segStart).join(' '));
     }
     const linePath = parts.join(' ');
+
+    // 날짜별 구간(앞 곡선 + 바닥)과 매듭. 안전선을 넘으면 매듭 간격이 벌어지고, 예산을 넘으면 흔들린다
+    const safeLoad = safeRatio > 0 && safeRatio < 1 ? capacity * safeRatio : capacity;
+    const segments = floors.map((f, i) => {
+      const over = capacity > 0 && loads[i] > safeLoad ? Math.min(1, (loads[i] - safeLoad) / (capacity - safeLoad)) : 0;
+      const spacing = knotSpacing * (1 + (knotStretch - 1) * over);
+      const mid = (f.x1 + f.x2) / 2;
+      const count = spacing > 0 ? Math.floor((f.x2 - f.x1) / spacing) + 1 : 1;
+      const knots = Array.from({ length: count }, (_, k) => round(mid + (k - (count - 1) / 2) * spacing));
+      return { path: segPaths[i], overBudget: capacity > 0 && loads[i] > capacity, stretch: round(over), knots };
+    });
+    const tailPath = segPaths[segPaths.length - 1];
 
     const dividers = [];
     for (let i = 1; i < columns.length; i++) {
@@ -76,7 +93,7 @@
       }
     }
 
-    return { points, floors, gridLines, safeLine, sags, linePath, dividers };
+    return { segments, tailPath, points, floors, gridLines, safeLine, sags, linePath, dividers };
   }
 
   return { carpetShape };
