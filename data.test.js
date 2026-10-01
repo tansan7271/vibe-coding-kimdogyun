@@ -16,7 +16,7 @@ test('빈 상태(첫 사용)를 내보냈다가 그대로 가져온다', () => {
   assert.deepEqual(r.state, empty);
 });
 
-test('내보냈다가 가져오면 같다 (apiKey만 빠진다)', () => {
+test('내보냈다가 가져오면 같다 (혹시 상태에 apiKey가 있어도 파일로 새지 않는다)', () => {
   const state = full();
   state.settings.apiKey = 'sk-secret';
   const text = serializeExport(state);
@@ -28,7 +28,7 @@ test('내보냈다가 가져오면 같다 (apiKey만 빠진다)', () => {
   assert.equal(state.settings.apiKey, 'sk-secret'); // 원본은 그대로
 });
 
-test('가져올 때 파일 안의 apiKey는 무시한다', () => {
+test('가져올 때 파일 안의 apiKey는 무시한다 (옛 파일 대비)', () => {
   const o = full();
   o.settings.apiKey = 'sk-x';
   assert.equal('apiKey' in parse(o).state.settings, false);

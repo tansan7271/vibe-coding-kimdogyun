@@ -505,7 +505,7 @@
 
     <h2>AI 분해</h2>
     <div class="settings-form">
-      <div class="ai-note">Anthropic API 키를 넣으면 할 일 화면에 "텍스트로 만들기"가 나타납니다. 키는 이 브라우저(localStorage)에만 저장되고 내보내기 파일에는 들어가지 않습니다. 키 없이도 앱은 모두 동작합니다.</div>
+      <div class="ai-note">Anthropic API 키를 넣으면 할 일 화면에 "텍스트로 만들기"가 나타납니다. 키는 저장하지 않고 이 화면을 열어 둔 동안 메모리에만 있습니다. 새로고침하면 다시 넣어야 합니다. 키 없이도 앱은 모두 동작합니다.</div>
       <div>
         <input type="password" id="ai-key-input" placeholder="API 키" autocomplete="off" style="min-width:240px">
         <button class="btn" id="ai-key-save" type="button">저장</button>
@@ -607,6 +607,12 @@
   }
 
   const state = loadState();
+
+  // 이전 버전이 localStorage에 남긴 API 키는 앱을 열 때 지운다 (SPEC 9장: 키는 저장하지 않는다)
+  if (state.settings && 'apiKey' in state.settings) {
+    delete state.settings.apiKey;
+    saveState();
+  }
 
   // 앱을 열었을 때: 깔린 날이 지난 미완료 단계는 밀린 것으로 처리한다 (SPEC 5장 밀림)
   (function applyAutoPush() {
@@ -1079,28 +1085,28 @@
   let aiDraft = null; // 편집 중인 초안. 확정 전에는 state에 넣지 않는다
   let aiBusy = false;
 
+  let aiKey = ''; // API 키는 메모리에만 둔다. localStorage, sessionStorage, 내보내기 파일에 쓰지 않는다
+
   function hasAiKey() {
-    return !!(state.settings.apiKey && state.settings.apiKey.trim());
+    return aiKey !== '';
   }
 
   function renderAiKeyUi() {
     aiOpenBtn.style.display = hasAiKey() ? '' : 'none';
-    aiKeyStatus.textContent = hasAiKey() ? 'API 키가 저장되어 있습니다.' : 'API 키가 없습니다. AI 기능은 숨겨져 있습니다.';
+    aiKeyStatus.textContent = hasAiKey() ? 'API 키가 메모리에 있습니다 (새로고침하면 사라집니다).' : 'API 키가 없습니다. AI 기능은 숨겨져 있습니다.';
     if (!hasAiKey()) { aiPanel.style.display = 'none'; closeAiDraft(); }
   }
 
   document.getElementById('ai-key-save').addEventListener('click', () => {
     const v = aiKeyInput.value.trim();
     if (!v) return;
-    state.settings.apiKey = v;
-    saveState();
+    aiKey = v;
     aiKeyInput.value = '';
     renderAiKeyUi();
   });
 
   document.getElementById('ai-key-delete').addEventListener('click', () => {
-    delete state.settings.apiKey;
-    saveState();
+    aiKey = '';
     aiKeyInput.value = '';
     renderAiKeyUi();
   });
@@ -1132,7 +1138,7 @@
     runBtn.disabled = true;
     aiMessage.textContent = 'AI가 나누는 중... (최대 30초)';
     const today = todayStr();
-    const req = Ai.buildRequest({ text, today, apiKey: state.settings.apiKey.trim() });
+    const req = Ai.buildRequest({ text, today, apiKey: aiKey });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
     const manual = ' 할 일은 위의 입력칸에서 직접 추가할 수 있습니다.';
@@ -1259,12 +1265,10 @@
     if (!result.ok) { setDataMessage(`가져오지 못했습니다: ${result.error}`, true); return; }
     if (!confirm('현재 데이터가 모두 사라지고 파일의 내용으로 바뀝니다. 가져올까요?')) return;
 
-    const apiKey = state.settings.apiKey; // 키는 파일로 오가지 않는다. 지금 키를 그대로 둔다
     state.goals = result.state.goals;
     state.steps = result.state.steps;
     state.events = result.state.events;
     state.settings = result.state.settings;
-    if (apiKey !== undefined) state.settings.apiKey = apiKey;
     // 앱을 연 직후와 같게: 깔린 날이 지난 미완료 단계는 밀린 것으로 처리한다
     state.steps = Placement.autoPush({ steps: state.steps, today: todayStr() }).steps;
     saveState();
