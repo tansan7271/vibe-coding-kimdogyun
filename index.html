@@ -471,8 +471,10 @@
       <select id="new-event-repeat">
         <option value="none">반복 없음</option>
         <option value="weekly">매주</option>
+        <option value="biweekly">격주</option>
+        <option value="monthly">매월</option>
       </select>
-      <span id="new-event-date-wrap"><input type="date" id="new-event-date"></span>
+      <span id="new-event-date-wrap"><span id="new-event-date-label">날짜</span> <input type="date" id="new-event-date"></span>
       <span id="new-event-weekday-wrap" style="display:none">
         <select id="new-event-weekday">
           <option value="0">월</option>
@@ -899,18 +901,31 @@
   const newEventDraft = { load: 3 };
   const eventList = document.getElementById('event-list');
 
+  const REPEAT_LABELS = { none: '반복 없음', weekly: '매주', biweekly: '격주', monthly: '매월' };
+
   function eventSortKey(ev) {
-    return ev.repeat === 'weekly' ? `1-${ev.weekday}` : `0-${ev.date}`;
+    if (ev.repeat === 'weekly') return `1-${ev.weekday}`;
+    if (ev.repeat === 'biweekly') return `1-${ev.date ? Placement.weekdayOf(ev.date) : 0}`;
+    return `0-${ev.date}`; // 반복 없음, 매월은 날짜순
   }
 
+  // 반복 일정은 시작 날짜부터 생긴다 (그 이전에는 없다). 매주의 시작 날짜는 옛 데이터에는 없을 수 있다
   function eventRepeatFieldsHtml(ev) {
+    const dateInput = `<input type="date" data-field="date" data-event-id="${ev.id}" value="${ev.date || ''}">`;
+    const until = `종료 <input type="date" data-field="repeatUntil" data-event-id="${ev.id}" value="${ev.repeatUntil || ''}">`;
     if (ev.repeat === 'weekly') {
       const options = WEEKDAY_LABELS.map((label, i) => `<option value="${i}"${Number(ev.weekday) === i ? ' selected' : ''}>${label}</option>`).join('');
-      return `
-        <select data-field="weekday" data-event-id="${ev.id}">${options}</select>
-        종료 <input type="date" data-field="repeatUntil" data-event-id="${ev.id}" value="${ev.repeatUntil || ''}">`;
+      return `<select data-field="weekday" data-event-id="${ev.id}">${options}</select> 시작 ${dateInput} ${until}`;
     }
-    return `<input type="date" data-field="date" data-event-id="${ev.id}" value="${ev.date || ''}">`;
+    if (ev.repeat === 'biweekly') {
+      const day = ev.date ? WEEKDAY_LABELS[Placement.weekdayOf(ev.date)] : '';
+      return `시작 ${dateInput} <span class="repeat-note">격주 ${day}요일</span> ${until}`;
+    }
+    if (ev.repeat === 'monthly') {
+      const dom = ev.date ? Number(ev.date.slice(8)) : '';
+      return `시작 ${dateInput} <span class="repeat-note">매월 ${dom}일${dom > 28 ? ' (없는 달은 말일)' : ''}</span> ${until}`;
+    }
+    return dateInput;
   }
 
   function eventRowHtml(ev) {
@@ -919,7 +934,7 @@
         <input type="text" class="event-title-input" data-field="title" data-event-id="${ev.id}" value="${escapeAttr(ev.title)}">
         <select data-field="repeat" data-event-id="${ev.id}">
           <option value="none"${ev.repeat === 'none' ? ' selected' : ''}>반복 없음</option>
-          <option value="weekly"${ev.repeat === 'weekly' ? ' selected' : ''}>매주</option>
+          ${['weekly', 'biweekly', 'monthly'].map(r => `<option value="${r}"${ev.repeat === r ? ' selected' : ''}>${REPEAT_LABELS[r]}</option>`).join('')}
         </select>
         ${eventRepeatFieldsHtml(ev)}
         <input type="time" data-field="start" data-event-id="${ev.id}" value="${ev.start}">
@@ -941,13 +956,18 @@
     document.getElementById('new-event-load-picker').innerHTML = loadPickerHtml('new-event', newEventDraft.load);
   }
 
+  // 날짜 칸은 항상 보인다. 반복 일정에서는 시작 날짜이고 기본값은 오늘이다 (그 이전에는 일정이 생기지 않는다)
   function syncNewEventRepeatFields() {
     const repeat = document.getElementById('new-event-repeat').value;
-    document.getElementById('new-event-date-wrap').style.display = repeat === 'none' ? '' : 'none';
+    const dateInput = document.getElementById('new-event-date');
+    document.getElementById('new-event-date-label').textContent = repeat === 'none' ? '날짜' : '시작 날짜';
     document.getElementById('new-event-weekday-wrap').style.display = repeat === 'weekly' ? '' : 'none';
-    document.getElementById('new-event-repeat-until-wrap').style.display = repeat === 'weekly' ? '' : 'none';
+    document.getElementById('new-event-repeat-until-wrap').style.display = repeat === 'none' ? 'none' : '';
+    if (!dateInput.value) dateInput.value = todayStr();
+    if (repeat === 'weekly' && dateInput.value) document.getElementById('new-event-weekday').value = Placement.weekdayOf(dateInput.value);
   }
 
+  document.getElementById('new-event-date').addEventListener('change', syncNewEventRepeatFields);
   document.getElementById('new-event-repeat').addEventListener('change', syncNewEventRepeatFields);
   syncNewEventRepeatFields();
   renderNewEventLoadPicker();
@@ -967,23 +987,22 @@
     if (!title || !start || !end) return;
     if (start >= end) { alert('시작 시각은 종료 시각보다 빨라야 합니다.'); return; }
 
-    const ev = { id: uid('event'), title, load: newEventDraft.load, start, end, repeat };
-    if (repeat === 'weekly') {
-      ev.weekday = Number(document.getElementById('new-event-weekday').value);
+    const date = document.getElementById('new-event-date').value;
+    if (!date) return;
+    const ev = { id: uid('event'), title, load: newEventDraft.load, start, end, repeat, date };
+    if (repeat === 'weekly') ev.weekday = Number(document.getElementById('new-event-weekday').value);
+    if (repeat !== 'none') {
       const repeatUntil = document.getElementById('new-event-repeat-until').value;
       if (repeatUntil) ev.repeatUntil = repeatUntil;
-    } else {
-      const date = document.getElementById('new-event-date').value;
-      if (!date) return;
-      ev.date = date;
     }
 
     state.events.push(ev);
     saveState();
 
     document.getElementById('new-event-title').value = '';
-    document.getElementById('new-event-date').value = '';
+    document.getElementById('new-event-date').value = todayStr();
     document.getElementById('new-event-repeat-until').value = '';
+    syncNewEventRepeatFields();
     newEventDraft.load = 3;
     renderNewEventLoadPicker();
     renderEvents();
@@ -1023,19 +1042,27 @@
       const v = e.target.value.trim();
       ev.title = v || ev.title;
     } else if (field === 'repeat') {
+      const prev = ev.repeat;
       ev.repeat = e.target.value;
-      if (ev.repeat === 'weekly') {
-        delete ev.date;
-        if (ev.weekday === undefined) ev.weekday = 0;
-      } else {
+      if (ev.repeat === 'none') {
         delete ev.weekday;
         delete ev.repeatUntil;
         if (!ev.date) ev.date = todayStr();
+      } else if (ev.repeat === 'weekly') {
+        if (ev.weekday === undefined) ev.weekday = Placement.weekdayOf(ev.date || todayStr());
+        if (!ev.date) ev.date = todayStr();
+      } else {
+        // 격주·매월은 시작 날짜가 기준이다. 매주였다면 기존 요일에 맞춰 시작 날짜 이후 첫 그 요일로 옮긴다
+        if (prev === 'weekly') ev.date = Placement.nextWeekday(ev.date || todayStr(), ev.weekday);
+        else if (!ev.date) ev.date = todayStr();
+        delete ev.weekday;
       }
     } else if (field === 'weekday') {
       ev.weekday = Number(e.target.value);
     } else if (field === 'date') {
-      ev.date = e.target.value;
+      if (e.target.value) ev.date = e.target.value;
+      else if (ev.repeat === 'weekly') delete ev.date; // 매주만 시작 날짜 없이 둘 수 있다 (옛 데이터와 같음)
+      else { renderEvents(); return; }
     } else if (field === 'repeatUntil') {
       if (e.target.value) ev.repeatUntil = e.target.value; else delete ev.repeatUntil;
     } else if (field === 'start') {

@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate } = require('./placement.js');
+const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange } = require('./placement.js');
 
 const defaultSettings = {
   capacity: 10,
@@ -334,4 +334,46 @@ test('autoPush 뒤에 다시 깔면 오늘 이후에 깔린다', () => {
   const { steps } = autoPush({ steps: [step({ placedDate: '2026-09-30' })], today: '2026-10-01' });
   const r = placeSteps({ steps, goals, events: [], today: '2026-10-01', ...defaultSettings });
   assert.equal(r[0].date, '2026-10-01');
+});
+
+const evOn = (ev, from, to) => dateRange(from, to).filter(d => eventsOnDate([ev], d).length > 0);
+const rep = (o) => ({ id: 'e', load: 3, start: '09:00', end: '10:00', ...o });
+
+test('매주: 시작일이 있으면 그 이전에는 없고, 시작일이 없는 옛 데이터는 예전처럼 있다', () => {
+  // 2026-10-01은 목요일(3)
+  const withStart = rep({ repeat: 'weekly', weekday: 0, date: '2026-10-05' });
+  assert.deepEqual(evOn(withStart, '2026-09-28', '2026-10-12'), ['2026-10-05', '2026-10-12']);
+  const legacy = rep({ repeat: 'weekly', weekday: 0 });
+  assert.deepEqual(evOn(legacy, '2026-09-28', '2026-10-06'), ['2026-09-28', '2026-10-05']);
+  assert.deepEqual(evOn(rep({ repeat: 'weekly', weekday: 0, date: '2026-10-05', repeatUntil: '2026-10-12' }), '2026-09-28', '2026-10-30'), ['2026-10-05', '2026-10-12']);
+});
+
+test('격주: 시작일과 같은 요일에 2주마다. 사이 주와 시작 전에는 없다 (연말 경계 포함)', () => {
+  const e = rep({ repeat: 'biweekly', date: '2026-10-01' });
+  assert.deepEqual(evOn(e, '2026-09-17', '2026-10-31'), ['2026-10-01', '2026-10-15', '2026-10-29']);
+  const y = rep({ repeat: 'biweekly', date: '2026-12-28' });
+  assert.deepEqual(evOn(y, '2026-12-21', '2027-01-31'), ['2026-12-28', '2027-01-11', '2027-01-25']);
+  assert.deepEqual(evOn(rep({ repeat: 'biweekly', date: '2026-10-01', repeatUntil: '2026-10-15' }), '2026-10-01', '2026-12-01'), ['2026-10-01', '2026-10-15']);
+});
+
+test('매월: 시작일의 일에 매달. 그 날이 없는 달은 말일 (31일, 윤년 2월)', () => {
+  const m15 = rep({ repeat: 'monthly', date: '2026-10-15' });
+  assert.deepEqual(evOn(m15, '2026-09-01', '2027-01-31'), ['2026-10-15', '2026-11-15', '2026-12-15', '2027-01-15']);
+  const m31 = rep({ repeat: 'monthly', date: '2026-01-31' });
+  assert.deepEqual(evOn(m31, '2026-01-01', '2026-06-30'), ['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30', '2026-05-31', '2026-06-30']);
+  assert.deepEqual(evOn(m31, '2028-02-01', '2028-02-29'), ['2028-02-29']); // 윤년
+  const m30 = rep({ repeat: 'monthly', date: '2026-04-30' });
+  assert.deepEqual(evOn(m30, '2027-02-01', '2027-03-31'), ['2027-02-28', '2027-03-30']);
+  assert.deepEqual(evOn(rep({ repeat: 'monthly', date: '2026-10-15', repeatUntil: '2026-11-15' }), '2026-10-01', '2027-01-31'), ['2026-10-15', '2026-11-15']);
+});
+
+test('nextWeekday: 오늘 포함, 월말·연말 경계', () => {
+  assert.equal(nextWeekday('2026-10-01', 3), '2026-10-01'); // 목 -> 같은 날
+  assert.equal(nextWeekday('2026-10-01', 0), '2026-10-05'); // 월
+  assert.equal(nextWeekday('2026-12-31', 0), '2027-01-04');
+});
+
+test('일정 부하는 반복 종류와 상관없이 그날 부하에 들어간다', () => {
+  const stats = dayStats({ date: '2026-10-15', steps: [], placements: [], events: [rep({ repeat: 'biweekly', date: '2026-10-01', load: 4 })], capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 4 });
+  assert.equal(stats.load, 4);
 });

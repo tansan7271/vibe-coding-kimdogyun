@@ -106,13 +106,19 @@
       if (!isLoad(ev.load)) return fail(`${at}의 부하는 1~5 정수여야 합니다: ${JSON.stringify(ev.load)}`);
       if (!isTimeStr(ev.start) || !isTimeStr(ev.end)) return fail(`${at}의 시작·종료 시각이 HH:MM 형식이 아닙니다.`);
       if (ev.start >= ev.end) return fail(`${at}의 시작 시각이 종료 시각보다 빠르지 않습니다.`);
-      if (ev.repeat === 'weekly') {
-        if (!(Number.isInteger(ev.weekday) && ev.weekday >= 0 && ev.weekday <= 6)) return fail(`${at}의 요일(weekday)은 0~6이어야 합니다.`);
-        if (ev.repeatUntil !== undefined && !isDateStr(ev.repeatUntil)) return fail(`${at}의 반복 종료일이 YYYY-MM-DD 형식이 아닙니다.`);
-      } else if (ev.repeat === 'none') {
+      if (ev.repeat === 'none') {
         if (!isDateStr(ev.date)) return fail(`${at}의 날짜가 YYYY-MM-DD 형식이 아닙니다.`);
+      } else if (ev.repeat === 'weekly' || ev.repeat === 'biweekly' || ev.repeat === 'monthly') {
+        if (ev.repeat === 'weekly') {
+          if (!(Number.isInteger(ev.weekday) && ev.weekday >= 0 && ev.weekday <= 6)) return fail(`${at}의 요일(weekday)은 0~6이어야 합니다.`);
+          // 매주의 시작일은 선택 (시작일이 생기기 전 데이터에는 없다)
+          if (ev.date !== undefined && !isDateStr(ev.date)) return fail(`${at}의 시작 날짜가 YYYY-MM-DD 형식이 아닙니다.`);
+        } else if (!isDateStr(ev.date)) {
+          return fail(`${at}의 시작 날짜가 YYYY-MM-DD 형식이 아닙니다.`);
+        }
+        if (ev.repeatUntil !== undefined && !isDateStr(ev.repeatUntil)) return fail(`${at}의 반복 종료일이 YYYY-MM-DD 형식이 아닙니다.`);
       } else {
-        return fail(`${at}의 반복(repeat)은 none 또는 weekly여야 합니다.`);
+        return fail(`${at}의 반복(repeat)은 none, weekly, biweekly, monthly 중 하나여야 합니다.`);
       }
     }
 

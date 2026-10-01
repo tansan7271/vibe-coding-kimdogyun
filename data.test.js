@@ -106,3 +106,16 @@ test('설정값 범위를 검사한다', () => {
   assert.match(parse(mod(o => { o.settings.placeMode = 'x'; })).error, /placeMode/);
   assert.match(parse(mod(o => { o.settings = []; })).error, /settings/);
 });
+
+test('격주·매월 일정: 시작 날짜 필수, 매주 시작 날짜는 선택', () => {
+  const bi = { ...event, repeat: 'biweekly', date: '2026-10-01' };
+  delete bi.weekday;
+  assert.equal(parse(mod(o => { o.events[0] = bi; })).ok, true);
+  assert.equal(parse(mod(o => { o.events[0] = { ...bi, repeat: 'monthly', repeatUntil: '2027-01-01' }; })).ok, true);
+  assert.match(parse(mod(o => { o.events[0] = { ...bi, date: undefined }; })).error, /시작 날짜/);
+  assert.match(parse(mod(o => { o.events[0] = { ...bi, repeat: 'monthly', date: '2026-02-30' }; })).error, /시작 날짜/);
+  assert.match(parse(mod(o => { o.events[0] = { ...bi, repeatUntil: '내일' }; })).error, /반복 종료일/);
+  assert.equal(parse(mod(o => { o.events[0] = { ...event, date: '2026-10-05' }; })).ok, true); // 매주 + 시작일
+  assert.match(parse(mod(o => { o.events[0] = { ...event, date: '10/05' }; })).error, /시작 날짜/);
+  assert.equal(parse(mod(() => {})).ok, true); // 시작일 없는 옛 매주 데이터
+});

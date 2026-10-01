@@ -59,13 +59,36 @@
     return Math.max(0, minutesOf(ev.end) - minutesOf(ev.start));
   }
 
+  function daysInMonth(y, m) {
+    const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+    return [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
+  }
+
+  // dateStr 또는 그 뒤에서 처음 오는 weekday(0=월..6=일)인 날
+  function nextWeekday(dateStr, weekday) {
+    return addDays(dateStr, (weekday - weekdayOf(dateStr) + 7) % 7);
+  }
+
+  /**
+   * 일정이 그 날에 있는가. 반복은 시작일(ev.date) 이전에는 없다. 날짜는 전부 YYYY-MM-DD 문자열로 다룬다.
+   * - weekly: ev.weekday 요일마다. 시작일은 선택 (옛 데이터에는 없다 -> 처음부터 있는 것으로 본다)
+   * - biweekly: 시작일과 같은 요일, 2주마다
+   * - monthly: 시작일의 '일'마다. 그 달에 그 날이 없으면 그 달의 마지막 날 (31일 -> 4월 30일, 2월 28/29일)
+   */
   function eventMatchesDate(ev, dateStr) {
-    if (ev.repeat === 'weekly') {
-      if (weekdayOf(dateStr) !== ev.weekday) return false;
-      if (ev.repeatUntil && dateStr > ev.repeatUntil) return false;
-      return true;
+    if (ev.repeat === 'none' || !ev.repeat) return ev.date === dateStr;
+    if (ev.date && dateStr < ev.date) return false;
+    if (ev.repeatUntil && dateStr > ev.repeatUntil) return false;
+    if (ev.repeat === 'weekly') return weekdayOf(dateStr) === ev.weekday;
+    if (ev.repeat === 'biweekly') {
+      return Math.round((dateToUTCms(dateStr) - dateToUTCms(ev.date)) / 86400000) % 14 === 0;
     }
-    return ev.date === dateStr;
+    if (ev.repeat === 'monthly') {
+      const anchor = parseDate(ev.date);
+      const cur = parseDate(dateStr);
+      return cur.d === Math.min(anchor.d, daysInMonth(cur.y, cur.m));
+    }
+    return false;
   }
 
   function eventsOnDate(events, dateStr) {
@@ -300,6 +323,7 @@
     canPush,
     addDays,
     weekdayOf,
+    nextWeekday,
     dateRange,
     eventsOnDate,
     eventDurationMinutes,
