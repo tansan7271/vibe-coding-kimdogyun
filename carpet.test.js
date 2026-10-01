@@ -109,25 +109,9 @@ test('curve가 0이면 제어점이 끝점에 붙어 직선이 되고, 격자 �
   assert.equal(g.gridLines.length, 6); // 0,4,...,16 + 예산선
 });
 
-test('주름: 밀림 0이면 없고, 많을수록 개수와 깊이가 늘며 최대에서 멈춘다', () => {
-  const opts = { ...base, loads: [0, 0, 0, 0, 0, 0, 0], creaseMaxCount: 4, creaseMaxDepth: 8, creaseSaturate: 4 };
-  const s = carpetShape({ ...opts, pushes: [0, 1, 2, 4, 9, 0, 0] });
-  assert.deepEqual(s.creases.map(c => c.length), [0, 1, 2, 4, 4, 0, 0]);
-  // 깊이: 제어점 y = 바닥 y + 2*깊이. 밀림 1 -> 깊이 2, 2 -> 4, 4 이상 -> 8
-  const ctrlY = path => Number(path.match(/Q \S+ (\S+)/)[1]) - 10;
-  assert.equal(ctrlY(s.creases[1][0]), 4);
-  assert.equal(ctrlY(s.creases[2][0]), 8);
-  assert.equal(ctrlY(s.creases[3][0]), 16);
-  assert.equal(ctrlY(s.creases[4][0]), 16);
-});
-
-test('주름: 입력이 없으면(첫 사용) 주름도 상자도 없다. 주름은 바닥 폭 안에 있다', () => {
+test('입력이 없으면(첫 사용) 짐 상자가 없다', () => {
   const s = carpetShape({ ...base, loads: [3, 3, 3, 3, 3, 3, 3] });
-  assert.ok(s.creases.every(c => c.length === 0));
   assert.ok(s.overflowBoxes.every(b => b === null));
-  const p = carpetShape({ ...base, loads: [0, 0, 0, 0, 0, 0, 0], pushes: [3, 0, 0, 0, 0, 0, 0] });
-  const xs = p.creases[0].flatMap(c => [...c.matchAll(/(?:M|Q) ([\d.]+) /g)].map(m => Number(m[1])));
-  assert.ok(xs.every(x => x >= p.floors[0].x1 && x <= p.floors[0].x2));
 });
 
 test('시간 초과: 초과인 날만 상자가 있고 칸 폭보다 넓다. 부하 초과와는 별개', () => {

@@ -22,20 +22,16 @@
    * @param {number} [input.safeRatio] 안전선 비율. 있으면 safeLine을 돌려준다
    * @param {number} [input.flatRatio] 카드 폭 중 평평한 바닥이 차지하는 비율 (기본 0.6, 카드 가운데 기준)
    * @param {number} [input.curve] 바닥 사이 곡선의 제어점 위치 (간격 대비 0~0.5, 기본 0.5. 0이면 직선, 0.5면 S자)
-   * @param {number[]} [input.pushes] 날짜별 밀림 합 (그날에 깔린 미완료 단계의 밀린 횟수 합). 많을수록 주름이 깊고 많다
    * @param {boolean[]} [input.timeOver] 날짜별 시간 초과 여부. true인 날만 짐 상자가 칸 폭 밖으로 삐져나온다
-   * @param {number} [input.creaseMaxCount] 주름 최대 개수 (기본 4)
-   * @param {number} [input.creaseMaxDepth] 주름 최대 깊이 (기본 6)
-   * @param {number} [input.creaseSaturate] 밀림 합이 이만큼이면 주름이 최대 (기본 5)
    * @param {number} [input.overflowBoxWidth] 짐 상자 폭 / 칸 폭 (기본 1.3)
    * @param {number} [input.overflowBoxHeight] 짐 상자 높이 (기본 14)
    * @param {number} [input.gridMaxLines] 가로 격자 선 최대 개수 (기본 10)
    * @param {number} [input.gridLabelEvery] 격자 몇 줄마다 숫자를 적을지 (기본 5)
-   * @returns {{creases:Array<string[]>, overflowBoxes:Array<{x:number,y:number,width:number,height:number}|null>, points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, gridLines:Array<{value:number,y:number,isBudget:boolean,label:boolean}>, safeLine:{value:number,y:number}|null, sags:number[], linePath:string, dividers:number[]}}
+   * @returns {{overflowBoxes:Array<{x:number,y:number,width:number,height:number}|null>, points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, gridLines:Array<{value:number,y:number,isBudget:boolean,label:boolean}>, safeLine:{value:number,y:number}|null, sags:number[], linePath:string, dividers:number[]}}
    * 날짜마다 평평한 바닥, 바닥 사이는 S자 곡선으로 잇는다. 양 끝은 baseY에 묶인다.
    * 처짐은 예산에서 멈춘다 (카펫은 잘 늘어나지 않는다).
    */
-  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, safeRatio, flatRatio = 0.6, pushes = [], timeOver = [], creaseMaxCount = 4, creaseMaxDepth = 6, creaseSaturate = 5, overflowBoxWidth = 1.3, overflowBoxHeight = 14, curve = 0.5, gridMaxLines = 10, gridLabelEvery = 5 }) {
+  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, safeRatio, flatRatio = 0.6, timeOver = [], overflowBoxWidth = 1.3, overflowBoxHeight = 14, curve = 0.5, gridMaxLines = 10, gridLabelEvery = 5 }) {
     const sags = loads.map(load => {
       if (!(capacity > 0)) return 0;
       return Math.min(1, Math.max(0, load / capacity));
@@ -62,22 +58,6 @@
       if (cur.x2 > cur.x1) parts.push(`L ${round(cur.x2)} ${round(cur.y)}`);
     }
     const linePath = parts.join(' ');
-
-    // 밀린 단계: 바닥 위에 아래로 눌린 짧은 곡선(주름). 밀림 합이 클수록 개수와 깊이가 늘고 최대에서 멈춘다
-    const creases = floors.map((f, i) => {
-      const count = pushes[i] || 0;
-      const width = f.x2 - f.x1;
-      if (!(count > 0) || !(width > 0) || !(creaseSaturate > 0)) return [];
-      const ratio = Math.min(1, count / creaseSaturate);
-      const n = Math.max(1, Math.round(creaseMaxCount * ratio));
-      const depth = creaseMaxDepth * ratio;
-      const half = (width / n) * 0.35;
-      return Array.from({ length: n }, (_, k) => {
-        const cx = f.x1 + (width * (k + 0.5)) / n;
-        // 2차 곡선의 가운데는 제어점 높이의 절반이라 2배로 잡는다
-        return `M ${round(cx - half)} ${round(f.y)} Q ${round(cx)} ${round(f.y + 2 * depth)} ${round(cx + half)} ${round(f.y)}`;
-      });
-    });
 
     // 시간 초과: 짐 상자가 칸 폭보다 넓어 양옆으로 삐져나온다 (부하 초과와 다른 표시)
     const overflowBoxes = floors.map((f, i) => {
@@ -107,7 +87,7 @@
       }
     }
 
-    return { creases, overflowBoxes, points, floors, gridLines, safeLine, sags, linePath, dividers };
+    return { overflowBoxes, points, floors, gridLines, safeLine, sags, linePath, dividers };
   }
 
   return { carpetShape };

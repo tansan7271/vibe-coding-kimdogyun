@@ -575,12 +575,6 @@
     lineColor: '#b8203a', // 카펫 선 색
     flatRatio: 0.5,       // 날짜 칸 폭 중 평평한 바닥 비율(0~1). 키우면 바닥이 길고 경사가 급해진다. 0이면 점처럼 뾰족하다
     curve: 0.5,           // 바닥 사이 곡선 모양(0~0.5). 0이면 비스듬한 직선, 0.5면 완만한 S자
-    // --- 주름 (밀린 단계) ---
-    creaseMaxCount: 4,    // 주름 최대 개수. 키우면 많이 밀린 날에 주름이 촘촘해진다
-    creaseMaxDepth: 16,   // 주름 최대 깊이(px). 키우면 카펫이 더 깊게 눌린다
-    creaseSaturate: 5,    // 그날 단계들의 밀림 횟수 합이 이만큼이면 주름이 최대. 줄이면 조금만 밀려도 깊어진다
-    creaseColor: '#6e0f20', // 주름 색. 카펫 선보다 어두운 색이 눌린 느낌을 준다
-    creaseWidth: 3,       // 주름 선 두께(px)
     // --- 시간 초과 (짐이 폭 밖으로 삐져나옴) ---
     overflowBoxWidth: 1.3,  // 짐 상자 폭 / 날짜 칸 폭. 1보다 커야 칸 밖으로 삐져나온다. 키우면 더 많이 삐져나온다
     overflowBoxHeight: 14,  // 짐 상자 높이(px). 키우면 짐이 높이 쌓인다
@@ -1484,8 +1478,7 @@
     const shape = Carpet.carpetShape({
       loads: lastCarpet.loads, capacity: lastCarpet.capacity, safeRatio: lastCarpet.safeRatio, columns, width,
       baseY: C.baseY, maxSag: C.maxSag, flatRatio: C.flatRatio, curve: C.curve,
-      pushes: lastCarpet.pushes, timeOver: lastCarpet.timeOver,
-      creaseMaxCount: C.creaseMaxCount, creaseMaxDepth: C.creaseMaxDepth, creaseSaturate: C.creaseSaturate,
+      timeOver: lastCarpet.timeOver,
       overflowBoxWidth: C.overflowBoxWidth, overflowBoxHeight: C.overflowBoxHeight,
       gridMaxLines: C.gridMaxLines, gridLabelEvery: C.gridLabelEvery,
     });
@@ -1500,8 +1493,7 @@
       + shape.gridLines.filter(g => g.label).map(g => `<text x="3" y="${g.y - 2}" font-size="${C.labelSize}" fill="${C.labelColor}">${g.value}</text>`).join('')
       + shape.dividers.map(x => `<line x1="${x}" y1="0" x2="${x}" y2="${C.height}" stroke="${C.dividerColor}" stroke-width="${C.dividerWidth}" stroke-dasharray="${C.dividerDash}"/>`).join('')
       + shape.overflowBoxes.filter(Boolean).map(b => `<rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" rx="3" fill="${C.overflowColor}" stroke="${C.overflowStroke}" stroke-width="1.5"/>`).join('')
-      + `<path d="${shape.linePath}" fill="none" stroke="${C.lineColor}" stroke-width="${C.lineWidth}" stroke-linejoin="round" stroke-linecap="round"/>`
-      + shape.creases.map(list => list.map(d => `<path d="${d}" fill="none" stroke="${C.creaseColor}" stroke-width="${C.creaseWidth}" stroke-linecap="round"/>`).join('')).join('');
+      + `<path d="${shape.linePath}" fill="none" stroke="${C.lineColor}" stroke-width="${C.lineWidth}" stroke-linejoin="round" stroke-linecap="round"/>`;
   }
 
   window.addEventListener('resize', drawCarpet);
@@ -1547,7 +1539,6 @@
     renderWeekSummary(weekStats);
     lastCarpet = {
       loads: weekStats.map(st => st.load),
-      pushes: weekStats.map(st => st.steps.reduce((sum, x) => sum + (x.step.pushCount || 0), 0)),
       timeOver: weekStats.map(st => st.overTime), capacity: s.capacity, safeRatio: s.safeRatio, todayIndex: dates.indexOf(today) };
     drawCarpet();
 
