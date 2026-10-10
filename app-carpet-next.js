@@ -40,8 +40,7 @@ const STAGE_STYLE = {
   // 왼쪽 위 꼭짓점보다 budgetBelowCorner만큼 아래에 오도록 화면에서 계산한다. 그 선 밑으로는 세로선도 오늘 칸도 없다
   budgetBelowCorner: 24,       // 예산선이 메모지 왼쪽 위 꼭짓점보다 얼마나 아래에 걸치는지(px)
   minSag: 120,                 // 화면이 아주 낮을 때 예산 깊이가 이보다 줄지 않게 하는 최소값(px)
-  topSpaceRatio: 0.375,        // 롤 크기로 정해지는 처음 위쪽 여백을 이 비율로 줄인다(1이면 그대로). 롤이 헤더 밑으로 파고들지 않는 선까지만 줄어든다
-  rollHeaderGap: -28,          // 롤 맨 위와 헤더 아랫단 사이 간격(px). 음수면 롤 윗부분이 그만큼 헤더 뒤로 들어간다. 위쪽 여백은 롤 지름 + 이 값보다 줄지 않는다
+  rollTuckRatio: 0.4,          // 처음 롤 윗부분이 헤더 뒤로 들어가는 정도(롤 지름의 비율). 클수록 위쪽 여백이 줄어든다. 위쪽 여백 ≈ 롤 지름 × (1 − 이 값)
   gridMaxLines: 5,             // 가로 눈금선 최대 개수
   gridColor: '#e6e1da',        // 눈금선 색
   gridWidth: 2,                // 눈금선 두께(px)
@@ -122,8 +121,9 @@ const STAGE_STYLE = {
     const headerBottom = parseFloat(getComputedStyle(document.body).paddingTop) || 0; // 헤더 아랫단 높이(화면 위에서)
     svg.style.marginTop = '0px';
     const stageTop = svg.getBoundingClientRect().top + window.scrollY;
-    // 위 여백 줄이기: 그림은 그대로 두고 통째로 위로 끌어올린다. 롤 맨 위가 헤더 아랫단을 넘지 않는 만큼까지만
-    const lift = Math.max(0, Math.min((1 - G.topSpaceRatio) * groundY, stageTop + S.topMargin - headerBottom - G.rollHeaderGap));
+    // 위 여백 줄이기: 그림은 그대로 두고 통째로 위로 끌어올려, 처음 롤 윗부분이 지름의 rollTuckRatio만큼 헤더 뒤로 들어가게 한다
+    const diameter = groundY - S.topMargin;
+    const lift = Math.max(0, stageTop + S.topMargin - headerBottom + G.rollTuckRatio * diameter);
     svg.style.marginTop = `${-lift}px`;
     const svgTop = stageTop - lift;
     const lineY = svgTop + groundY;                // 카펫 선의 화면 높이
