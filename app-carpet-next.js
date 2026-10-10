@@ -481,7 +481,8 @@ const STAGE_STYLE = {
       loads, capacity: cEff, columns: world.columns, width, baseY: m.groundY, maxSag: m.unit * cEff, flatRatio: G.carpetFlatRatio, curve: 0.5,
     });
     drawCarpet(page, shape, width, m); // 카펫 선과 그림자를 같은 곡선으로 같은 프레임에 그린다
-    if (!sim.carpetShown) { // 처음 한 번: 롤이 깔아 둔 직선과 가리개를 걷고 처지는 카펫으로 넘긴다(처음에는 같은 직선이라 티가 안 난다)
+    if (!sim.carpetShown) {
+      showShadow(page); // 카펫이 처음 그려질 때 그림자도 같이 서서히 나타난다. 이후로는 숨기지 않고 카펫을 따라 계속 그려진다 // 처음 한 번: 롤이 깔아 둔 직선과 가리개를 걷고 처지는 카펫으로 넘긴다(처음에는 같은 직선이라 티가 안 난다)
       sim.carpetShown = true;
       if (page.laidEl) page.laidEl.style.display = 'none';
       if (page.coverEl) page.coverEl.style.display = 'none';
@@ -577,17 +578,15 @@ const STAGE_STYLE = {
     sim.raf = sim.fidgetRaf = 0;
   }
 
-  // ---- 카펫 아래 그림자(차트 채우기 영역처럼): 카펫이 다 정착한 모양으로 한 번만 계산해 그리고, 카펫이 떨어도 그대로 둔다. ----
-  // 낙하·슬라이드·다시 그리기가 시작되면 서서히 사라지고, 다 정착하면 서서히 다시 나타난다.
+  // ---- 카펫 아래 그림자(차트 채우기 영역처럼): 카펫 선과 같은 곡선으로 같은 프레임에 매번 그려서, 눌리고 떨리는 카펫을 실시간으로 따라간다. ----
+  // 카펫이 처음 그려질 때 서서히 나타나고, 그 뒤로는 숨기지 않는다(주 넘기기 때는 그 주의 카펫과 같이 밀려 들어오고 나간다).
   // 모양 값. 숫자나 색을 바꾸고 새로고침하면 바로 보인다
   const SHADOW_STYLE = {
     rgb: '0,0,0',        // 그림자 색(처음엔 검정)
     alpha: 0.15,         // 카펫 곡선 바로 아래의 진하기(0~1). 아래로 갈수록 곡선을 따라 옅어진다
     fadeLength: 160,     // 곡선에서 완전히 투명해지기까지의 깊이(px)
     resolution: 0.5,     // 그림자를 그리는 해상도(1이면 화면 픽셀 그대로). 부드러운 그림자라 절반으로 그려도 티가 나지 않고 메모리를 아낀다
-    fadeInMs: 600,       // 정착한 뒤 나타나는 시간(ms)
-    fadeInDelayMs: 120,  // 정착한 뒤 나타나기 시작하기까지 기다리는 시간(ms)
-    fadeOutMs: 200,      // 바뀌기 시작할 때 사라지는 시간(ms)
+    fadeInMs: 350,       // 카펫이 처음 그려질 때 그림자가 나타나는 시간(ms). 카펫이 눌리고 떨리는 것은 그림자가 실시간으로 따라간다
   };
 
   // 캔버스 크기를 맞춘다(CSS 크기는 화면 픽셀, 캔버스 크기는 scale배). 크기가 같으면 아무것도 하지 않는다. 캔버스 크기를 바꾸면 내용이 지워진다
@@ -635,22 +634,13 @@ const STAGE_STYLE = {
     });
   }
 
-  // 그림자를 서서히 보인다(정착한 뒤). 내용은 renderSim이 카펫과 같이 계속 그려 두므로 여기서는 투명도만 바꾼다
+  // 그림자를 서서히 보인다. 내용은 renderSim이 카펫과 같이 매번 그리므로 여기서는 투명도만 바꾼다
   function showShadow(page) {
     const el = page.shadowEl;
     if (!el) return;
-    el.style.transition = reduceMotion() ? 'none' : `opacity ${SHADOW_STYLE.fadeInMs}ms ease ${SHADOW_STYLE.fadeInDelayMs}ms`;
+    el.style.transition = reduceMotion() ? 'none' : `opacity ${SHADOW_STYLE.fadeInMs}ms ease`;
     el.classList.add('on');
     if (page === active) stage.dataset.shadow = 'on'; // 확인용
-  }
-
-  // 그림자를 서서히 숨긴다(바뀌기 시작할 때)
-  function hideShadow(page) {
-    const el = page.shadowEl;
-    if (!el) return;
-    el.style.transition = reduceMotion() ? 'none' : `opacity ${SHADOW_STYLE.fadeOutMs}ms ease`;
-    el.classList.remove('on');
-    if (page === active) stage.dataset.shadow = 'off'; // 확인용
   }
 
   // 다 자리를 잡은 뒤에도, 예산 초과인 날이 있으면 떨림을 계속 그린다(물리 계산은 멈춰 있고 그리기만). 탭이 가려지면 브라우저가 알아서 멈춘다
@@ -658,7 +648,6 @@ const STAGE_STYLE = {
   const openModals = document.getElementsByClassName('modal-backdrop open');
   function startFidget(page) {
     const sim = page.sim;
-    showShadow(page); // 정착한 모양으로 그림자를 서서히 보인다(떨림 여부와 상관없다)
     if (!sim.fidget) return;
     const jigBoxes = sim.world.boxes.filter(b => sim.over[b.col]);
     const minGap = 1000 / G.jiggleCarpetFps - 2; // 프레임 간격이 조금 들쭉날쭉해도 건너뛰지 않게 여유를 둔다
@@ -679,7 +668,6 @@ const STAGE_STYLE = {
   // dropIds(Set): 'drop'일 때 이 박스들만 떨어뜨리고 나머지는 보이지 않게 먼저 자리를 잡아 둔다(다시 그릴 때). 없으면 전부 떨어진다
   function startBoxes(page, mode, dropIds = null) {
     closeFocus(true);
-    hideShadow(page); // 새로 떨어지는 동안은 그림자를 숨기고, 다 정착하면 startFidget이 다시 보인다
     stopSim(page);
     page.boxesEl.innerHTML = '';
     page.sealsEl.innerHTML = '';
@@ -978,7 +966,6 @@ const STAGE_STYLE = {
     navTarget = target;
     const dir = target > active.offset ? 1 : -1;       // 다음 주(+1)면 새 페이지가 오른쪽에서 들어온다
     const old = active;
-    hideShadow(old);
     const next = buildPage(target);
     const width = pagesEl.clientWidth;
     pagesEl.style.height = `${Math.max(old.m.height, next.m.height)}px`; // 슬라이드 동안은 둘 중 높은 쪽에 맞춘다
@@ -999,7 +986,7 @@ const STAGE_STYLE = {
     const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
     if (drag.mode === 'wait') {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      if (Math.abs(dx) > Math.abs(dy) * 1.2) { drag.mode = 'drag'; hideShadow(active); try { pagesEl.setPointerCapture(e.pointerId); } catch (err) { /* 무시 */ } }
+      if (Math.abs(dx) > Math.abs(dy) * 1.2) { drag.mode = 'drag'; try { pagesEl.setPointerCapture(e.pointerId); } catch (err) { /* 무시 */ } }
       else { drag = null; return; } // 세로로 밀면 스크롤에 맡긴다
     }
     const dt = e.timeStamp - drag.lastT;
@@ -1037,7 +1024,6 @@ const STAGE_STYLE = {
       removePage(next);
       applyContainer(old.m);
       busy = false;
-      if (old.sim && old.sim.world.settled) showShadow(old); // 제자리로 돌아오면 그림자도 다시
       if (refreshQueued) refreshCarpet();
     }
   }
@@ -1065,7 +1051,6 @@ const STAGE_STYLE = {
     let resizeTimer = 0;
     window.addEventListener('resize', () => { // 폭·높이가 바뀌면 보이는 주의 선과 박스를 새 크기로 다시 놓는다(연출 없이). 창을 끄는 동안은 기다렸다가 멈추면 한 번만
       clearTimeout(resizeTimer);
-      hideShadow(active); // 크기가 바뀌는 동안은 숨긴다(다시 놓은 뒤 정착하면 나타난다)
       resizeTimer = setTimeout(() => {
         if (busy || drag) return;
         const width = active.el.clientWidth;
