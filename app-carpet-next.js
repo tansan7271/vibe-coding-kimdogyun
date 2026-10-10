@@ -36,11 +36,12 @@ const INTRO_STYLE = {
 
 // 눈금(카펫 아래 격자) 모양 값. 점선 모양(길이·간격·두께·둥근 끝)은 공용 스티치 값(style.css의 --stitch-*)을 쓴다
 const STAGE_STYLE = {
-  // 예산 깊이(예산선이 카펫 선에서 내려가는 깊이)는 값으로 두지 않는다. 카펫 선 위쪽 여백(헤더 아랫단~카펫 선)과
-  // 예산선 아래쪽 여백(예산선~화면 바닥)이 같아지도록 화면 높이에서 계산한다
+  // 예산 깊이(예산선이 카펫 선에서 내려가는 깊이)는 값으로 두지 않는다. 맨 아래 가로선(예산선)이 아래쪽 '할 일' 메모지의
+  // 왼쪽 위 꼭짓점보다 budgetBelowCorner만큼 아래에 오도록 화면에서 계산한다. 그 선 밑으로는 세로선도 오늘 칸도 없다
+  budgetBelowCorner: 24,       // 예산선이 메모지 왼쪽 위 꼭짓점보다 얼마나 아래에 걸치는지(px)
   minSag: 120,                 // 화면이 아주 낮을 때 예산 깊이가 이보다 줄지 않게 하는 최소값(px)
   topSpaceRatio: 0.375,        // 롤 크기로 정해지는 처음 위쪽 여백을 이 비율로 줄인다(1이면 그대로). 롤이 헤더 밑으로 파고들지 않는 선까지만 줄어든다
-  rollHeaderGap: 4,            // 롤 맨 위와 헤더 아랫단 사이에 남기는 최소 간격(px)
+  rollHeaderGap: 2,            // 롤 맨 위와 헤더 아랫단 사이에 남기는 최소 간격(px). 위쪽 여백은 롤 지름 + 이 값보다 줄지 않는다
   gridMaxLines: 5,             // 가로 눈금선 최대 개수
   gridColor: '#e6e1da',        // 눈금선 색
   gridWidth: 2,                // 눈금선 두께(px)
@@ -93,10 +94,20 @@ const STAGE_STYLE = {
     });
     const todayIdx = dates.indexOf(today);
     gridG.innerHTML =
-      (todayIdx >= 0 ? `<rect x="${columns[todayIdx].left}" y="${groundY}" width="${colW}" height="${height - groundY}" fill="${G.todayFill}"/>` : '')
+      (todayIdx >= 0 ? `<rect x="${columns[todayIdx].left}" y="${groundY}" width="${colW}" height="${sag}" fill="${G.todayFill}"/>` : '')
       + shape.gridLines.map(g => `<line x1="0" y1="${g.y}" x2="${width}" y2="${g.y}" stroke="${g.isBudget ? G.budgetColor : G.gridColor}" stroke-width="${G.gridWidth}"/>`).join('')
       + (shape.safeLine ? `<line x1="0" y1="${shape.safeLine.y}" x2="${width}" y2="${shape.safeLine.y}" stroke="${yarn}" ${stitch}/>` : '')
-      + shape.dividers.map(x => `<line x1="${x}" y1="${groundY}" x2="${x}" y2="${height}" stroke="${G.dividerColor}" ${stitch}/>`).join('');
+      + shape.dividers.map(x => `<line x1="${x}" y1="${groundY}" x2="${x}" y2="${groundY + sag}" stroke="${G.dividerColor}" ${stitch}/>`).join('');
+  }
+
+  // 아래쪽 '할 일' 메모지의 왼쪽 위 꼭짓점의 화면 높이. 메모지는 가운데를 기준으로 기울어 있어서 기울기(변환 행렬)를 반영해 계산한다
+  function noteCornerY() {
+    const el = document.querySelector('.dock-note');
+    if (!el) return null;
+    const m = new DOMMatrix(getComputedStyle(el).transform);
+    const r = el.getBoundingClientRect();
+    const w = el.offsetWidth, h = el.offsetHeight;
+    return r.top + r.height / 2 + m.b * (-w / 2) + m.d * (-h / 2);
   }
 
   // 세로 배치. 화면 폭과 높이가 바뀔 때만 다시 잰다
@@ -117,8 +128,11 @@ const STAGE_STYLE = {
     const svgTop = stageTop - lift;
     const lineY = svgTop + groundY;                // 카펫 선의 화면 높이
     const topSpace = lineY - headerBottom;         // 위쪽 여백: 헤더 아랫단 ~ 카펫 선
-    const sag = Math.max(G.minSag, window.innerHeight - topSpace - lineY); // 아래쪽 여백(예산선 ~ 화면 바닥)을 위쪽 여백과 같게
-    const height = Math.floor(window.innerHeight - svgTop); // 구분 점선과 오늘 칸은 화면 바닥까지
+    // 예산선(맨 아래 가로선): 아래쪽 '할 일' 메모지의 왼쪽 위 꼭짓점보다 조금 아래. 메모지를 못 찾으면 위쪽 여백과 같은 아래 여백
+    const corner = noteCornerY();
+    const budgetY = corner === null ? window.innerHeight - topSpace : corner + G.budgetBelowCorner;
+    const sag = Math.max(G.minSag, budgetY - lineY);
+    const height = Math.ceil(groundY + sag + 2);   // 그림 높이는 예산선까지(선 두께 여유 2px)
     L = { P, startMargin, groundY, lift, sag, height, topSpace };
     return L;
   }
