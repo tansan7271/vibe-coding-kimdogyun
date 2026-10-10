@@ -52,8 +52,21 @@
 ## 저장소 구조
 
 ```
-index.html
+index.html       화면 뼈대(마크업)와 script·link 태그만. 스타일과 코드를 직접 넣지 않는다
+style.css        모든 스타일. 모양 값은 맨 위 :root 변수
+app-common.js    공통: 상태·저장, 날짜·문자열 도우미, 팝업과 헤더 버튼. 가장 먼저 읽는다
+app-goals.js     할 일 화면, AI "텍스트로 만들기"
+app-settings.js  일정과 설정 화면, 데이터 내보내기/가져오기
+app-carpet.js    카펫 화면, 단계 드래그 고정, CARPET_STYLE. 처음 그리는 쪽이라 마지막에 읽는다
+placement.js     배치 규칙 (순수 함수, 테스트 있음)
+carpet.js        카펫 모양 계산 (순수 함수, 테스트 있음)
+data.js          내보내기/가져오기 검사 (순수 함수, 테스트 있음)
+ai.js            AI 분해 요청·응답 검사 (순수 함수, 테스트 있음)
+*.test.js        node --test로 도는 테스트
 SPEC.md
 CLAUDE.md
-phase0/     이전 실험 결과. 참고만 하고 고치지 않는다. 코드를 가져다 쓰지 않는다
+phase0/          이전 실험 결과. 참고만 하고 고치지 않는다. 코드를 가져다 쓰지 않는다
 ```
+
+- 코드는 일반 script 태그로 읽는다(`type="module"` 없음). app-*.js는 전역을 같이 쓰므로 index.html의 읽는 순서가 곧 규칙이다: 순수 함수 파일들 → app-common → app-goals → app-settings → app-carpet
+- 한 화면의 코드는 그 화면의 파일에만 쓴다. 여러 화면이 쓰는 것만 app-common.js에 둔다

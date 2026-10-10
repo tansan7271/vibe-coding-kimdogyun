@@ -1,0 +1,732 @@
+/* 로고·헤더 모양 값. 바꾸고 새로고침하면 바로 보인다 */
+:root {
+  --logo-height: 42px;      /* 로고 그림 높이. 가로는 비율대로 따라온다 */
+  --logo-nudge-y: 0px;      /* 글자 무게중심 미세 조정. 양수면 아래로 내려간다 */
+  --header-pad-y: 12px;     /* 헤더 위아래 여백 */
+  --header-height: calc(var(--logo-height) + var(--header-pad-y) * 2); /* 헤더 기본 높이 */
+
+  /* 털실 스티치 공용 값. 헤더 말고 다른 요소에도 가져다 쓴다.
+     점선: SVG 요소는 CSS로 stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-width: var(--stitch-width); stroke: var(--stitch-color);
+     그림자: box-shadow나 drop-shadow 자리에 var(--shadow-soft). 점선과 두께는 숫자만 쓴다(px 안 붙임) */
+  --stitch-color: #e0a030;     /* 털실 색(주황) */
+  --stitch-dash: 4;            /* 점 길이 */
+  --stitch-gap: 6;             /* 점 사이 간격. 둥근 끝이 두께만큼 먹으므로 눈에 보이는 틈은 간격 − 두께 */
+  --stitch-width: 2.4;         /* 털실 두께 */
+  --shadow-rgb: 184, 32, 58;   /* 그림자 색(붉은 기운) */
+  --shadow-alpha: 0.4;         /* 그림자 진하기 */
+  --shadow-y: 3px;             /* 그림자가 아래로 내려오는 거리 */
+  --shadow-blur: 7px;          /* 그림자 번짐 */
+  --shadow-soft: 0 var(--shadow-y) var(--shadow-blur) rgba(var(--shadow-rgb), var(--shadow-alpha));
+
+  /* 털실 스티치 헤더 */
+  --header-bg: #b8203a;        /* 헤더 천 색 */
+  --header-tilt-deg: 0.75deg;  /* 기울기. 반시계 방향으로 이만큼 기운다 */
+  --edge-amp: 3;               /* 울렁이는 아랫단 진폭(위아래 px, 숫자만) */
+  --edge-wave: 128;            /* 울렁임 한 주기 길이(px, 숫자만) */
+  --edge-offset: 6;            /* 점선과 천 끝 사이 거리(px, 숫자만) */
+  /* 아래 값은 위 값에서 계산된다. 같은 식이 <head>의 스크립트에도 있다 */
+  --edge-sy: calc(var(--stitch-width) / 2 + var(--edge-amp) + 1);   /* 점선 곡선 가운데 높이 */
+  --edge-ey: calc(var(--edge-sy) + var(--edge-offset));             /* 천 끝 곡선 가운데 높이 */
+  --edge-h: calc((var(--edge-ey) + var(--edge-amp) + 1) * 1px);     /* 아랫단 그림 높이 */
+  --edge-depth: calc((var(--edge-ey) + var(--edge-amp)) * 1px);     /* 아랫단이 헤더 밑으로 내려오는 깊이. 본문이 이만큼 더 내려온다 */
+  /* --edge-tile(천 끝과 털실 점선 그림)은 <head>의 스크립트가 위 값으로 만들어 넣는다 */
+  /* 기울이면 한쪽 위 모서리가 화면 안으로 내려오므로, 폭의 절반×sin(기울기)만큼 헤더를 화면 위로 더 늘려 가린다 */
+  --header-bleed: calc(sin(var(--header-tilt-deg)) * 50vw + 4px);
+
+  /* 주 이동 패치: 헤더에 꿰맨 듯 걸린 둥근 사각형. 이전 주·날짜·다음 주·이번 주 버튼이 올라간다 */
+  --patch-bg: #a51d34;         /* 패치 천 색. 헤더(--header-bg)보다 약간 어둡게 */
+  --patch-top: 28px;           /* 화면 위에서 내려오는 거리. 헤더 아랫단 밑으로 삐져나오도록 정한다 */
+  --patch-right: -14px;        /* 화면 오른쪽에서 띄우는 거리. 음수면 화면 밖으로 조금 나간다 */
+  --patch-pad: 18px 28px 22px; /* 안쪽 여백(위 / 좌우 / 아래) */
+  --patch-radius: 18px;        /* 모서리 둥글기 */
+  --patch-tilt-deg: 2deg;      /* 기울기. 시계 방향으로 이만큼 기운다 */
+  --patch-stitch-inset: 8px;   /* 털실 점선이 가장자리에서 안쪽으로 들어간 거리. 점선 모서리 둥글기는 HTML의 rx(= 둥글기 − 이 값)로 맞춘다 */
+  --patch-z: 110;              /* 헤더(100) 바로 위 */
+
+  /* 아래쪽 버튼: 스프링 메모장(할 일)과 일마다 찢는 달력(일정과 설정). 크기·기울기·색은 여기서 바꾼다.
+     화면 아래로 일부러 잘려 나가고, 두 버튼이 서로 겹친다 */
+  --dock-bottom: -30px;        /* 화면 아래에서 띄우는 거리. 음수면 그만큼 화면 밖으로 잘려 나간다 */
+  --dock-gap: -28px;           /* 두 버튼 사이 간격. 음수면 할 일이 일정과 설정 위에 포개진다 (CSS gap은 음수가 안 돼서 달력의 왼쪽 여백으로 적용) */
+  --dock-label-zone: 1.05;     /* 글자가 놓이는 영역: 화면에 보이는 높이의 이만큼(위에서부터) 안에 둔다 */
+  --dock-z: 150;               /* 본문 위, 팝업(200) 아래 */
+  --dock-shadow: 0 8px 16px rgba(0, 0, 0, 0.18); /* 두 버튼 공통 그림자. 연한 회색 */
+  --note-w: 334px;             /* 메모장 크기. 자주 쓰는 버튼이라 달력보다 크게 */
+  --note-h: 190px;
+  --note-tilt: -3deg;          /* 메모장 기울기. 음수는 반시계 */
+  --note-paper: #fffbea;       /* 메모지 색 */
+  --note-ink: #3a2f2a;         /* 글자 색 */
+  --note-font: 34px;
+  --note-margin-x: 56px;       /* 코넬식 세로선 위치(메모장 왼쪽에서) */
+  --note-margin-color: rgba(184, 32, 58, 0.22); /* 세로선 색. 연한 빨강 */
+  --note-line-color: rgba(0, 0, 0, 0.09);       /* 가로선 색. 흐린 회색 */
+  --note-line-gap: 26px;       /* 가로선 간격 */
+  --note-line-top: 12px;       /* 가로선 그리기 시작 높이. 첫 줄은 이 값 + 줄 간격 − 1px 자리에 생긴다 */
+  --note-plus-size: 34px;      /* 글자 옆 + 원 크기 */
+  --note-plus-bg: #f3e6ae;     /* + 원 색. 메모지보다 조금 진하게 */
+  --note-plus-fg: #b8962f;     /* + 모양 색. 원보다 더 진하게 */
+  --spring-pitch: 20px;        /* 스프링 알약 사이 간격(가로). 끝이 잘리지 않게 실제로는 칸 수가 맞게 살짝 늘어난다 */
+  --spring-h: 22px;            /* 스프링 알약 길이. 절반이 메모지 위로 튀어나온다 */
+  --cal-w: 224px;              /* 달력 크기 */
+  --cal-h: 138px;
+  --cal-tilt: 2.5deg;          /* 달력 기울기. 양수는 시계 방향 */
+  --cal-paper: #fffdf8;        /* 달력 종이 색 */
+  --cal-band: #b8203a;         /* 달력 윗줄 색 */
+  --cal-band-h: 30px;          /* 달력 윗줄 높이 */
+  --cal-font: 24px;
+  --cal-band-shadow: 0 3px 9px rgba(var(--shadow-rgb), 0.32); /* 달력 붉은 윗줄 그림자. 붉은 기운 */
+
+  /* 팝업(할 일, 일정과 설정) 모양 값 */
+  --modal-dim: rgba(30, 20, 20, 0.45); /* 뒤 화면을 덮는 어두운 막 */
+  --modal-blur: 6px;                   /* 뒤 화면 흐림 정도 */
+  --modal-gap: 32px;                   /* 패널 상하좌우 바깥 여백. 클수록 뒤 카펫이 더 보인다 */
+  --modal-max-width: 880px;            /* 패널 최대 가로 */
+  --modal-radius: 14px;                /* 패널 모서리 둥글기 */
+  --modal-pad: 24px;                   /* 패널 안쪽 여백 */
+  --modal-z: 200;                      /* 헤더(100)와 아래쪽 버튼(150)보다 위 */
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  background: #f5f2ee;
+  color: #222;
+  padding-top: calc(var(--header-height) + var(--edge-depth));
+  padding-bottom: calc(var(--note-h) + var(--dock-bottom) + 24px); /* 아래쪽 버튼에 본문이 가리지 않게 */
+}
+
+header {
+  position: fixed;
+  top: calc(var(--header-bleed) * -1);
+  left: -16px;
+  right: -16px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--header-bleed) + var(--header-pad-y)) 32px var(--header-pad-y);
+  color: #fff;
+  transform: rotate(calc(var(--header-tilt-deg) * -1));
+  transform-origin: 50% 0;
+}
+
+/* 천 + 울렁이는 아랫단 + 털실 점선. 그림자는 여기에만 걸어 로고와 버튼에는 번지지 않게 한다 */
+header::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--edge-h) * -1);
+  background:
+    var(--edge-tile) left bottom / auto var(--edge-h) no-repeat,
+    linear-gradient(var(--header-bg), var(--header-bg)) left top / 100% calc(100% - var(--edge-h) + 1px) no-repeat;
+  filter: drop-shadow(var(--shadow-soft));
+}
+
+/* 아래쪽 버튼 */
+nav {
+  position: fixed;
+  bottom: var(--dock-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--dock-z);
+  display: flex;
+  align-items: flex-end;
+}
+
+nav button {
+  position: relative;
+  display: flex;               /* button은 안쪽을 세로 가운데로 맞추려 해서, 위에서부터 놓도록 flex로 바꾼다 */
+  align-items: flex-start;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+  color: var(--note-ink);
+}
+
+/* 할 일: 위에 스프링이 달린 메모장 */
+.dock-note {
+  width: var(--note-w);
+  height: var(--note-h);
+  padding-top: calc(var(--spring-h) / 2);
+  font-size: var(--note-font);
+  border-radius: 6px 6px 12px 12px;
+  transform: rotate(var(--note-tilt));
+  background:
+    linear-gradient(var(--note-margin-color), var(--note-margin-color)) var(--note-margin-x) calc(var(--note-line-top) + var(--note-line-gap) - 1px) / 2px 100% no-repeat, /* 세로선은 맨 위 가로선에서 시작 */
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--note-line-gap) - 1px), var(--note-line-color) calc(var(--note-line-gap) - 1px) var(--note-line-gap)) 0 var(--note-line-top) / 100% 100% no-repeat,
+    var(--note-paper);
+  box-shadow: var(--dock-shadow);
+  z-index: 1; /* 달력 위로 포갠다 */
+}
+
+.dock-note span::after { /* 글자 왼쪽 + 표시: 할 일을 더할 수 있다는 안내 */
+  content: '';
+  flex: none;
+  width: var(--note-plus-size);
+  height: var(--note-plus-size);
+  order: -1;               /* 글자 왼쪽에 붙인다 */
+  margin-right: 12px;
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--note-plus-fg), var(--note-plus-fg)) center / 44% 3px no-repeat,
+    linear-gradient(var(--note-plus-fg), var(--note-plus-fg)) center / 3px 44% no-repeat,
+    var(--note-plus-bg);
+}
+
+.dock-note::before { /* 스프링: 세로로 선 알약을 가로로 늘어놓는다 */
+  content: '';
+  position: absolute;
+  top: calc(var(--spring-h) / -2);
+  left: 20px;
+  right: 20px;
+  height: var(--spring-h);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='22' viewBox='0 0 16 22'%3E%3Crect x='5' y='0' width='6' height='22' rx='3' fill='%23666'/%3E%3C/svg%3E") left top / var(--spring-pitch) var(--spring-h) round no-repeat;
+}
+
+/* 일정과 설정: 일마다 찢는 달력 */
+.dock-cal {
+  margin-left: var(--dock-gap);
+  width: var(--cal-w);
+  height: var(--cal-h);
+  padding-top: var(--cal-band-h);
+  font-size: var(--cal-font);
+  border-radius: 6px;
+  transform: rotate(var(--cal-tilt));
+  background: var(--cal-paper);
+  box-shadow: 0 3px 0 #eadfce, 0 6px 0 #dccfba, var(--dock-shadow); /* 아래로 겹친 종이 두 장 + 그림자 */
+}
+
+.dock-cal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--cal-band-h);
+  border-radius: 6px 6px 0 0;
+  background:
+    radial-gradient(circle at 22% 50%, var(--cal-paper) 0 calc(var(--cal-band-h) * 0.15), transparent calc(var(--cal-band-h) * 0.15 + 0.5px)),
+    radial-gradient(circle at 78% 50%, var(--cal-paper) 0 calc(var(--cal-band-h) * 0.15), transparent calc(var(--cal-band-h) * 0.15 + 0.5px)),
+    var(--cal-band);
+  box-shadow: var(--cal-band-shadow);
+}
+
+
+.dock-note span, .dock-cal span {
+  position: relative; /* 장식 위에 글자가 오게 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+/* 아래가 화면 밖으로 잘려 나가므로, 보이는 높이의 위쪽 2/3 안에 글자를 놓는다 */
+.dock-note span { height: calc((var(--note-h) + var(--dock-bottom)) * var(--dock-label-zone) - var(--spring-h) / 2); }
+.dock-cal span { height: calc((var(--cal-h) + var(--dock-bottom)) * var(--dock-label-zone) - var(--cal-band-h)); }
+
+.logo-link {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: block;
+}
+
+.logo-link img {
+  display: block;
+  height: var(--logo-height);
+  transform: translateY(var(--logo-nudge-y));
+}
+
+main {
+  padding: 24px 16px;
+}
+
+.screen {
+  display: none;
+}
+
+.screen.active {
+  display: block;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--modal-z);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--modal-gap);
+  background: var(--modal-dim);
+  -webkit-backdrop-filter: blur(var(--modal-blur));
+  backdrop-filter: blur(var(--modal-blur));
+}
+
+.modal-backdrop.open { display: flex; }
+
+.modal-panel {
+  position: relative;
+  width: 100%;
+  max-width: var(--modal-max-width);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--modal-pad);
+  background: #f5f2ee;
+  border-radius: var(--modal-radius);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+
+.modal-panel .screen { display: block; }
+.modal-panel .screen h1 { margin: 0 48px 16px 0; height: 32px; line-height: 32px; } /* 제목 줄 높이를 x 버튼(32px)과 같게 해서 세로 중심을 맞춘다 */
+
+.modal-close {
+  position: absolute;
+  top: var(--modal-pad);
+  right: var(--modal-pad);
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: #e6e2dc;
+  color: #444;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-close:hover { background: #d8d2c9; }
+
+/* 탭: 할 일은 제목 줄 x 버튼 옆, 일정은 '일정' 소제목 줄 오른쪽 */
+.tab-bar { display: flex; gap: 4px; }
+.tab-bar button {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tab-bar button:hover { background: #e6e2dc; }
+.tab-bar button.active { background: #b8203a; color: #fff; font-weight: bold; }
+.modal-panel .tab-bar.title-tabs { position: absolute; top: var(--modal-pad); right: calc(var(--modal-pad) + 40px); }
+.section-head { display: flex; align-items: center; justify-content: space-between; }
+
+.screen h1 {
+  font-size: 18px;
+  color: #444;
+}
+
+.goal-add-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.goal-add-form input[type="text"] {
+  flex: 1;
+  min-width: 160px;
+}
+
+#ai-panel, #ai-draft {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+#ai-panel textarea { width: 100%; box-sizing: border-box; min-height: 120px; font-family: inherit; font-size: 14px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+#ai-draft .ai-step-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+#ai-draft .ai-step-row input[type="text"] { flex: 1; min-width: 140px; }
+#ai-draft .ai-step-row input[type="number"] { width: 70px; }
+.ai-warn { color: #b8203a; font-size: 12px; }
+.ai-note { color: #666; font-size: 12px; margin: 6px 0; }
+
+input, select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+button.btn {
+  border: none;
+  background: #b8203a;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button.btn-danger {
+  background: #888;
+}
+
+button.btn-plain {
+  background: none;
+  color: #333;
+  border: 1px solid #ccc;
+}
+
+.goal-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.goal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.goal-header-info {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.goal-title {
+  font-weight: bold;
+}
+
+.goal-deadline {
+  font-size: 13px;
+  color: #b8203a;
+}
+
+.goal-actions button {
+  margin-left: 6px;
+}
+
+.goal-body {
+  margin-top: 12px;
+  border-top: 1px solid #eee;
+  padding-top: 12px;
+}
+
+.goal-edit-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.step-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+
+.step-title-input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.step-minutes-input {
+  width: 70px;
+}
+
+.load-picker {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.load-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.load-btn.selected {
+  background: #b8203a;
+  color: #fff;
+  border-color: #b8203a;
+}
+
+.load-btn.load-extra {
+  color: #bbb;
+  border-color: #eee;
+}
+
+.load-btn.load-extra.selected {
+  background: #e8a3ae;
+  color: #fff;
+  border-color: #e8a3ae;
+}
+
+.step-add-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.empty-hint {
+  color: #999;
+  font-size: 13px;
+}
+
+.screen h2 {
+  font-size: 15px;
+  color: #444;
+  margin-top: 28px;
+}
+
+.event-add-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.event-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  flex-wrap: wrap;
+}
+
+.event-row .skipped-dates { flex-basis: 100%; font-size: 12px; color: #555; }
+.event-row .event-title-input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 260px;
+}
+
+.settings-form label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.settings-form input {
+  width: 90px;
+}
+
+.week-patch {
+  position: fixed;
+  top: var(--patch-top);
+  right: var(--patch-right);
+  z-index: var(--patch-z);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--patch-pad);
+  border-radius: var(--patch-radius);
+  background: var(--patch-bg);
+  color: #fff;
+  box-shadow: var(--shadow-soft);
+  transform: rotate(var(--patch-tilt-deg));
+}
+
+.week-patch .patch-stitch { /* 털실 점선: 공용 토큰(--stitch-*)을 그대로 쓴다 */
+  position: absolute;
+  inset: var(--patch-stitch-inset);
+  width: calc(100% - var(--patch-stitch-inset) * 2);
+  height: calc(100% - var(--patch-stitch-inset) * 2);
+  overflow: visible;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--stitch-color);
+  stroke-width: var(--stitch-width);
+  stroke-dasharray: var(--stitch-dash) var(--stitch-gap);
+  stroke-linecap: round;
+}
+
+.week-patch .btn-plain { /* 붉은 천 위라 종이색 버튼으로 */
+  background: var(--note-paper);
+  color: var(--note-ink);
+  border: none;
+  border-radius: 6px;
+}
+
+.week-patch .week-label { color: #fff; }
+
+.week-patch > :not(.patch-stitch) { position: relative; } /* 점선 위에 버튼이 오게 */
+
+.week-summary {
+  font-size: 13px;
+  color: #444;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+.week-summary .note { color: #888; font-size: 12px; }
+
+.week-label {
+  font-size: 14px;
+  color: #444;
+  min-width: 150px;
+  text-align: center;
+}
+
+.week-scroll { overflow-x: auto; }
+
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 8px;
+  min-width: 888px;
+}
+
+#carpet-svg { display: block; min-width: 888px; }
+
+.day-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  font-size: 12px;
+  border: 2px solid transparent;
+}
+
+.day-card.today { border-color: #b8203a; }
+.day-card.past { background: #f0eeeb; }
+
+.day-head {
+  font-weight: bold;
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.today-badge {
+  font-size: 11px;
+  background: #b8203a;
+  color: #fff;
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+
+.day-item {
+  padding: 3px 6px;
+  margin-bottom: 3px;
+  border-radius: 4px;
+  background: #f5f2ee;
+  overflow-wrap: anywhere;
+}
+
+.day-item.event { background: #e4e9f2; }
+/* 끌어서 옮기기 */
+.week-strip .day-item.step.clickable { cursor: grab; }
+body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-select: none; cursor: grabbing !important; }
+.drag-ghost { position: fixed; z-index: 1000; pointer-events: none; opacity: 0.85; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 220px; }
+.day-card.drop-ok { outline: 2px solid #b8203a; outline-offset: -2px; }
+.day-card.drop-bad { opacity: 0.5; }
+.day-item.step.drag-source { opacity: 0.4; }
+.drag-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 1001; }
+.skip-btn {
+  font-size: 11px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  border: 1px solid #aab4c8;
+  border-radius: 4px;
+  background: #fff;
+  color: #445;
+  cursor: pointer;
+}
+.day-item.step { background: #f8e3e7; }
+.day-item.exceeded { border: 1px solid #b8203a; }
+
+.day-item .tag {
+  font-size: 10px;
+  color: #b8203a;
+  font-weight: bold;
+}
+
+.day-items { margin-bottom: 8px; min-height: 24px; }
+
+.bar-row { margin-top: 6px; }
+
+.bar-label {
+  display: flex;
+  justify-content: space-between;
+  color: #555;
+  margin-bottom: 2px;
+}
+
+.bar-label .warn { color: #b8203a; font-weight: bold; }
+
+.bar {
+  position: relative;
+  height: 10px;
+  background: #e6e2dc;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.bar-fill { height: 100%; background: #6b8fc7; }
+.bar-fill.over-safe { background: #e0a030; }
+.bar-fill.over-budget { background: #b8203a; }
+.bar-fill.time { background: #7aa88a; }
+.bar-fill.over-time { background: #b8203a; }
+
+.bar-safe-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #333;
+}
+
+.overdue-box { margin-top: 20px; }
+
+.day-item.clickable { cursor: pointer; }
+.day-item.clickable:hover { background: #f1cfd6; }
+.day-item.done { background: #dfeede; text-decoration: none; }
+.day-item.pinned .tag-pin { color: #333; }
+
+.step-menu {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px;
+  margin-bottom: 6px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.step-menu button { text-align: left; }
+.step-menu input[type="date"] { width: 100%; font-size: 12px; }
+.step-menu .menu-hint { color: #777; font-size: 11px; }
