@@ -58,6 +58,7 @@ app-common.js    공통: 상태·저장, 날짜·문자열 도우미, 팝업과 
 app-goals.js     할 일 화면, AI "텍스트로 만들기"
 app-settings.js  일정과 설정 화면, 데이터 내보내기/가져오기
 app-carpet.js    카펫 화면, 단계 드래그 고정, CARPET_STYLE. 처음 그리는 쪽이라 마지막에 읽는다
+app-carpet-next.js 새 카펫 화면(작업 중). ?carpet=next 로 열 때만 켜진다. 이관 체크리스트가 맨 위에 있고, 다 채우면 옛 app-carpet.js를 지우고 이름을 되돌린다
 placement.js     배치 규칙 (순수 함수, 테스트 있음)
 carpet.js        카펫 모양 계산 (순수 함수, 테스트 있음)
 data.js          내보내기/가져오기 검사 (순수 함수, 테스트 있음)
@@ -68,5 +69,5 @@ CLAUDE.md
 phase0/          이전 실험 결과. 참고만 하고 고치지 않는다. 코드를 가져다 쓰지 않는다
 ```
 
-- 코드는 일반 script 태그로 읽는다(`type="module"` 없음). app-*.js는 전역을 같이 쓰므로 index.html의 읽는 순서가 곧 규칙이다: 순수 함수 파일들 → app-common → app-goals → app-settings → app-carpet
+- 코드는 일반 script 태그로 읽는다(`type="module"` 없음). app-*.js는 전역을 같이 쓰므로 index.html의 읽는 순서가 곧 규칙이다: 순수 함수 파일들 → app-common → app-goals → app-settings → app-carpet → app-carpet-next
 - 한 화면의 코드는 그 화면의 파일에만 쓴다. 여러 화면이 쓰는 것만 app-common.js에 둔다
