@@ -12,7 +12,8 @@
 //  [ ] 지난 주 요약(총 부하, 초과한 날 수, 밀린 횟수)
 //  [ ] 카펫 선: 부하만큼 처짐, 시간 초과 짐 상자
 //  [x] 눈금: 가로 눈금, 예산선, 안전선, 날짜 구분선, 오늘 칸 배경. 예산선 아래에는 아무것도 없다
-//  [x] 날짜 숫자: 카펫 선 위쪽 여백 안, 칸마다 왼쪽 정렬(눈금 숫자와 요일 글자는 아직 안 넣음)
+//  [x] 날짜 숫자: 카펫 선 위쪽 여백 안, 칸마다 왼쪽 정렬. 폰트 파일 없이 숫자 윤곽선(barista-digits.js)으로 그린다(눈금 숫자와 요일 글자는 아직 안 넣음)
+//  [x] 헤더의 월 표시: Red Carpet ∙ 10월
 //  [ ] 좁은 화면(가로 스크롤)
 //  숨은 부작용(빠뜨리기 쉬움)
 //  [ ] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
@@ -48,10 +49,8 @@ const STAGE_STYLE = {
   budgetColor: '#b9b2a8',      // 예산선(맨 아래 눈금) 색
   dividerColor: '#d6cfc4',     // 날짜 구분 점선 색(모양은 스티치). 안전선은 스티치 색(주황)을 그대로 쓴다
   todayFill: 'rgba(184,32,58,0.08)', // 오늘 칸 배경. 마지막 숫자를 올리면 진해진다
-  // --- 날짜 숫자: 헤더 아랫단과 카펫 선 사이(위쪽 여백)에 칸마다 왼쪽 정렬 ---
-  dateFont: "'Barista Script', cursive", // 폰트 파일은 저장소에 없고 설치된 폰트만 쓴다(style.css의 @font-face 참고). 없으면 cursive로 대체된다
+  // --- 날짜 숫자: 헤더 아랫단과 카펫 선 사이(위쪽 여백)에 칸마다 왼쪽 정렬. 숫자 모양은 barista-digits.js의 윤곽선 ---
   dateColor: '#d6cfc4',        // 숫자 색. 날짜 구분 점선과 같은 흐린 색
-  dateDigitEm: 0.8,            // 이 폰트에서 숫자 높이 / 글자 크기. Barista Script 숫자는 기준선 위로 약 0.8em
   dateHeightRatio: 0.5,        // 숫자 높이 / 위쪽 여백. 숫자는 위쪽 여백의 세로 가운데에 놓인다(클수록 크고 위아래 패딩이 줄어든다)
   datePadXRatio: 0.08,         // 칸 왼쪽에서 숫자까지 띄우는 거리 / 칸 폭
 };
@@ -87,7 +86,9 @@ const STAGE_STYLE = {
 
   // 헤더의 월 표시("Red Carpet ∙ 12월"): 그 주의 목요일이 든 달. 주가 두 달에 걸치면 날이 더 많은 쪽이다
   const monthEl = document.getElementById('header-month');
-  monthEl.querySelector('.num').textContent = Number(thisWeekDates()[3].slice(5, 7));
+  const monthNum = Number(thisWeekDates()[3].slice(5, 7));
+  monthEl.setAttribute('aria-label', `${monthNum}월`);
+  monthEl.querySelector('.num').innerHTML = monthNumberSvg(monthNum, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-month-num-size')));
   monthEl.hidden = false;
 
   // 눈금: 7칸을 화면 너비로 똑같이 나눠 그린다. 오늘 칸은 배경을 깐다. 폭이나 높이가 바뀔 때만 다시 만든다
@@ -156,15 +157,32 @@ const STAGE_STYLE = {
     return L;
   }
 
+  // 숫자 문자열을 윤곽선 글리프 <g>로 만든다. x: 왼쪽 시작, baseline: 기준선의 y, fontSize: 글자 크기(px)
+  function digitsSvg(text, x, baseline, fontSize, fill) {
+    const B = BaristaDigits;
+    const sc = (fontSize / B.unitsPerEm).toFixed(5);
+    return `<g transform="translate(${x.toFixed(2)} ${baseline.toFixed(2)}) scale(${sc} -${sc})" fill="${fill}">`
+      + B.layout(text).glyphs.map(g => `<path transform="translate(${g.x} 0)" d="${B.glyphs[g.ch].d}"/>`).join('') + '</g>';
+  }
+
   // 날짜 숫자: 헤더 아랫단~카펫 선 사이의 세로 가운데에, 칸 왼쪽에서 padX만큼 띄워 왼쪽 정렬
   function dateNumbers(columns, dates, colW, groundY, topSpace) {
     const digitH = topSpace * G.dateHeightRatio;
-    const fontSize = digitH / G.dateDigitEm;
+    const fontSize = digitH / (BaristaDigits.digitHeight / BaristaDigits.unitsPerEm);
     const baseline = groundY - topSpace / 2 + digitH / 2; // 위쪽 여백 가운데에 숫자 높이를 맞춘다(숫자는 기준선 위로 자란다)
     const padX = colW * G.datePadXRatio;
-    return dates.map((d, i) =>
-      `<text x="${(columns[i].left + padX).toFixed(2)}" y="${baseline.toFixed(2)}" font-family="${G.dateFont}" font-size="${fontSize.toFixed(2)}" fill="${G.dateColor}">${Number(d.slice(8))}</text>`
-    ).join('');
+    return dates.map((d, i) => digitsSvg(String(Number(d.slice(8))), columns[i].left + padX, baseline, fontSize, G.dateColor)).join('');
+  }
+
+  // 헤더의 월 숫자: 같은 윤곽선으로 그린 작은 그림. 숫자 기준선이 옆의 '월' 글자 기준선에 놓이게 아래로 내려 붙인다
+  function monthNumberSvg(month, sizePx) {
+    const B = BaristaDigits;
+    const lay = B.layout(String(month));
+    const sc = sizePx / B.unitsPerEm;
+    const h = B.digitHeight + B.digitDepth;
+    return `<svg width="${(lay.right * sc).toFixed(2)}" height="${(h * sc).toFixed(2)}" viewBox="0 ${-B.digitHeight} ${lay.right} ${h}" style="margin-bottom:${(-B.digitDepth * sc).toFixed(2)}px" aria-hidden="true">`
+      + '<g transform="scale(1 -1)" fill="currentColor">'
+      + lay.glyphs.map(g => `<path transform="translate(${g.x} 0)" d="${B.glyphs[g.ch].d}"/>`).join('') + '</g></svg>';
   }
 
   // 롤 그리기. eased는 0~1(곡선을 입힌 진행도)
