@@ -1131,7 +1131,8 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 
 /* 새 카펫의 층(app-carpet-next.js). 모든 층은 .cn-world 안에서 왼쪽 위가 (0,0)인 같은 좌표를 쓴다.
    움직이는 것(박스·가리개·깔린 카펫·롤)은 transform만 바꿔서 그래픽 카드가 위치만 옮기게 한다 */
-.cn-world { position: relative; margin: 0 -16px; } /* 화면 너비 끝까지: main의 좌우 여백 16px을 되돌린다. 높이와 위쪽 당김은 JS가 정한다 */
+.cn-pages { position: relative; margin: 0 -16px; overflow-x: clip; touch-action: pan-y; } /* 화면 너비 끝까지: main의 좌우 여백 16px을 되돌린다. 옆으로 밀려 나가는 페이지는 화면 가장자리에서 잘린다(가로 스크롤 없음). 세로 스크롤은 브라우저에, 가로 스와이프는 JS에. 높이와 위쪽 당김은 JS가 정한다 */
+.cn-world { position: absolute; left: 0; top: 0; width: 100%; will-change: transform; } /* 한 주 = 한 페이지. 주를 넘길 때 통째로 옆으로 밀린다 */
 .cn-world > * { position: absolute; left: 0; top: 0; }
 .cn-grid, .cn-carpet, .cn-roll { overflow: visible; }
 .cn-grid, .cn-carpet { will-change: transform; } /* 각자 독립 레이어: 카펫 선이 바뀔 때 눈금 점선까지 다시 그려지지 않게 */
