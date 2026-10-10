@@ -467,15 +467,15 @@ main {
   width: 32px;
   height: 32px;
   border: 0;
-  border-radius: 50%;
-  background: #e6e2dc;
-  color: #444;
-  font-size: 20px;
+  background: none; /* 배경 없이 × 기호만 */
+  color: #6a5d4a;
+  font-size: 26px;
   line-height: 1;
   cursor: pointer;
+  transition: color 120ms, transform 120ms;
 }
 
-.modal-close:hover { background: #d8d2c9; }
+.modal-close:hover { color: #b8203a; transform: rotate(90deg); }
 
 /* 팝업 오른쪽에 튀어나온 인덱스 견출지. 글자는 시계 방향으로 90도 눕힌다.
    선택된 탭은 팝업 앞에 있고 종이 색이 같아 팝업과 이어져 보이며 더 튀어나온다. 선택 안 된 탭은 팝업 뒤로 밀려 가장자리 밑에 끼워져 있다. 그림자는 없다 */
@@ -533,8 +533,8 @@ main {
 
 .goal-add-form {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 14px;
+  align-items: center;
   flex-wrap: wrap;
 }
 
@@ -543,14 +543,21 @@ main {
   min-width: 160px;
 }
 
-#ai-panel, #ai-draft {
+#place-mode-slot-manual, #place-mode-slot-ai { display: inline-flex; }
+
+/* AI 입력기: 입력줄 자리를 대신한다 */
+#ai-panel .ai-lead { font-size: 14px; color: #444; }
+#ai-panel textarea { display: block; width: 100%; min-height: 96px; margin-top: 6px; resize: vertical; font-family: inherit; }
+.ai-actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+.ai-actions .ai-warn { flex: 1; min-width: 120px; }
+
+#ai-draft {
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 6px;
   padding: 12px;
   margin-bottom: 20px;
 }
-#ai-panel textarea { width: 100%; box-sizing: border-box; min-height: 120px; font-family: inherit; font-size: 14px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
 #ai-draft .ai-step-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
 #ai-draft .ai-step-row input[type="text"] { flex: 1; min-width: 140px; }
 #ai-draft .ai-step-row input[type="number"] { width: 70px; }
@@ -778,7 +785,8 @@ button.btn-plain {
   stroke-linecap: round;
 }
 
-.week-patch .wbtn { /* 붉은 천 위라 종이색 버튼으로 */
+.wbtn, .sbtn { /* 종이색 버튼 + 털실 점선. 주 이동 버튼(붉은 천 위)과 팝업의 버튼이 같이 쓴다 */
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -794,7 +802,7 @@ button.btn-plain {
   transition: transform var(--wbtn-ms) ease-out, background-color var(--wbtn-ms) ease-out;
 }
 
-.week-patch .wbtn .btn-stitch { /* 털실 점선 */
+:is(.wbtn, .sbtn) .btn-stitch { /* 털실 점선 */
   position: absolute;
   inset: var(--wbtn-stitch-inset);
   width: calc(100% - var(--wbtn-stitch-inset) * 2);
@@ -808,7 +816,7 @@ button.btn-plain {
   stroke-linecap: round;
 }
 
-.week-patch .wbtn .chev {
+:is(.wbtn, .sbtn) .chev {
   width: var(--wbtn-chevron);
   height: var(--wbtn-chevron);
   fill: none;
@@ -823,15 +831,71 @@ button.btn-plain {
 }
 
 @media (hover: hover) {
-  .week-patch .wbtn:hover { transform: rotate(var(--wbtn-hover-tilt)); } /* 시계 방향 */
+  .wbtn:hover, .sbtn:hover:not(:disabled) { transform: rotate(var(--wbtn-hover-tilt)); } /* 시계 방향 */
 }
 
-.week-patch .wbtn:active { /* 반대(반시계) 방향으로 더 기울고, 배경이 약간 어두워진다 */
+.wbtn:active, .sbtn:active:not(:disabled) { /* 반대(반시계) 방향으로 더 기울고, 배경이 약간 어두워진다 */
   transform: rotate(var(--wbtn-press-tilt));
   background: var(--wbtn-press-bg);
 }
 
 .week-patch .week-label { color: #fff; }
+
+/* 팝업의 스티치 버튼: 바탕이 팝업 종이와 같은 색이라 그림자로 떠 보이게 하고, 그림자 색은 팝업 종이를 진하게 한 색으로 은은하게 */
+#modal-goals { --paper-shadow-rgb: 150, 118, 40; }
+#modal-settings { --paper-shadow-rgb: 140, 112, 84; }
+.modal-scroll .sbtn { --wbtn-shadow: 0 2px 7px rgba(var(--paper-shadow-rgb), 0.34); --wbtn-font: 14px; --wbtn-pad: 8px 16px; }
+.sbtn:disabled { opacity: 0.5; cursor: default; }
+.sbtn-accent { /* 강조 버튼: 붉은 바탕에 같은 털실 점선 */
+  background: #b8203a;
+  color: #fff;
+  --wbtn-press-bg: #9c1a30;
+}
+.sbtn-field { cursor: text; } /* 날짜 칸: 스티치 버튼 모양 안에 날짜 입력을 넣는다 */
+.sbtn-field input[type="date"] {
+  position: relative;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  outline: none;
+}
+
+/* 윤곽선·배경 없이 아래쪽에만 스티치와 같은 두께·색의 실선을 긋는 입력기 */
+.line-input {
+  border: 0;
+  border-bottom: calc(var(--stitch-width) * 1px) solid var(--stitch-color);
+  border-radius: 0;
+  background: none;
+  padding: 8px 2px;
+  font-size: 16px;
+  outline: none;
+}
+.line-input:focus { border-bottom-color: #b8203a; }
+
+[hidden] { display: none !important; }
+
+/* 할 일 입력줄: 아래 목록을 스크롤해도 위로 딸려 나가지 않게 팝업 위쪽에 고정한다. 종이색 바탕이 목록을 가리고, 아래쪽은 은은하게 사라진다 */
+.goal-compose {
+  position: sticky;
+  top: calc(12px - var(--modal-top, 0px)); /* 팝업 위쪽 끝에서 12px(스프링 아래). 고정 위치는 스크롤 영역의 안쪽 여백(--modal-top)을 포함해서 재므로 그만큼 뺀다 */
+  z-index: 2;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  background: var(--note-paper);
+  box-shadow: 0 -14px 0 var(--note-paper); /* 위쪽 틈(스프링 아래)도 종이색으로 덮는다 */
+}
+.goal-compose::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 12px;
+  background: linear-gradient(var(--note-paper), transparent);
+  pointer-events: none;
+}
 
 .week-patch > :not(.patch-stitch) { position: relative; } /* 점선 위에 버튼이 오게 */
 

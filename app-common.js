@@ -105,7 +105,7 @@
   const placeModeToggle = document.getElementById('place-mode-toggle');
 
   function renderPlaceModeToggle() {
-    placeModeToggle.textContent = PLACE_MODE_LABELS[state.settings.placeMode];
+    placeModeToggle.querySelector('span').textContent = PLACE_MODE_LABELS[state.settings.placeMode]; // 버튼 안의 털실 점선 svg를 지우지 않게 글자만 바꾼다
   }
 
   placeModeToggle.addEventListener('click', () => {
