@@ -867,8 +867,8 @@ button.btn-plain {
 
 /* 팝업의 스티치 버튼: 바탕이 팝업 종이와 같은 색이라 그림자로 떠 보이게 하고, 그림자 색은 팝업 종이를 진하게 한 색으로 은은하게 */
 #modal-goals { --paper-shadow-rgb: 150, 118, 40; --paper: var(--note-paper); --card-bg: #fff; --btn-bg: var(--note-paper); }
-/* 일정과 설정은 팝업 종이가 거의 흰색이라, 카드는 살짝 짙은 베이지로 두고 버튼·칸·부하 동그라미는 흰색으로 올려 구분한다 */
-#modal-settings { --paper-shadow-rgb: 140, 112, 84; --paper: var(--cal-paper); --card-bg: #f6efe1; --btn-bg: #fff; }
+/* 일정과 설정: 카드는 흰색(그림자와 겹쳐 보이는 베이지는 쓰지 않는다). 버튼·칸·부하 동그라미는 아주 옅은 크림색이라 흰 카드 위에서도 구분된다 */
+#modal-settings { --paper-shadow-rgb: 140, 112, 84; --paper: var(--cal-paper); --card-bg: #fff; --btn-bg: #fbf6ec; }
 .modal-scroll {
   --card-shadow: 0 2px 7px rgba(var(--paper-shadow-rgb), 0.34);     /* 팝업 안 버튼·부하 동그라미 그림자(팝업 종이를 진하게 한 색) */
   --cardbox-shadow: 0 4px 22px rgba(var(--paper-shadow-rgb), 0.15); /* 흰 카드 그림자: 버튼보다 옅고 넓게 퍼진다 */
