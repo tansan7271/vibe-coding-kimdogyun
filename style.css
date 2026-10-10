@@ -1174,6 +1174,24 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .cn-seal-wrap { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform, translate, rotate; }
 .cn-seal { position: absolute; overflow: visible; }
 
+/* 박스 누르기: 눌린 박스가 제자리에서 커진 모양(app-carpet-next.js). 다른 박스·도장 위의 층에 그린다. 층은 평소 클릭을 통과시키고, 열려 있는 동안만 바깥 클릭을 받아 닫는다 */
+.cn-boxes .cn-box { pointer-events: auto; cursor: pointer; }
+.cn-focus { width: 100%; height: 100%; pointer-events: none; }
+.cn-focus.open { pointer-events: auto; }
+.cn-fbox { cursor: default; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3); }
+.cn-fbox .fx { box-sizing: border-box; padding: var(--fx-pad); display: flex; flex-direction: column; gap: 8px; color: var(--box-ink); font-size: var(--fx-font); line-height: 1.35; opacity: 0; transition: opacity 0.16s ease-out; }
+.cn-fbox.placed .fx { position: absolute; left: 0; top: 0; overflow-y: auto; }
+.cn-fbox .fx.in { opacity: 1; }
+.fx-title { font-size: var(--fx-title-font); font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; word-break: keep-all; }
+.fx-goal, .fx-sub, .fx-metrics { color: var(--box-stitch); }
+.cn-fbox.todo .fx-goal, .cn-fbox.todo .fx-metrics { color: var(--box-todo-stitch); }
+.fx-metrics { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.fx-metrics .m { display: inline-flex; align-items: center; gap: 3px; }
+.fx-metrics .m b { font-weight: 600; }
+.fx-metrics .ic { width: 15px; height: 15px; fill: currentColor; flex: none; }
+.fx-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.cn-fbox .sbtn { --wbtn-pad: 8px 16px; --wbtn-font: 14px; }
+
 /* 예산 초과인 날의 박스 떨림(홈 화면 수정 모드). 위치는 translate, 기울기는 transform, 떨림은 rotate 속성이 맡아 곱해진다. 박스마다 빠르기·시작점은 JS가 --jig-dur, --jig-delay로 준다.
    슬라이드·끌기·팝업이 떠 있는 동안은 JS가 #carpet-next에 cn-paused를 붙여 멈춘다 */
 @keyframes cn-jig { from { rotate: calc(var(--jig-deg) * -1); } to { rotate: var(--jig-deg); } }

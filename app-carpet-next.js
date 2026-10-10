@@ -6,7 +6,7 @@
 //  [x] 주 이동(이전·다음·이번 주)과 날짜 범위 표시. 버튼은 헤더의 week-patch가 가지고 있다. 이동하는 주는 연출 없이 정착한 모습으로 슬라이드해 들어온다
 //  [ ] 날짜 7칸: 일정, 그날의 단계, 부하/예산, 여유, 남은 시간, 오늘 표시
 //  [ ] 초과 표시 3종: 안전선 초과, 예산 초과, 시간 초과
-//  [ ] 단계를 누르면 메뉴: 완료 / 이 날 안 함(밀림) / 다른 날에 고정
+//  [ ] 단계를 누르면 메뉴: 완료(됨, 박스 누르기) / 이 날 안 함(밀림) / 다른 날에 고정(둘은 드래그가 맡는다)
 //  [ ] 단계 드래그로 다른 날에 고정(마우스, 터치는 길게 눌러 시작, 안내 토스트)
 //  [ ] 지남 박스(마감이 지나 깔리지 않은 단계)
 //  [ ] 지난 주 요약(총 부하, 초과한 날 수, 밀린 횟수)
@@ -16,7 +16,7 @@
 //  [x] 헤더의 월 표시: Red Carpet ∙ 10월
 //  [x] 박스(일정·완료·남은 단계) 낙하: 위에서 떨어져 부딪히고 쌓이며 카펫이 무게만큼 눌렸다 정착한다. 첫 입장 때 한 번(carpet-physics.js)
 //  [x] 박스 위 글자(제목)와 아이콘(부하·시간·밀림), 완료 도장. 박스 크기(부하)에 따라 배치가 달라진다
-//  [ ] 박스 누르기(단계 메뉴 등 동작은 따로 정한다), 끌어 놓으면 다시 낙하
+//  [x] 박스 누르기: 제자리에서 커지며 모든 정보와 버튼(완료, 반복 일정의 이 날만 빼기)이 보인다  [ ] 끌어 놓으면 다시 낙하
 //  [ ] 좁은 화면(가로 스크롤)
 //  숨은 부작용(빠뜨리기 쉬움)
 //  [x] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
@@ -95,6 +95,12 @@ const STAGE_STYLE = {
   sealSize: 30,                // 완료 도장 지름(px). 가장 작은 박스는 sealSizeTiny
   sealSizeTiny: 24,            // 박스 높이가 sealTinyBelow보다 낮을 때
   sealTinyBelow: 40,
+  focusWidth: 250,             // 누르면 커지는 박스의 폭(px). 보이는 영역보다 넓으면 영역에 맞춘다
+  focusPad: 16,                // 커진 박스 안쪽 여백(px)
+  focusMargin: 12,             // 커진 박스가 화면 가장자리(양옆·헤더 아래·아래 메모지 위)에서 띄우는 거리(px)
+  focusMs: 260,                // 커지고 줄어드는 시간(ms)
+  focusTitleFont: 17,          // 커진 박스의 제목 글자 크기(px)
+  focusFont: 13,               // 그 밖의 글자 크기(px)
   sealInset: 0.2,              // 도장 중심이 박스 오른쪽 위 모서리에서 안쪽으로 들어간 거리(도장 지름의 배수). 작을수록 더 튀어나간다
   sealLobes: 18,               // 도장 가장자리의 물결 수
   carpetFlatRatio: 0.75,       // 카펫이 처졌을 때 칸 폭 중 평평한 바닥 비율. 키우면 바닥이 넓고 날짜 사이 경사가 가팔라진다(박스 폭보다 작으면 박스 끝이 경사 위로 살짝 나온다)
@@ -252,14 +258,14 @@ const STAGE_STYLE = {
       + (intro ? '<div class="cn-cover"></div><div class="cn-laid"></div>' : '')
       + '<canvas class="cn-shadow" aria-hidden="true"></canvas>'
       + '<svg class="cn-carpet" aria-hidden="true"><path/></svg>'
-      + '<div class="cn-boxes"></div><div class="cn-seals"></div>'
+      + '<div class="cn-boxes"></div><div class="cn-seals"></div><div class="cn-focus"></div>'
       + (intro ? '<svg class="cn-roll" aria-hidden="true"><path/></svg>' : '');
     pagesEl.appendChild(el);
     const q = sel => el.querySelector(sel);
     const page = {
       offset, dates, stats: [], el, sim: null, m: null, mKey: '', gridKey: '',
       gridSvg: q('.cn-grid'), gridG: q('.grid'), carpetSvg: q('.cn-carpet'), carpetPath: q('.cn-carpet path'),
-      boxesEl: q('.cn-boxes'), sealsEl: q('.cn-seals'), shadowEl: q('.cn-shadow'),
+      boxesEl: q('.cn-boxes'), sealsEl: q('.cn-seals'), focusEl: q('.cn-focus'), shadowEl: q('.cn-shadow'),
       coverEl: q('.cn-cover'), laidEl: q('.cn-laid'), rollSvg: q('.cn-roll'), rollPath: q('.cn-roll path'),
     };
     [page.carpetPath, page.rollPath].filter(Boolean).forEach(p => {
@@ -389,9 +395,9 @@ const STAGE_STYLE = {
     const items = [];
     const goalTitle = new Map(state.goals.map(g => [g.id, g.title])); // 단계의 상위 할 일
     page.stats.forEach((st, col) => {
-      st.events.forEach(ev => items.push({ id: `ev:${ev.id}:${st.date}`, col, load: ev.load, kind: 'fixed', title: ev.title, minutes: Placement.eventDurationMinutes(ev), push: 0 }));
-      st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done', title: s.title, goal: goalTitle.get(s.goalId) || '', minutes: s.minutes, push: s.pushCount || 0 }));
-      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo', title: step.title, goal: goalTitle.get(step.goalId) || '', minutes: step.minutes, push: step.pushCount || 0 }));
+      st.events.forEach(ev => items.push({ id: `ev:${ev.id}:${st.date}`, col, load: ev.load, kind: 'fixed', title: ev.title, minutes: Placement.eventDurationMinutes(ev), push: 0, eventId: ev.id, date: st.date }));
+      st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done', title: s.title, goal: goalTitle.get(s.goalId) || '', minutes: s.minutes, push: s.pushCount || 0, stepId: s.id }));
+      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo', title: step.title, goal: goalTitle.get(step.goalId) || '', minutes: step.minutes, push: step.pushCount || 0, stepId: step.id }));
     });
     return items.filter(it => it.load > 0);
   }
@@ -428,12 +434,16 @@ const STAGE_STYLE = {
 
   // 박스 하나: 둥근 모서리 몸통(div, 그림자는 box-shadow) + 안쪽 털실 점선(한 번 그리면 안 바뀌는 작은 SVG) + 글자·아이콘. 색은 style.css의 .cn-box 규칙.
   // 작은 박스는 점선을 가장자리에 더 붙여 글자 자리를 만든다. 움직일 때는 transform만 바꾼다. 중심이 (0,0)에 오게 두고 translate로 옮긴다
+  // 박스 크기에 맞는 점선 들어간 거리와 모서리 둥글기
+  function boxLook(w, h) {
+    return { inset: Math.max(G.boxInsetMin, Math.min(G.boxInsetMax, (h - 22) / 3)), radius: Math.min(cssNum('--box-radius'), h / 2.6, w / 4) };
+  }
+
   function makeBoxEl(page, box, kind, item) {
-    const baseRadius = cssNum('--box-radius');
-    const inset = Math.max(G.boxInsetMin, Math.min(G.boxInsetMax, (box.h - 22) / 3));
-    const radius = Math.min(baseRadius, box.h / 2.6, box.w / 4);
+    const { inset, radius } = boxLook(box.w, box.h);
     const el = document.createElement('div');
     el.className = `cn-box ${kind}`;
+    el.dataset.id = item.id;
     el.style.cssText = `width:${box.w.toFixed(1)}px;height:${box.h.toFixed(1)}px;margin:${(-box.h / 2).toFixed(1)}px 0 0 ${(-box.w / 2).toFixed(1)}px;border-radius:${radius.toFixed(1)}px`;
     el.innerHTML = `<svg class="stitch" width="${box.w.toFixed(1)}" height="${box.h.toFixed(1)}" viewBox="0 0 ${box.w.toFixed(1)} ${box.h.toFixed(1)}" aria-hidden="true">`
       + `<rect x="${inset.toFixed(1)}" y="${inset.toFixed(1)}" width="${(box.w - inset * 2).toFixed(1)}" height="${(box.h - inset * 2).toFixed(1)}" rx="${Math.max(0, radius - inset).toFixed(1)}"/></svg>`
@@ -653,6 +663,7 @@ const STAGE_STYLE = {
   //      'empty': 박스 없이 평평한 카펫만 둔다(슬라이드로 들어오는 동안. 눈금·날짜 숫자는 페이지에 붙어서 같이 들어온다)
   // dropIds(Set): 'drop'일 때 이 박스들만 떨어뜨리고 나머지는 보이지 않게 먼저 자리를 잡아 둔다(다시 그릴 때). 없으면 전부 떨어진다
   function startBoxes(page, mode, dropIds = null) {
+    closeFocus(true);
     hideShadow(page); // 새로 떨어지는 동안은 그림자를 숨기고, 다 정착하면 startFidget이 다시 보인다
     stopSim(page);
     page.boxesEl.innerHTML = '';
@@ -704,6 +715,171 @@ const STAGE_STYLE = {
     }
     sim.raf = requestAnimationFrame(frame);
   }
+
+  // ---- 박스 누르기: 눌린 박스가 제자리에서 커져(회전 0도) 모든 정보와 버튼을 보여 준다. 원래 박스는 숨기고, 다른 박스·도장 위의 층(.cn-focus)에 큰 박스를 그린다.
+  // 그래서 그 박스의 떨림·기울기는 멈추고 다른 박스는 영향이 없다. 바깥을 누르거나 Esc, 스크롤, 다시 그리기·주 이동·창 크기 변경이면 닫힌다 ----
+  let focus = null; // { page, item, f, fx, el, seal, from, to, raf, closing }
+  const REPEAT_TEXT = { weekly: '매주', biweekly: '격주', monthly: '매월' };
+  const easeOut = k => 1 - Math.pow(1 - k, 3);
+
+  function focusHtml(item) {
+    const icon = name => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${BoxIcons.paths[name]}"/></svg>`;
+    const metric = (name, text) => `<span class="m">${icon(name)}<b>${text}</b></span>`;
+    const button = (action, label, accent) => `<button type="button" class="sbtn${accent ? ' sbtn-accent' : ''}" data-focus-action="${action}"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><span>${label}</span></button>`;
+    let sub = '', actions = '';
+    if (item.kind === 'fixed') {
+      const ev = state.events.find(e => e.id === item.eventId);
+      if (ev) {
+        sub = `<div class="fx-sub">${ev.start}~${ev.end}${REPEAT_TEXT[ev.repeat] ? ` · ${REPEAT_TEXT[ev.repeat]} 반복` : ''}</div>`;
+        if (ev.repeat !== 'none') actions = button('skip', '이 날만 빼기', false);
+      }
+    } else if (item.goal) {
+      sub = `<div class="fx-goal">${escapeHtml(item.goal)}</div>`;
+    }
+    if (item.kind === 'todo') actions = button('done', '완료', true);
+    const metrics = (item.push > 0 ? metric('push', `밀림 ${item.push}회`) : '') + metric('time', shortDuration(item.minutes)) + metric('load', `부하 ${item.load}`);
+    return `<div class="fx-title">${escapeHtml(item.title || '')}</div>${sub}<div class="fx-metrics">${metrics}</div>${actions ? `<div class="fx-actions">${actions}</div>` : ''}`;
+  }
+
+  // 크기·위치·기울기·모서리를 한 번에 적용(점선 사각형도 같이). r: { cx, cy, w, h, rot }
+  function applyFocus(f, r) {
+    const { inset, radius } = boxLook(r.w, r.h);
+    f.style.width = `${r.w.toFixed(1)}px`;
+    f.style.height = `${r.h.toFixed(1)}px`;
+    f.style.translate = `${(r.cx - r.w / 2).toFixed(1)}px ${(r.cy - r.h / 2).toFixed(1)}px`;
+    f.style.rotate = `${r.rot.toFixed(2)}deg`;
+    f.style.borderRadius = `${radius.toFixed(1)}px`;
+    const svg = f.querySelector('.stitch'), rect = svg.firstChild;
+    svg.setAttribute('width', r.w.toFixed(1)); svg.setAttribute('height', r.h.toFixed(1));
+    rect.setAttribute('x', inset.toFixed(1)); rect.setAttribute('y', inset.toFixed(1));
+    rect.setAttribute('width', Math.max(0, r.w - inset * 2).toFixed(1)); rect.setAttribute('height', Math.max(0, r.h - inset * 2).toFixed(1));
+    rect.setAttribute('rx', Math.max(0, radius - inset).toFixed(1));
+  }
+
+  function runFocusTween(from, to, ms, onFrame, done) {
+    const ease = reduceMotion() ? (() => 1) : easeOut;
+    const lerp = (a, b, k) => a + (b - a) * k;
+    const t0 = performance.now();
+    const tick = now => {
+      const raw = ms > 0 && !reduceMotion() ? Math.min(1, Math.max(0, (now - t0) / ms)) : 1;
+      const k = ease(raw);
+      onFrame({ cx: lerp(from.cx, to.cx, k), cy: lerp(from.cy, to.cy, k), w: lerp(from.w, to.w, k), h: lerp(from.h, to.h, k), rot: lerp(from.rot, to.rot, k) }, raw);
+      if (raw < 1) focus.raf = requestAnimationFrame(tick); else done();
+    };
+    focus.raf = requestAnimationFrame(tick);
+  }
+
+  function openFocus(page, id) {
+    const item = (page.items || []).find(it => it.id === id);
+    const sim = page.sim, el = sim && sim.els.get(id);
+    const box = sim && sim.world.boxes.find(b => b.id === id);
+    if (!item || !el || !box || !box.landed || !el.style.translate) return;
+    // 지금 보이는 자리: 떨림이 더해진 위치와 기울기
+    const [cx, cy] = el.style.translate.split(' ').map(parseFloat);
+    const jig = parseFloat(getComputedStyle(el).rotate) || 0;
+    const from = { cx, cy, w: box.w, h: box.h, rot: box.tilt + jig };
+    // 커진 뒤 크기: 정해진 폭에서 내용이 차지하는 높이를 미리 잰다
+    const f = document.createElement('div');
+    f.className = `${el.className.replace(/\bjig\b/, '').trim()} cn-fbox`;
+    f.style.cssText = `--fx-pad:${G.focusPad}px;--fx-title-font:${G.focusTitleFont}px;--fx-font:${G.focusFont}px`;
+    const compact = el.querySelector('.bx').cloneNode(true);
+    const fx = document.createElement('div');
+    fx.className = 'fx';
+    fx.innerHTML = focusHtml(item);
+    f.innerHTML = '<svg class="stitch" aria-hidden="true"><rect/></svg>';
+    f.appendChild(compact);
+    f.appendChild(fx);
+    const pageRect = page.el.getBoundingClientRect();
+    const bounds = {
+      left: -pageRect.left, right: document.documentElement.clientWidth - pageRect.left,
+      top: (parseFloat(getComputedStyle(document.body).paddingTop) || 0) - pageRect.top,
+      bottom: (noteCornerY() ?? window.innerHeight) - pageRect.top,
+    };
+    const width = Math.min(G.focusWidth, bounds.right - bounds.left - 2 * G.focusMargin);
+    f.style.width = `${width}px`;
+    fx.style.width = `${width}px`;
+    page.focusEl.appendChild(f);
+    const naturalH = fx.offsetHeight; // fx는 글 흐름대로 높이가 정해진 채 재진다(아직 absolute 아님)
+    const rect = BoxFocus.focusRect({ box: { x: cx, y: cy }, size: { w: width, h: naturalH }, bounds, margin: G.focusMargin });
+    const to = { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, w: rect.width, h: rect.height, rot: 0 };
+    f.classList.add('placed'); // 이제부터 fx는 박스 안에 얹힌다(스크롤은 넘칠 때만)
+    fx.style.width = `${rect.width}px`;
+    fx.style.height = `${rect.height}px`;
+    // 완료 도장은 그대로 모서리에 붙는다
+    const seal = sim.seals.get(id);
+    if (seal) {
+      const s = G.sealSize;
+      f.insertAdjacentHTML('beforeend', `<svg class="cn-seal" style="right:${(G.sealInset * s - s / 2).toFixed(1)}px;top:${(G.sealInset * s - s / 2).toFixed(1)}px;width:${s}px;height:${s}px" aria-hidden="true"><use href="#cn-seal-sym"/></svg>`);
+    }
+    applyFocus(f, from);
+    el.style.visibility = 'hidden';
+    if (seal) seal.style.visibility = 'hidden';
+    page.focusEl.classList.add('open');
+    focus = { page, item, f, fx, compact, el, seal, from, to, raf: 0, closing: false, scrollY: window.scrollY };
+    runFocusTween(from, to, G.focusMs, (r, raw) => {
+      applyFocus(f, r);
+      compact.style.opacity = String(Math.max(0, 1 - raw * 2.5)); // 원래 글자는 앞쪽에서 사라지고
+    }, () => { fx.classList.add('in'); });                       // 전체 정보는 다 커진 뒤 나타난다
+    fx.classList.toggle('in', reduceMotion());
+  }
+
+  // instant: 연출 없이 바로 닫는다(다시 그리기·주 이동·창 크기 변경처럼 박스가 바뀌는 때)
+  function closeFocus(instant = false) {
+    const c = focus;
+    if (!c) return;
+    if (c.closing && !instant) return;
+    cancelAnimationFrame(c.raf);
+    const finish = () => {
+      c.el.style.visibility = ''; if (c.seal) c.seal.style.visibility = '';
+      c.f.remove();
+      c.page.focusEl.classList.remove('open');
+      if (focus === c) focus = null;
+    };
+    if (instant) { finish(); return; }
+    c.closing = true;
+    c.page.focusEl.classList.remove('open'); // 줄어드는 동안은 다른 곳을 누를 수 있다
+    c.fx.classList.remove('in');
+    const now = { cx: c.to.cx, cy: c.to.cy, w: c.to.w, h: c.to.h, rot: 0 };
+    runFocusTween(now, c.from, G.focusMs * 0.8, (r, raw) => {
+      applyFocus(c.f, r);
+      c.compact.style.opacity = String(Math.min(1, Math.max(0, (raw - 0.5) * 2)));
+    }, finish);
+  }
+
+  function focusAction(action) {
+    const c = focus;
+    if (!c) return;
+    const { item } = c;
+    if (action === 'done') {
+      const step = state.steps.find(st => st.id === item.stepId);
+      if (!step || step.done) return;
+      step.done = true;
+      step.doneDate = todayStr(); // SPEC 6장: 완료일 기본은 오늘
+    } else if (action === 'skip') {
+      const ev = state.events.find(e => e.id === item.eventId);
+      if (!ev || ev.repeat === 'none' || !item.date) return;
+      ev.skipDates = [...new Set([...(ev.skipDates || []), item.date])].sort(); // SPEC 10장: 그 날 하루만 뺀다
+    } else return;
+    saveState();
+    closeFocus(true);
+    renderCarpet();
+    if (action === 'skip' && typeof renderEvents === 'function') renderEvents(); // 일정 화면 목록도 새로 그린다
+  }
+
+  pagesEl.addEventListener('click', e => {
+    if (focus) {
+      if (focus.closing) return;
+      const b = e.target.closest('[data-focus-action]');
+      if (b && focus.f.contains(b)) focusAction(b.dataset.focusAction);
+      else if (!focus.f.contains(e.target)) closeFocus();
+      return;
+    }
+    const el = e.target.closest('.cn-box');
+    if (!el || busy || drag || !introDone || !active.boxesEl.contains(el)) return;
+    openFocus(active, el.dataset.id);
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && focus) closeFocus(); });
+  window.addEventListener('scroll', () => { if (focus && Math.abs(window.scrollY - focus.scrollY) > 4) closeFocus(true); }, { passive: true });
 
   // ---- 다시 그리기: 할 일·일정·설정이 바뀌면 다른 화면이 전역 renderCarpet()을 부른다. 바뀐 게 없으면 아무것도 하지 않고,
   // 바뀌었으면 새로 생겼거나 옮겨졌거나 크기가 바뀐 박스만 위에서 떨어진다(나머지는 제자리). 슬라이드·끌기·첫 입장 중이면 끝난 뒤로 미룬다 ----
@@ -782,6 +958,7 @@ const STAGE_STYLE = {
     if (!introDone || target === navTarget && !busy) return;
     if (busy) { queued = target; return; }
     if (target === active.offset) return;
+    closeFocus(true);
     busy = true;
     navTarget = target;
     const dir = target > active.offset ? 1 : -1;       // 다음 주(+1)면 새 페이지가 오른쪽에서 들어온다
@@ -799,7 +976,7 @@ const STAGE_STYLE = {
   // 터치 스와이프: 손가락을 따라 페이지가 움직이고, 놓을 때 충분히 밀었거나 빠르면 넘어가고 아니면 제자리로 돌아간다
   let drag = null;
   pagesEl.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'touch' || busy || !introDone) return;
+    if (e.pointerType !== 'touch' || busy || !introDone || focus) return;
     drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, mode: 'wait', dir: 0, other: null, dx: 0, lastX: e.clientX, lastT: e.timeStamp, v: 0 };
   });
   pagesEl.addEventListener('pointermove', e => {
