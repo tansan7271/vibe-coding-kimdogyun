@@ -150,23 +150,77 @@
   // 팝업은 헤더 위에 뜬다. 닫는 길: 바깥 배경, 왼쪽 위 x, Esc
   const modals = { goals: document.getElementById('modal-goals'), settings: document.getElementById('modal-settings') };
 
+  // 열고 닫는 연출: 아래쪽 버튼 자리·크기에서 시작해 세로축으로 돌며 팝업 자리로 커진다. 닫을 때는 거꾸로. 모양 값은 style.css 맨 위 --modal-*
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let modalBusy = false; // 연출이 도는 동안은 열기·닫기를 받지 않는다
+
+  const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const cssMs = name => parseFloat(cssVar(name));
+
+  // 버튼의 기울어진 각도(도)
+  function tiltDeg(el) {
+    const m = getComputedStyle(el).transform.match(/matrix\(([^)]+)\)/);
+    if (!m) return 0;
+    const [a, b] = m[1].split(',').map(Number);
+    return Math.atan2(b, a) * 180 / Math.PI;
+  }
+
+  // reverse가 true면 닫는 연출(같은 키프레임을 거꾸로 돌린다). 끝나면 done을 부른다
+  function playModal(modal, btn, reverse, done) {
+    if (reduceMotion.matches) { done(); return; }
+    const panel = modal.querySelector('.modal-panel');
+    const scroll = modal.querySelector('.modal-scroll');
+    const b = btn.getBoundingClientRect(); // 기울어진 버튼의 바깥 사각형. 중심은 그대로다
+    const p = panel.getBoundingClientRect();
+    const dx = (b.left + b.width / 2) - (p.left + p.width / 2);
+    const dy = (b.top + b.height / 2) - (p.top + p.height / 2);
+    const persp = cssVar('--modal-perspective');
+    const ms = cssMs('--modal-anim-ms');
+    const timing = { duration: ms, easing: cssVar('--modal-ease'), direction: reverse ? 'reverse' : 'normal', fill: 'both' };
+    const fadeTiming = { duration: cssMs('--modal-fade-ms'), easing: 'ease', direction: reverse ? 'reverse' : 'normal', fill: 'both' };
+    const delay = cssMs('--modal-content-delay');
+
+    const anims = [
+      modal.animate([{ opacity: 0 }, { opacity: 1 }], fadeTiming),
+      panel.animate([
+        { transform: `perspective(${persp}) translate(${dx}px, ${dy}px) rotate(${tiltDeg(btn)}deg) scale(${btn.offsetWidth / p.width}, ${btn.offsetHeight / p.height}) rotateY(0deg)` },
+        { transform: `perspective(${persp}) translate(0px, 0px) rotate(0deg) scale(1, 1) rotateY(${cssVar('--modal-spin-deg')})` },
+      ], timing),
+      ...[...scroll.children].map(el => el.animate([{ opacity: 0 }, { opacity: 0, offset: delay }, { opacity: 1 }], timing)),
+    ];
+    modalBusy = true;
+    Promise.all(anims.map(a => a.finished)).then(() => {
+      modalBusy = false;
+      anims.forEach(a => a.cancel()); // fill을 걷어 평소 상태로 돌린다
+      done();
+    });
+  }
+
+  function openModal(target, btn) {
+    if (modalBusy) return;
+    if (target === 'goals') renderGoals();
+    if (target === 'settings') { renderEvents(); showSettingsTab('events'); }
+    document.body.style.overflow = 'hidden';
+    modals[target].classList.add('open');
+    playModal(modals[target], btn, false, () => {});
+  }
+
   function closeModals() {
-    const wasOpen = Object.values(modals).some(m => m.classList.contains('open'));
-    Object.values(modals).forEach(m => m.classList.remove('open'));
-    document.body.style.overflow = '';
-    if (wasOpen) renderCarpet();
+    if (modalBusy) return;
+    const key = Object.keys(modals).find(k => modals[k].classList.contains('open'));
+    if (!key) { document.body.style.overflow = ''; return; }
+    playModal(modals[key], document.querySelector(`[data-screen="${key}"]`), true, () => {
+      modals[key].classList.remove('open');
+      document.body.style.overflow = '';
+      renderCarpet();
+    });
   }
 
   document.querySelectorAll('[data-screen]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.screen;
-      closeModals();
-      if (modals[target]) {
-        if (target === 'goals') renderGoals();
-        if (target === 'settings') renderEvents();
-        modals[target].classList.add('open');
-        document.body.style.overflow = 'hidden';
-      }
+      if (modals[target]) openModal(target, btn);
+      else closeModals();
     });
   });
 
@@ -182,8 +236,6 @@
     const btn = e.target.closest('[data-tab]');
     if (btn) showSettingsTab(btn.dataset.tab);
   });
-
-  document.querySelector('[data-screen="settings"]').addEventListener('click', () => showSettingsTab('events'));
 
   Object.values(modals).forEach(m => {
     m.addEventListener('click', (e) => {
