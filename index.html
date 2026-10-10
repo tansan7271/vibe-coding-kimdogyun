@@ -53,7 +53,7 @@
        화면 아래로 일부러 잘려 나가고, 두 버튼이 서로 겹친다 */
     --dock-bottom: -30px;        /* 화면 아래에서 띄우는 거리. 음수면 그만큼 화면 밖으로 잘려 나간다 */
     --dock-gap: -28px;           /* 두 버튼 사이 간격. 음수면 할 일이 일정과 설정 위에 포개진다 (CSS gap은 음수가 안 돼서 달력의 왼쪽 여백으로 적용) */
-    --dock-label-zone: 0.95;     /* 글자가 놓이는 영역: 화면에 보이는 높이의 이만큼(위에서부터) 안에 둔다 */
+    --dock-label-zone: 1.05;     /* 글자가 놓이는 영역: 화면에 보이는 높이의 이만큼(위에서부터) 안에 둔다 */
     --dock-z: 150;               /* 본문 위, 팝업(200) 아래 */
     --dock-shadow: 0 8px 16px rgba(0, 0, 0, 0.18); /* 두 버튼 공통 그림자. 연한 회색 */
     --note-w: 334px;             /* 메모장 크기. 자주 쓰는 버튼이라 달력보다 크게 */
@@ -163,19 +163,20 @@
     border-radius: 6px 6px 12px 12px;
     transform: rotate(var(--note-tilt));
     background:
-      linear-gradient(var(--note-margin-color), var(--note-margin-color)) var(--note-margin-x) 0 / 2px 100% no-repeat,
+      linear-gradient(var(--note-margin-color), var(--note-margin-color)) var(--note-margin-x) calc(var(--note-line-top) + var(--note-line-gap) - 1px) / 2px 100% no-repeat, /* 세로선은 맨 위 가로선에서 시작 */
       repeating-linear-gradient(to bottom, transparent 0 calc(var(--note-line-gap) - 1px), var(--note-line-color) calc(var(--note-line-gap) - 1px) var(--note-line-gap)) 0 var(--note-line-top) / 100% 100% no-repeat,
       var(--note-paper);
     box-shadow: var(--dock-shadow);
     z-index: 1; /* 달력 위로 포갠다 */
   }
 
-  .dock-note span::after { /* 글자 옆 + 표시: 할 일을 더할 수 있다는 안내 */
+  .dock-note span::after { /* 글자 왼쪽 + 표시: 할 일을 더할 수 있다는 안내 */
     content: '';
     flex: none;
     width: var(--note-plus-size);
     height: var(--note-plus-size);
-    margin-left: 12px;
+    order: -1;               /* 글자 왼쪽에 붙인다 */
+    margin-right: 12px;
     border-radius: 50%;
     background:
       linear-gradient(var(--note-plus-fg), var(--note-plus-fg)) center / 44% 3px no-repeat,
@@ -802,7 +803,12 @@
   <button class="modal-close" type="button" aria-label="닫기">×</button>
   <section id="screen-settings" class="screen">
     <h1>일정과 설정</h1>
+    <div class="tab-bar title-tabs" id="settings-tabs">
+      <button type="button" data-tab="events" class="active">일정</button>
+      <button type="button" data-tab="prefs">설정</button>
+    </div>
 
+    <div id="settings-pane-events">
     <div class="section-head">
       <h2>일정</h2>
       <div class="tab-bar" id="event-tabs">
@@ -840,7 +846,9 @@
       <button class="btn" id="add-event-btn" type="button">일정 추가</button>
     </div>
     <div id="event-list"></div>
+    </div>
 
+    <div id="settings-pane-prefs" hidden>
     <h2>기본값</h2>
     <div class="settings-form">
       <label>하루 예산 <input type="number" id="setting-capacity" min="1"></label>
@@ -868,6 +876,7 @@
         <input type="file" id="import-file" accept="application/json,.json" style="display:none">
       </div>
       <div id="data-message" style="font-size:13px;color:#555"></div>
+    </div>
     </div>
   </section>
   </div>
@@ -2133,6 +2142,21 @@
       }
     });
   });
+
+  // 일정과 설정 팝업 안의 탭. 팝업을 열 때는 항상 일정부터 보인다
+  const settingsPanes = { events: document.getElementById('settings-pane-events'), prefs: document.getElementById('settings-pane-prefs') };
+
+  function showSettingsTab(key) {
+    Object.entries(settingsPanes).forEach(([k, pane]) => { pane.hidden = k !== key; });
+    document.querySelectorAll('#settings-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === key));
+  }
+
+  document.getElementById('settings-tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-tab]');
+    if (btn) showSettingsTab(btn.dataset.tab);
+  });
+
+  document.querySelector('header [data-screen="settings"]').addEventListener('click', () => showSettingsTab('events'));
 
   Object.values(modals).forEach(m => {
     m.addEventListener('click', (e) => {
