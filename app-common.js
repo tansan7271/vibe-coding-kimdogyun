@@ -272,6 +272,7 @@
   // 견출지로 팝업 안의 페이지를 바꿀 때: 위쪽이 스프링으로 묶인 메모장의 페이지를 넘기는 효과.
   //  1) 페이지 전체가 위쪽 가장자리를 축으로 위로 젖혀진다 (90도를 넘으면 종이 뒷면이 보인다)
   //  2) 다 젖혀지면 팝업 뒤로 층이 바뀌고, 뒤에서 아래로 내려가며 팝업에 가려진다
+  //  위로 젖히기와 뒤로 내려가기는 한 번도 멈추지 않는 하나의 곡선(0 → 360도)으로 이어진다. 구간마다 속도가 0으로 끝나면 맨 위에서 턱 걸린다
   // 'next'(지금보다 아래쪽 탭): 지금 페이지가 이 순서대로 넘어간다. 'prev'(위쪽 탭): 새 페이지가 이 순서를 거꾸로 해서 덮는다.
   // 3D 그래픽이 아니라 CSS 3D 변환(perspective + rotateX)으로 평평한 요소를 기울이는 것이다. 모양 값은 --turn-* (style.css).
   // 그림자는 filter·box-shadow 없이 그라디언트로만 그린다(날아다니는 팝업의 그림자가 연출 중 사라지던 문제를 피하려고)
@@ -300,23 +301,26 @@
     // curl: 팝업 내용 위에 깔리는 층(덮이기 전의 옛 페이지, 그림자). book: 위로 젖혀지는 페이지. 젖힌 뒤 book만 팝업 뒤로 보낸다
     const curl = div('page-curl');
     const cast = div('pc-cast');   // 페이지가 젖혀 올라가며 아래쪽에 드리우는 그림자
-    if (dir === 'prev') curl.append(oldPage);
+    const hasBand = modal.id === 'modal-settings'; // 일정과 설정의 붉은 접합부는 종이에 딸려 있어서 페이지와 함께 젖혀진다
+    if (dir === 'prev') { curl.append(oldPage); if (hasBand) curl.append(div('pc-band')); } // 덮이기 전의 옛 페이지(와 그 접합부)
     curl.append(cast);
     const book = div('page-book');
     const lit = div('pc-lit');     // 기울어질수록 어두워지는 앞면
     const back = div('pc-back');   // 젖혀졌을 때 보이는 종이 뒷면
-    book.append(mover, lit, back);
+    book.append(mover);
+    if (hasBand) book.append(div('pc-band'));
+    book.append(lit, back);
     panel.append(curl, book); // 진짜 요소보다 뒤에 둬야 getElementById가 진짜를 먼저 찾는다
     mover.scrollTop = scroll.scrollTop;
     oldPage.scrollTop = scroll.scrollTop;
 
     const rgb = cssVar('--turn-shadow-rgb'), persp = cssVar('--turn-perspective');
-    const castW = cssMs('--turn-cast-w'), castA = cssMs('--turn-cast-a'), litA = cssMs('--turn-lit-a'), endB = cssMs('--turn-b');
+    const castW = cssMs('--turn-cast-w'), castA = cssMs('--turn-cast-a'), litA = cssMs('--turn-lit-a'), pageShadowA = cssMs('--turn-page-shadow-a');
     const FALL = [[0, 1], [0.12, 0.72], [0.3, 0.4], [0.55, 0.16], [0.8, 0.05], [1, 0]]; // 그림자는 바깥으로 갈수록 천천히 사라진다: [거리 비율, 진하기 비율]
     const col = a => `rgba(${rgb}, ${a.toFixed(3)})`;
 
-    // 진행도 u(0~1)에서 젖힌 각도 phi: 0 → 180(다 젖혀짐) → 360(뒤로 내려가 팝업에 가려짐). 구간마다 부드럽게 이어 붙인다
-    const phiAt = u => (u < endB ? 180 * smooth(u / endB) : 180 + 180 * smooth((u - endB) / (1 - endB)));
+    // 진행도 u(0~1)에서 젖힌 각도 phi: 0 → 180(다 젖혀짐) → 360(뒤로 내려가 팝업에 가려짐). 중간에 멈추지 않는 하나의 곡선
+    const phiAt = u => 360 * smooth(u);
 
     function draw(u) {
       const phi = phiAt(u), rad = phi * Math.PI / 180, face = Math.sin(Math.min(rad, Math.PI)); // face: 0(정면)→1(옆면)→0(젖혀짐)
@@ -324,6 +328,8 @@
       book.style.transform = `perspective(${persp}) rotateX(${phi}deg)`;
       book.style.zIndex = phi > 180 ? -1 : 3;
       lit.style.backgroundColor = col(litA * face); // 기울어질수록 앞면이 어두워진다
+      // 종이 자체의 그림자: 평평할 때(0도)는 팝업의 그림자와 겹쳐 튀지 않게 0이고, 들리기 시작하면 빠르게 나타나 젖혀진 뒤에도 윤곽을 보여 준다
+      book.style.setProperty('--sa', (pageShadowA * smooth(Math.min(phi, 360 - phi) / 30)).toFixed(3));
       // 젖혀 올라가는 페이지가 드러난 페이지 위쪽에 드리우는 그림자: 페이지 아래 가장자리(투영) 바로 아래
       const edgeY = Math.max(0, H * Math.cos(rad));
       const a = castA * face * (phi < 90 ? 1 : Math.max(0, 1 - (phi - 90) / 60));
