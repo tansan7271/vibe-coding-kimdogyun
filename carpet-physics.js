@@ -28,6 +28,7 @@
     impactKick: 0.00215,    // 박스가 떨어진 충격이 카펫을 얼마나 흔드는지(클수록 더 깊이 출렁). 박스가 카펫을 누르는 깊이(부하 × 부하 1당 높이)에 비례한다 — 예산 설정이 달라도 같은 박스는 같게 흔든다
     settleSpeed: 10,        // 이 속도(px/s)보다 느리면 가만히 있는 것으로 본다
     settleSeconds: 0.35,    // 위 상태가 이만큼 이어지면 정착(settled)으로 본다
+    liftK: 100,             // 박스를 뺀 열의 카펫이 올라올 때의 용수철 세기(1/s²). 출렁이지 않게 임계 감쇠(2√liftK)로 쓴다. 작을수록 천천히 올라오지만 그 사이 위의 박스가 더 떨어진다. 이보다 크면(특히 springK처럼 출렁이면) 올라오던 카펫이 멈출 때 위의 박스를 던져 올린다
     capSag: true,           // true: 카펫은 예산(maxSag)에서 더 처지지 않는다. false: 부하만큼 계속 처진다(예산을 넘으면 예산선 밑으로 쭉 내려간다)
     dt: 1 / 120,            // 고정 계산 간격(초)
   };
@@ -46,6 +47,7 @@
       p: { ...DEFAULTS, ...params },
       boxes: [],
       sag: columns.map(() => 0),     // 카펫이 처진 깊이(px)
+      lift: columns.map(() => false), // 박스를 빼서 카펫이 부드럽게 올라오는 중인 열(removeBox가 켜고, 목표에 닿거나 박스가 새로 들어오면 꺼진다)
       sagVel: columns.map(() => 0),  // 처지는 속도(px/s, 아래가 +)
       kick: columns.map(() => 0),    // 이번 프레임에 쌓인 충격
       time: 0, acc: 0, quiet: 0, settled: false,
@@ -63,8 +65,20 @@
       mass: w * h, landed: false, onFloor: false, supported: false,
     };
     world.boxes.push(box);
+    world.lift[col] = false;
     world.settled = false; world.quiet = 0;
     return box;
+  }
+
+  // 박스를 뺀다(없어진 박스). 아래가 빈 박스는 떨어지고 카펫은 줄어든 무게만큼 올라오도록 정착 상태를 푼다. 없는 id면 false
+  function removeBox(world, id) {
+    const i = world.boxes.findIndex(b => b.id === id);
+    if (i < 0) return false;
+    const col = world.boxes[i].col;
+    world.boxes.splice(i, 1);
+    world.lift[col] = true;
+    world.settled = false; world.quiet = 0;
+    return true;
   }
 
   // 카펫이 처지려는 목표 깊이: 쌓인 부하 / 예산 × maxSag(= 부하 1당 maxSag/예산 px). capSag면 maxSag에서 멈춘다
@@ -205,9 +219,11 @@
     for (let c = 0; c < world.columns.length; c++) {
       const target = targetSag(world, wts[c]);
       world.sagVel[c] += world.kick[c];
-      const acc = p.springK * (target - world.sag[c]) - p.springC * world.sagVel[c];
+      const lifting = world.lift[c]; // 박스를 뺀 열: 출렁이지 않는 부드러운 용수철로 올라온다
+      const acc = (lifting ? p.liftK : p.springK) * (target - world.sag[c]) - (lifting ? 2 * Math.sqrt(p.liftK) : p.springC) * world.sagVel[c];
       world.sagVel[c] += acc * dt;
       world.sag[c] += world.sagVel[c] * dt;
+      if (lifting && Math.abs(target - world.sag[c]) < 0.5 && Math.abs(world.sagVel[c]) < p.settleSpeed) world.lift[c] = false;
     }
 
     // 5. 정착 판정
@@ -243,5 +259,5 @@
     return world.settled;
   }
 
-  return { DEFAULTS, createWorld, addBox, floorY, weights, targetSag, step, advance, settle };
+  return { DEFAULTS, createWorld, addBox, removeBox, floorY, weights, targetSag, step, advance, settle };
 });

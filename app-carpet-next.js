@@ -101,6 +101,7 @@ const STAGE_STYLE = {
   focusPad: 16,                // 커진 박스 안쪽 여백(px)
   focusMargin: 12,             // 커진 박스가 화면 가장자리(양옆·헤더 아래·아래 메모지 위)에서 띄우는 거리(px)
   focusCoverPad: 3,            // 커진 박스가 원래 박스보다 사방으로 이만큼 더 덮는다(px). 기울어 있던 박스의 모서리가 삐져나오지 않게
+  vanishMs: 280,               // 없어지는 박스가 투명해지는 시간(ms). 그동안 카펫은 줄어든 무게만큼 올라온다
   focusMs: 260,                // 커지고 줄어드는 시간(ms)
   focusTitleFont: 17,          // 커진 박스의 제목 글자 크기(px)
   focusFont: 13,               // 그 밖의 글자 크기(px)
@@ -732,7 +733,6 @@ const STAGE_STYLE = {
       renderSim(page);
       return;
     }
-    debug('falling');
     if (mode === 'instant') {
       sim.pending.forEach(item => spawn(page, item));
       sim.pending = [];
@@ -744,8 +744,17 @@ const STAGE_STYLE = {
     }
     if (stays.length) { stays.forEach(item => spawn(page, item)); CarpetPhysics.settle(world, 15); } // 그대로인 박스는 떨어뜨리지 않고 자리만 잡아 둔다
     renderSim(page); // 카펫 선을 처지는 카펫으로 먼저 넘겨 둔다(처음엔 직선)
+    runFrames(page);
+  }
+
+  // 박스를 떨어뜨리고 물리를 진행해 정착할 때까지 프레임마다 그린다. 정착하면 떨림 루프로 넘어간다(처음 그릴 때와 제자리 갱신이 같이 쓴다)
+  function runFrames(page) {
+    const sim = page.sim, world = sim.world;
+    const debug = state => { if (page === active) { stage.dataset.boxes = String(world.boxes.length + sim.pending.length); stage.dataset.boxState = state; } };
+    debug('falling');
+    sim.start = 0;
     function frame(now) {
-      if (!sim.start) { sim.start = now; sim.last = now; }
+      if (!sim.start) { sim.start = now; sim.last = now; sim.lastSpawnAt = now; }
       while (sim.pending.length && now - sim.start >= sim.pending[0].at) { spawn(page, sim.pending.shift()); sim.released++; sim.lastSpawnAt = now; } // 때가 된 박스를 떨어뜨린다
       CarpetPhysics.advance(world, Math.min(50, now - sim.last));
       sim.last = now;
@@ -755,6 +764,44 @@ const STAGE_STYLE = {
       else { sim.raf = 0; debug('settled'); startFidget(page); }
     }
     sim.raf = requestAnimationFrame(frame);
+  }
+
+  // 떨림을 끈다(예산을 더 이상 넘기지 않는 날의 박스)
+  function stopJig(b, el, seal) {
+    b.jigOn = false;
+    [el, seal].forEach(e => { if (e) { e.classList.remove('jig'); e.style.removeProperty('--jig-dur'); e.style.removeProperty('--jig-delay'); } });
+  }
+
+  // 없어지는 박스: 물리 세계에서는 바로 빼고(카펫이 올라오고 위 박스가 내려온다), 그림은 투명해진 뒤 치운다
+  function vanishBox(page, id) {
+    const sim = page.sim;
+    const el = sim.els.get(id), seal = sim.seals.get(id);
+    CarpetPhysics.removeBox(sim.world, id);
+    sim.els.delete(id); sim.seals.delete(id);
+    [el, seal].forEach(e => {
+      if (!e) return;
+      e.style.setProperty('--vanish-ms', `${G.vanishMs}ms`);
+      e.classList.add('vanish');
+      setTimeout(() => e.remove(), G.vanishMs + 60);
+    });
+  }
+
+  // 월드를 새로 만들지 않고 바뀐 만큼만 고친다: 없어진 박스(옮겨지거나 크기가 바뀐 박스의 옛 모습 포함)는 사라지고, 새로 생기거나 옮겨진 박스는 떨어진다
+  function updateInPlace(page, diff, next) {
+    closeFocus(true);
+    const sim = page.sim, world = sim.world;
+    if (sim.fidgetRaf) { cancelAnimationFrame(sim.fidgetRaf); sim.fidgetRaf = 0; }
+    const moved = diff.drop.filter(id => sim.els.has(id));
+    [...diff.removed, ...moved].forEach(id => vanishBox(page, id));
+    page.items = next.map(it => ({ ...it }));
+    const over = page.stats.map(st => st.overBudget);
+    sim.over = over;
+    sim.fidget = over.some(Boolean) && !reduceMotion();
+    world.boxes.forEach(b => { if (b.jigOn && !over[b.col]) stopJig(b, sim.els.get(b.id), sim.seals.get(b.id)); });
+    const dropIds = new Set(diff.drop);
+    sim.pending = releaseOrder(next.filter(it => dropIds.has(it.id)));
+    world.settled = false; world.quiet = 0;
+    runFrames(page);
   }
 
   // ---- 박스 누르기: 눌린 박스가 제자리에서 커져(회전 0도) 모든 정보와 버튼을 보여 준다. 원래 박스는 숨기고, 다른 박스·도장 위의 층(.cn-focus)에 큰 박스를 그린다.
@@ -958,11 +1005,15 @@ const STAGE_STYLE = {
     const page = active;
     syncWork(page);
     setHeader(page);
-    const diff = BoxDiff.diffBoxes(page.items || [], boxItems(page));
+    const next = boxItems(page);
+    const diff = BoxDiff.diffBoxes(page.items || [], next);
     if (!diff.changed && settingsKey(page) === page.settingsKey) return;
     const width = page.el.clientWidth;
     drawGrid(page, metrics(page, width), width);
     const still = reduceMotion();
+    const sim = page.sim;
+    // 설정이 그대로이고 가만히 정착해 있으며 글자만 바뀐 박스가 없으면, 월드를 새로 만들지 않고 바뀐 만큼만 고친다(없어지는 박스는 사라지고 카펫이 올라온다)
+    if (!still && sim && !sim.raf && sim.width === width && diff.edited.length === 0 && settingsKey(page) === page.settingsKey) { updateInPlace(page, diff, next); return; }
     startBoxes(page, still ? 'instant' : 'drop', still ? null : new Set(diff.drop));
   }
   window.renderCarpet = refreshCarpet; // 옛 카펫의 같은 이름 함수를 이어받는다(옛 화면은 숨겨져 있다)

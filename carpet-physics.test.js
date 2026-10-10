@@ -257,3 +257,69 @@ test('충격 기준 속도(kickMinSpeed)를 0으로 하면 위 문제가 다시 
   for (let seed = 1; seed <= 12; seed++) { const r = heavyRun(seed, { kickMinSpeed: 0 }); if (!r.settled || r.after >= 8000) bad++; }
   assert.ok(bad >= 1, `기준 속도 0에서도 문제가 안 생겼다(${bad}/12). 위 테스트가 문제를 잡지 못할 수 있다`);
 });
+
+test('박스를 빼면 카펫이 줄어든 무게만큼 올라오고, 그 위 박스는 내려와 쌓인다', () => {
+  const w = world();
+  drop(w, 'a', 3, 3);
+  drop(w, 'b', 3, 2, { y: -600 });
+  P.settle(w);
+  assert.ok(Math.abs(w.sag[3] - 5 * unit) < 1.5, `처짐 ${w.sag[3]}`);
+  const topBefore = w.boxes.find(b => b.id === 'b').y;
+  assert.equal(P.removeBox(w, 'a'), true);
+  assert.equal(w.settled, false, '정착 상태가 풀려야 한다');
+  P.settle(w);
+  assert.ok(w.settled);
+  assert.ok(Math.abs(w.sag[3] - 2 * unit) < 1.5, `처짐 ${w.sag[3]}`);
+  const b = w.boxes[0];
+  assert.equal(w.boxes.length, 1);
+  assert.ok(Math.abs(b.y + b.h / 2 - P.floorY(w, 3)) < 1.5, '남은 박스는 카펫 위에 얹힌다');
+  assert.ok(Math.abs(b.y - b.h / 2 - baseY) < 1.5, '더미 꼭대기는 처음 카펫 선에 맞는다');
+  assert.ok(b.y !== topBefore);
+});
+
+test('없는 박스를 빼면 false이고 아무것도 바뀌지 않는다', () => {
+  const w = world();
+  drop(w, 'a', 1, 2);
+  P.settle(w);
+  assert.equal(P.removeBox(w, 'zzz'), false);
+  assert.equal(w.settled, true);
+  assert.equal(w.boxes.length, 1);
+});
+
+test('다른 열의 박스는 영향이 없다', () => {
+  const w = world();
+  drop(w, 'a', 1, 2);
+  drop(w, 'b', 4, 3);
+  P.settle(w);
+  const keep = { y: w.boxes[1].y, sag: w.sag[4] };
+  P.removeBox(w, 'a');
+  P.settle(w);
+  assert.ok(Math.abs(w.boxes[0].y - keep.y) < 0.5);
+  assert.ok(Math.abs(w.sag[4] - keep.sag) < 0.5);
+});
+
+test('박스를 빼서 카펫이 올라올 때 위의 박스를 던져 올리지 않는다(출렁이지 않고 올라온다)', () => {
+  const w = P.createWorld({ columns, capacity, maxSag, baseY, params: { capSag: false } });
+  const c = columns[3], mid = (c.left + c.right) / 2;
+  [['a', 4, 0], ['b', 3, -300], ['c', 2, -700], ['d', 2, -1100]].forEach(([id, load, y]) => P.addBox(w, { id, col: 3, x: mid, y, w: 120, h: load * unit, load, lockX: id === 'a' }));
+  P.settle(w, 15);
+  const before = Object.fromEntries(w.boxes.map(b => [b.id, b.y]));
+  P.removeBox(w, 'a');
+  let minUp = 0, t = 0;
+  while (!w.settled && t < 6) { P.step(w, w.p.dt); t += w.p.dt; w.boxes.forEach(b => { minUp = Math.min(minUp, b.y - before[b.id]); }); }
+  assert.ok(w.settled, '정착해야 한다');
+  assert.ok(-minUp < 5, `위로 튀어 오른 높이 ${-minUp}`);
+  assert.ok(Math.abs(w.sag[3] - 7 * unit) < 1.5, `처짐 ${w.sag[3]}`);
+  w.boxes.forEach(b => assert.ok(Math.abs(b.y - before[b.id]) < 2, `${b.id}가 처음 자리로 돌아온다`));
+  assert.equal(w.lift[3], false, '올라오기가 끝나면 꺼진다');
+});
+
+test('박스를 새로 넣으면 올라오기 모드가 꺼지고 평소처럼 출렁인다', () => {
+  const w = world();
+  drop(w, 'a', 3, 3);
+  P.settle(w);
+  P.removeBox(w, 'a');
+  assert.equal(w.lift[3], true);
+  drop(w, 'b', 3, 2);
+  assert.equal(w.lift[3], false);
+});

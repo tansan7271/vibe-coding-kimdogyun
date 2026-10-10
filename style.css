@@ -1199,6 +1199,7 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .cn-box.jig, .cn-seal-wrap.jig { animation: cn-jig var(--jig-dur) cubic-bezier(0.37, 0, 0.63, 1) var(--jig-delay) infinite alternate; }
 #carpet-next.cn-paused .jig { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .cn-box.jig, .cn-seal-wrap.jig { animation: none; } }
+.cn-box.vanish, .cn-seal-wrap.vanish { opacity: 0; transition: opacity var(--vanish-ms, 280ms) ease-out; pointer-events: none; } /* 없어지는 박스: 제자리에서 투명해진다. 물리 세계에서는 이미 빠져 있다 */
 
 /* 새 카펫(작업 중). ?carpet=next 일 때만 켜진다(app-carpet-next.js). 교체가 끝나면 이 블록과 옛 카펫 규칙을 정리한다 */
 #carpet-next { display: none; }
