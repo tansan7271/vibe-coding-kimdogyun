@@ -584,6 +584,8 @@ const STAGE_STYLE = {
   // 모양 값. 숫자나 색을 바꾸고 새로고침하면 바로 보인다
   const SHADOW_STYLE = {
     rgb: '0,0,0',        // 그림자 색(처음엔 검정)
+    overRgb: '170,25,45', // 예산을 넘긴 날짜 칸의 그림자 색(붉은 톤). 이웃 칸과 경계에서 부드럽게 섞인다
+    mixSteps: 16,        // 검정과 붉은색 사이를 몇 단계로 나눠 섞을지. 줄마다 그라데이션을 새로 만들지 않고 이 단계 수만큼 만들어 재사용한다
     alpha: 0.15,         // 카펫 곡선 바로 아래의 진하기(0~1). 아래로 갈수록 곡선을 따라 옅어진다
     fadeLength: 160,     // 곡선에서 완전히 투명해지기까지의 깊이(px)
     resolution: 0.5,     // 그림자를 그리는 해상도(1이면 화면 픽셀 그대로). 부드러운 그림자라 절반으로 그려도 티가 나지 않고 메모리를 아낀다
@@ -615,7 +617,8 @@ const STAGE_STYLE = {
     drawShadow(page, shape, width, m);
   }
 
-  // 그림자: 가로 한 줄마다 곡선 바로 아래에서 시작해 아래로 옅어지는 세로 그라데이션을 한 줄씩. 곡선을 따라가고 계단이 없다
+  // 그림자: 가로 한 줄마다 곡선 바로 아래에서 시작해 아래로 옅어지는 세로 그라데이션을 한 줄씩. 곡선을 따라가고 계단이 없다.
+  // 예산을 넘긴 날짜 칸은 붉은 톤, 이웃 칸과는 카펫 곡선처럼 S자로 섞인다. 캔버스 맨 아래에 닿는 줄은 그림자를 세로로 줄여 맨 아래에서 정확히 투명해지게 한다(싹둑 잘려 보이지 않게)
   function drawShadow(page, shape, width, m) {
     const el = page.shadowEl;
     if (!el) return;
@@ -625,12 +628,24 @@ const STAGE_STYLE = {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, el.width, el.height);
     const fade = SHADOW_STYLE.fadeLength;
-    const grad = ctx.createLinearGradient(0, 0, 0, fade); // 곡선 높이를 0으로 둔 그라데이션 하나를 줄마다 옮겨 재사용한다
-    CarpetShadow.falloffStops(SHADOW_STYLE.alpha).forEach(([t, a]) => grad.addColorStop(t, `rgba(${SHADOW_STYLE.rgb},${a})`));
-    ctx.fillStyle = grad;
+    const steps = SHADOW_STYLE.mixSteps;
+    const stops = CarpetShadow.falloffStops(SHADOW_STYLE.alpha);
+    const grads = Array.from({ length: steps + 1 }, (_, b) => { // 검정(0)에서 붉은색(steps)까지 단계마다 그라데이션 하나. 곡선 높이를 0으로 둔 것을 줄마다 옮겨 재사용한다
+      const rgb = CarpetShadow.mixRgb(SHADOW_STYLE.rgb, SHADOW_STYLE.overRgb, b / steps);
+      const g = ctx.createLinearGradient(0, 0, 0, fade);
+      stops.forEach(([t, a]) => g.addColorStop(t, `rgba(${rgb},${a})`));
+      return g;
+    });
     const step = 1 / k; // 가로로 한 줄 폭(화면 픽셀). 해상도 절반이면 2px
-    CarpetShadow.curveYs({ linePath: shape.linePath, width, step }).forEach((y, i) => {
-      ctx.setTransform(k, 0, 0, k, 0, y * k); // 이 줄의 곡선 높이가 그라데이션의 맨 위
+    const over = page.sim ? page.sim.over : [];
+    const ys = CarpetShadow.curveYs({ linePath: shape.linePath, width, step });
+    const weights = CarpetShadow.overWeights({ over, width, flatRatio: G.carpetFlatRatio, step });
+    ys.forEach((y, i) => {
+      const room = m.height - y; // 이 줄에서 캔버스 맨 아래까지 남은 높이
+      if (room <= 0.5) return;
+      const squeeze = Math.min(1, room / fade); // 남은 높이가 그림자보다 짧으면 그만큼 세로로 줄인다
+      ctx.setTransform(k, 0, 0, k * squeeze, 0, y * k); // 이 줄의 곡선 높이가 그라데이션의 맨 위
+      ctx.fillStyle = grads[Math.round(weights[i] * steps)];
       ctx.fillRect(i * step, 0, step, fade); // 줄 폭이 캔버스 픽셀의 정수배라 줄 사이에 틈도 겹침도 없다(겹치면 줄 경계에 세로 줄무늬가 진해진다)
     });
   }
@@ -804,7 +819,7 @@ const STAGE_STYLE = {
     fx.style.width = `${width}px`;
     page.focusEl.appendChild(f);
     const naturalH = fx.offsetHeight; // fx는 글 흐름대로 높이가 정해진 채 재진다(아직 absolute 아님)
-    const rect = BoxFocus.focusRect({ box: { x: cx, y: cy }, size: { w: Math.max(width, box.w + 2 * G.focusCoverPad), h: Math.max(naturalH, box.h + 2 * G.focusCoverPad) }, bounds, margin: G.focusMargin, cover: { w: box.w + 2 * G.focusCoverPad, h: box.h + 2 * G.focusCoverPad } }); // 원래 박스보다 작아지지 않는다: 남는 높이는 글자 아래에 비고, 버튼은 항상 아래 오른쪽 끝
+    const rect = BoxFocus.focusRect({ box: { x: cx, y: cy }, size: { w: width, h: naturalH }, bounds, margin: G.focusMargin, cover: { w: box.w + 2 * G.focusCoverPad, h: box.h + 2 * G.focusCoverPad } });
     const to = { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, w: rect.width, h: rect.height, rot: 0 }; // 바탕: 내용 자리와 원래 박스 자리를 함께 덮는다
     f.classList.add('placed'); // 이제부터 fx는 박스 안에 얹힌다(스크롤은 넘칠 때만)
     const c = rect.content; // 글자와 버튼은 항상 보이는 영역 안. 바탕 안에서의 자리로 놓는다

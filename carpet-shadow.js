@@ -62,5 +62,45 @@
     return shape.map(([t, f]) => [t, Math.round(a * f * 1000) / 1000]);
   }
 
-  return { curveYs, falloffStops };
+  /**
+   * 날짜 칸마다 '예산 초과면 1, 아니면 0'인 값을 가로 한 줄마다의 섞임 정도(0~1)로 펴 준다.
+   * 카펫처럼 각 칸의 가운데는 평평하게 그 칸의 값을 유지하고(flatRatio), 이웃 칸 사이는 S자(smoothstep)로 이어서 경계에서 색이 부드럽게 섞인다.
+   * @param {object} input
+   * @param {boolean[]} input.over 날짜 칸별 예산 초과 여부(왼쪽부터)
+   * @param {number} input.width 그림 폭(칸은 이 폭을 똑같이 나눈다)
+   * @param {number} input.flatRatio 칸 폭 중 평평하게 유지하는 비율(카펫의 flatRatio와 같게)
+   * @param {number} input.step 재는 간격(x). curveYs와 같은 값을 쓰면 줄이 맞는다
+   * @returns {number[]} i번째 값은 x = min(i*step, width)에서의 섞임 정도. 길이는 curveYs와 같다
+   */
+  function overWeights({ over, width, flatRatio, step }) {
+    const n = over.length;
+    const colW = width / n;
+    const half = (colW * Math.min(1, Math.max(0, flatRatio))) / 2;
+    const val = i => (over[i] ? 1 : 0);
+    const smooth = t => t * t * (3 - 2 * t);
+    const count = Math.ceil(width / step) + 1;
+    const out = new Array(count);
+    for (let k = 0; k < count; k++) {
+      const x = Math.min(k * step, width);
+      const seg = Math.min(n - 2, Math.max(0, Math.floor((x - colW / 2) / colW))); // x가 놓인 두 칸 가운데 사이의 구간 번호(양 끝 바깥은 가까운 끝 칸)
+      if (n < 2 || x <= colW / 2) { out[k] = val(0); continue; } // 칸이 하나거나 첫 칸 가운데보다 왼쪽이면 첫 칸의 값
+      const left = (seg + 0.5) * colW + half, right = (seg + 1.5) * colW - half; // 왼쪽 바닥이 끝나는 곳, 오른쪽 바닥이 시작하는 곳
+      if (x >= (n - 0.5) * colW) { out[k] = val(n - 1); continue; }
+      if (x <= left) out[k] = val(seg);
+      else if (x >= right) out[k] = val(seg + 1);
+      else out[k] = val(seg) + (val(seg + 1) - val(seg)) * smooth((x - left) / (right - left));
+    }
+    return out;
+  }
+
+  /**
+   * 두 색을 섞는다. 'r,g,b' 문자열 둘과 정도 w(0이면 a, 1이면 b)를 받아 'r,g,b'로 돌려준다
+   */
+  function mixRgb(a, b, w) {
+    const pa = a.split(',').map(Number), pb = b.split(',').map(Number);
+    const t = Math.min(1, Math.max(0, w));
+    return pa.map((v, i) => Math.round(v + (pb[i] - v) * t)).join(',');
+  }
+
+  return { curveYs, falloffStops, overWeights, mixRgb };
 });

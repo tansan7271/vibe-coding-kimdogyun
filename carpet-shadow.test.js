@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const Carpet = require('./carpet.js');
-const { curveYs, falloffStops } = require('./carpet-shadow.js');
+const { curveYs, falloffStops, overWeights, mixRgb } = require('./carpet-shadow.js');
 
 const near = (a, b, eps = 0.01) => assert.ok(Math.abs(a - b) < eps, `${a} vs ${b}`);
 
@@ -50,4 +50,43 @@ test('감쇠 곡선: 맨 위가 alpha, 맨 아래가 0이고 아래로 갈수록
 test('감쇠 곡선의 불투명도는 0~1로 자른다', () => {
   assert.equal(falloffStops(3)[0][1], 1);
   assert.equal(falloffStops(-1)[0][1], 0);
+});
+
+test('예산 초과가 없으면 모든 줄의 섞임 정도가 0, 전부 초과면 1', () => {
+  assert.ok(overWeights({ over: [false, false, false], width: 300, flatRatio: 0.5, step: 10 }).every(w => w === 0));
+  assert.ok(overWeights({ over: [true, true, true], width: 300, flatRatio: 0.5, step: 10 }).every(w => w === 1));
+});
+
+test('초과한 칸의 가운데는 1, 두 칸 떨어진 곳은 0, 이웃 칸과의 경계는 정확히 절반', () => {
+  const step = 10;
+  const w = overWeights({ over: [false, true, false, false], width: 400, flatRatio: 0.5, step });
+  assert.equal(w[Math.round(150 / step)], 1);   // 둘째 칸 가운데
+  assert.equal(w[Math.round(50 / step)], 0);    // 첫째 칸 가운데
+  assert.equal(w[Math.round(350 / step)], 0);   // 넷째 칸 가운데
+  near(w[Math.round(100 / step)], 0.5, 0.001);  // 첫째·둘째 칸 경계
+  near(w[Math.round(200 / step)], 0.5, 0.001);  // 둘째·셋째 칸 경계
+});
+
+test('이웃 칸 사이는 끊김 없이 이어진다(한 줄에 크게 뛰지 않는다)', () => {
+  const w = overWeights({ over: [true, false, true, false, true, false, true], width: 700, flatRatio: 0.5, step: 2 });
+  for (let i = 1; i < w.length; i++) assert.ok(Math.abs(w[i] - w[i - 1]) < 0.12, `${i}: ${w[i - 1]} -> ${w[i]}`);
+  for (const v of w) assert.ok(v >= 0 && v <= 1);
+});
+
+test('양 끝 칸이 초과면 가장자리까지 1로 이어진다', () => {
+  const w = overWeights({ over: [true, false, false, false, false, false, true], width: 700, flatRatio: 0.5, step: 10 });
+  assert.equal(w[0], 1);
+  assert.equal(w[w.length - 1], 1);
+});
+
+test('길이는 curveYs와 같아서 줄이 맞는다', () => {
+  const path = 'M 0 0 L 700 0';
+  assert.equal(overWeights({ over: new Array(7).fill(false), width: 700, flatRatio: 0.5, step: 2 }).length, curveYs({ linePath: path, width: 700, step: 2 }).length);
+});
+
+test('색 섞기: 0이면 앞 색, 1이면 뒤 색, 중간은 가운데', () => {
+  assert.equal(mixRgb('0,0,0', '170,25,45', 0), '0,0,0');
+  assert.equal(mixRgb('0,0,0', '170,25,45', 1), '170,25,45');
+  assert.equal(mixRgb('0,0,0', '170,26,46', 0.5), '85,13,23');
+  assert.equal(mixRgb('0,0,0', '170,25,45', 5), '170,25,45'); // 범위 밖은 자른다
 });
