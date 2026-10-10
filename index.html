@@ -66,7 +66,7 @@
     --note-margin-color: rgba(184, 32, 58, 0.22); /* 세로선 색. 연한 빨강 */
     --note-line-color: rgba(0, 0, 0, 0.09);       /* 가로선 색. 흐린 회색 */
     --note-line-gap: 26px;       /* 가로선 간격 */
-    --note-line-top: 38px;       /* 첫 가로선 시작 높이. 스프링 아래부터 */
+    --note-line-top: 12px;       /* 가로선 그리기 시작 높이. 첫 줄은 이 값 + 줄 간격 − 1px 자리에 생긴다 */
     --note-plus-size: 34px;      /* 글자 옆 + 원 크기 */
     --note-plus-bg: #f3e6ae;     /* + 원 색. 메모지보다 조금 진하게 */
     --note-plus-fg: #b8962f;     /* + 모양 색. 원보다 더 진하게 */
@@ -2156,7 +2156,7 @@
     if (btn) showSettingsTab(btn.dataset.tab);
   });
 
-  document.querySelector('header [data-screen="settings"]').addEventListener('click', () => showSettingsTab('events'));
+  document.querySelector('[data-screen="settings"]').addEventListener('click', () => showSettingsTab('events'));
 
   Object.values(modals).forEach(m => {
     m.addEventListener('click', (e) => {
