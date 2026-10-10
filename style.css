@@ -14,6 +14,10 @@
   --logo-nudge-y: 0px;      /* 글자 무게중심 미세 조정. 양수면 아래로 내려간다 */
   --header-pad-y: 12px;     /* 헤더 위아래 여백 */
   --header-height: calc(var(--logo-height) + var(--header-pad-y) * 2); /* 헤더 기본 높이 */
+  --header-month-gap: 14px;       /* 로고와 월 표시 사이 간격 */
+  --header-month-num-size: 36px;  /* 월 숫자 크기(날짜 숫자와 같은 폰트) */
+  --header-month-unit-size: 17px; /* '월' 글자 크기 */
+  --header-month-color: rgba(255, 255, 255, 0.92); /* 월 표시 색 */
 
   /* 털실 스티치 공용 값. 헤더 말고 다른 요소에도 가져다 쓴다.
      점선: SVG 요소는 CSS로 stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-width: var(--stitch-width); stroke: var(--stitch-color);
@@ -169,7 +173,8 @@ header {
   z-index: 100;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: var(--header-month-gap);
   padding: calc(var(--header-bleed) + var(--header-pad-y)) 32px var(--header-pad-y);
   color: #fff;
   transform: rotate(calc(var(--header-tilt-deg) * -1));
@@ -965,6 +970,16 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .step-menu button { text-align: left; }
 .step-menu input[type="date"] { width: 100%; font-size: 12px; }
 .step-menu .menu-hint { color: #777; font-size: 11px; }
+
+/* 헤더의 월 표시: "Red Carpet ∙ 12월". 새 카펫(?carpet=next)일 때만 켜진다 */
+.header-month { display: flex; align-items: baseline; gap: 6px; color: var(--header-month-color); }
+.header-month .dot { font-size: var(--header-month-unit-size); }
+.header-month .num { font-family: 'Barista Script', cursive; font-size: var(--header-month-num-size); line-height: 1; }
+.header-month .unit { font-size: var(--header-month-unit-size); }
+
+/* 날짜 숫자 폰트(새 카펫). 라이선스를 확인하기 전이라 폰트 파일은 저장소에 넣지 않고 컴퓨터에 설치된 폰트(local)만 쓴다.
+   확인이 끝나면 src에 url(파일)을 덧붙인다. 설치돼 있지 않으면 cursive 글꼴로 대체된다 */
+@font-face { font-family: 'Barista Script'; src: local('Barista Script'), local('BaristaScript'); }
 
 /* 새 카펫(작업 중). ?carpet=next 일 때만 켜진다(app-carpet-next.js). 교체가 끝나면 이 블록과 옛 카펫 규칙을 정리한다 */
 #carpet-next { display: none; }

@@ -11,7 +11,8 @@
 //  [ ] 지남 박스(마감이 지나 깔리지 않은 단계)
 //  [ ] 지난 주 요약(총 부하, 초과한 날 수, 밀린 횟수)
 //  [ ] 카펫 선: 부하만큼 처짐, 시간 초과 짐 상자
-//  [x] 눈금: 가로 눈금, 예산선, 안전선, 날짜 구분선, 오늘 칸 배경(눈금 숫자와 날짜 글자는 아직 안 넣음)
+//  [x] 눈금: 가로 눈금, 예산선, 안전선, 날짜 구분선, 오늘 칸 배경. 예산선 아래에는 아무것도 없다
+//  [x] 날짜 숫자: 카펫 선 위쪽 여백 안, 칸마다 왼쪽 정렬(눈금 숫자와 요일 글자는 아직 안 넣음)
 //  [ ] 좁은 화면(가로 스크롤)
 //  숨은 부작용(빠뜨리기 쉬움)
 //  [ ] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
@@ -47,6 +48,12 @@ const STAGE_STYLE = {
   budgetColor: '#b9b2a8',      // 예산선(맨 아래 눈금) 색
   dividerColor: '#d6cfc4',     // 날짜 구분 점선 색(모양은 스티치). 안전선은 스티치 색(주황)을 그대로 쓴다
   todayFill: 'rgba(184,32,58,0.08)', // 오늘 칸 배경. 마지막 숫자를 올리면 진해진다
+  // --- 날짜 숫자: 헤더 아랫단과 카펫 선 사이(위쪽 여백)에 칸마다 왼쪽 정렬 ---
+  dateFont: "'Barista Script', cursive", // 폰트 파일은 저장소에 없고 설치된 폰트만 쓴다(style.css의 @font-face 참고). 없으면 cursive로 대체된다
+  dateColor: '#d6cfc4',        // 숫자 색. 날짜 구분 점선과 같은 흐린 색
+  dateDigitEm: 0.8,            // 이 폰트에서 숫자 높이 / 글자 크기. Barista Script 숫자는 기준선 위로 약 0.8em
+  dateHeightRatio: 0.5,        // 숫자 높이 / 위쪽 여백. 숫자는 위쪽 여백의 세로 가운데에 놓인다(클수록 크고 위아래 패딩이 줄어든다)
+  datePadXRatio: 0.08,         // 칸 왼쪽에서 숫자까지 띄우는 거리 / 칸 폭
 };
 
 (function () {
@@ -72,10 +79,21 @@ const STAGE_STYLE = {
   });
   rollPath.setAttribute('stroke-linejoin', 'round');
 
+  // 오늘이 든 주의 7일(YYYY-MM-DD)
+  function thisWeekDates() {
+    const start = Placement.weekStart(todayStr());
+    return Placement.dateRange(start, Placement.addDays(start, 6));
+  }
+
+  // 헤더의 월 표시("Red Carpet ∙ 12월"): 그 주의 목요일이 든 달. 주가 두 달에 걸치면 날이 더 많은 쪽이다
+  const monthEl = document.getElementById('header-month');
+  monthEl.querySelector('.num').textContent = Number(thisWeekDates()[3].slice(5, 7));
+  monthEl.hidden = false;
+
   // 눈금: 7칸을 화면 너비로 똑같이 나눠 그린다. 오늘 칸은 배경을 깐다. 폭이나 높이가 바뀔 때만 다시 만든다
   let gridKey = '';
-  function drawGrid(width, groundY, height, sag) {
-    const key = [width, groundY, height, sag].join();
+  function drawGrid(width, groundY, height, sag, topSpace) {
+    const key = [width, groundY, height, sag, topSpace].join();
     if (key === gridKey) return;
     gridKey = key;
     const cs = getComputedStyle(document.documentElement);
@@ -84,7 +102,7 @@ const STAGE_STYLE = {
     const stitch = `stroke-dasharray="${dash} ${gap}" stroke-width="${stitchW}" stroke-linecap="round"`;
     const st = state.settings;
     const today = todayStr();
-    const dates = Placement.dateRange(Placement.weekStart(today), Placement.addDays(Placement.weekStart(today), 6));
+    const dates = thisWeekDates();
     const colW = width / 7;
     const columns = dates.map((_, i) => ({ left: i * colW, right: (i + 1) * colW }));
     const shape = Carpet.carpetShape({
@@ -96,7 +114,8 @@ const STAGE_STYLE = {
       (todayIdx >= 0 ? `<rect x="${columns[todayIdx].left}" y="${groundY}" width="${colW}" height="${sag}" fill="${G.todayFill}"/>` : '')
       + shape.gridLines.map(g => `<line x1="0" y1="${g.y}" x2="${width}" y2="${g.y}" stroke="${g.isBudget ? G.budgetColor : G.gridColor}" stroke-width="${G.gridWidth}"/>`).join('')
       + (shape.safeLine ? `<line x1="0" y1="${shape.safeLine.y}" x2="${width}" y2="${shape.safeLine.y}" stroke="${yarn}" ${stitch}/>` : '')
-      + shape.dividers.map(x => `<line x1="${x}" y1="${groundY}" x2="${x}" y2="${groundY + sag}" stroke="${G.dividerColor}" ${stitch}/>`).join('');
+      + shape.dividers.map(x => `<line x1="${x}" y1="${groundY}" x2="${x}" y2="${groundY + sag}" stroke="${G.dividerColor}" ${stitch}/>`).join('')
+      + dateNumbers(columns, dates, colW, groundY, topSpace);
   }
 
   // 아래쪽 '할 일' 메모지의 왼쪽 위 꼭짓점의 화면 높이. 메모지는 가운데를 기준으로 기울어 있어서 기울기(변환 행렬)를 반영해 계산한다
@@ -137,13 +156,24 @@ const STAGE_STYLE = {
     return L;
   }
 
+  // 날짜 숫자: 헤더 아랫단~카펫 선 사이의 세로 가운데에, 칸 왼쪽에서 padX만큼 띄워 왼쪽 정렬
+  function dateNumbers(columns, dates, colW, groundY, topSpace) {
+    const digitH = topSpace * G.dateHeightRatio;
+    const fontSize = digitH / G.dateDigitEm;
+    const baseline = groundY - topSpace / 2 + digitH / 2; // 위쪽 여백 가운데에 숫자 높이를 맞춘다(숫자는 기준선 위로 자란다)
+    const padX = colW * G.datePadXRatio;
+    return dates.map((d, i) =>
+      `<text x="${(columns[i].left + padX).toFixed(2)}" y="${baseline.toFixed(2)}" font-family="${G.dateFont}" font-size="${fontSize.toFixed(2)}" fill="${G.dateColor}">${Number(d.slice(8))}</text>`
+    ).join('');
+  }
+
   // 롤 그리기. eased는 0~1(곡선을 입힌 진행도)
   function draw(eased) {
     const width = svg.clientWidth || stage.clientWidth + 32;
-    const { P, startMargin, groundY, sag, height } = layout(width);
+    const { P, startMargin, groundY, sag, height, topSpace } = layout(width);
     const pose = CarpetRoll.rollPose({ progress: eased, width, ...P, groundY, startMargin });
     svg.setAttribute('height', height);
-    drawGrid(width, groundY, height, sag);
+    drawGrid(width, groundY, height, sag, topSpace);
     // 눈금은 롤이 깔고 지나간 자리까지만 드러난다
     revealRect.setAttribute('x', -50);
     revealRect.setAttribute('y', 0);
