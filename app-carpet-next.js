@@ -662,7 +662,7 @@ const STAGE_STYLE = {
     }
     const grads = page.shadowGrads;
     const step = 1 / k; // 가로로 한 줄 폭(화면 픽셀). 해상도 절반이면 2px
-    const over = page.sim ? page.sim.over : [];
+    const over = page.sim ? page.sim.overSafe : []; // 그림자 붉기는 안전선 초과 기준(떨림은 예산 초과 기준)
     const ys = CarpetShadow.curveYs({ linePath: shape.linePath, width, step });
     const weightsKey = `${over.map(Number).join('')}|${width}|${step}`; // 붉은 톤 가중치는 어느 날이 초과인지와 폭에만 달렸다
     if (!page.shadowWeights || page.shadowWeights.key !== weightsKey) page.shadowWeights = { key: weightsKey, w: CarpetShadow.overWeights({ over, width, flatRatio: G.carpetFlatRatio, step }) };
@@ -731,8 +731,9 @@ const STAGE_STYLE = {
     const stays = dropIds ? all.filter(it => !dropIds.has(it.id)) : [];
     if (mode !== 'empty') { page.items = all.map(it => ({ ...it })); page.settingsKey = settingsKey(page); } // 다시 그릴 때 무엇이 달라졌는지 견주는 기준
     const over = page.stats.map(st => st.overBudget);
+    const overSafe = page.stats.map(st => st.overSafe); // 안전선 초과(예산 초과 포함): 그림자가 붉어지는 기준
     const fidget = over.some(Boolean) && !reduceMotion();
-    const sim = page.sim = { world, width, colW, unit: m.unit, over, fidget, els: new Map(), seals: new Map(), pending: releaseOrder(drops), raf: 0, fidgetRaf: 0, start: 0, last: 0, released: 0, carpetShown: false };
+    const sim = page.sim = { world, width, colW, unit: m.unit, over, overSafe, fidget, els: new Map(), seals: new Map(), pending: releaseOrder(drops), raf: 0, fidgetRaf: 0, start: 0, last: 0, released: 0, carpetShown: false };
     const debug = state => { if (page === active) { stage.dataset.boxes = String(world.boxes.length + sim.pending.length); stage.dataset.boxState = state; } };
     if (mode === 'empty') {
       sim.pending = [];
@@ -803,6 +804,7 @@ const STAGE_STYLE = {
     page.items = next.map(it => ({ ...it }));
     const over = page.stats.map(st => st.overBudget);
     sim.over = over;
+    sim.overSafe = page.stats.map(st => st.overSafe);
     sim.fidget = over.some(Boolean) && !reduceMotion();
     world.boxes.forEach(b => { if (b.jigOn && !over[b.col]) stopJig(b, sim.els.get(b.id), sim.seals.get(b.id)); });
     const dropIds = new Set(diff.drop);
