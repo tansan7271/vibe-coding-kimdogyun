@@ -38,7 +38,7 @@
     --header-bg: #b8203a;        /* 헤더 천 색 */
     --header-tilt-deg: 0.75deg;  /* 기울기. 반시계 방향으로 이만큼 기운다 */
     --edge-amp: 3;               /* 울렁이는 아랫단 진폭(위아래 px, 숫자만) */
-    --edge-wave: 128;            /* 울렁임 한 주기 길이(px, 숫자만). 화면 폭이 달라도 이 조각을 가로로 반복할 뿐이라 울렁임 크기는 그대로다 */
+    --edge-wave: 128;            /* 울렁임 한 주기 길이(px, 숫자만) */
     --edge-offset: 6;            /* 점선과 천 끝 사이 거리(px, 숫자만) */
     /* 아래 값은 위 값에서 계산된다. 같은 식이 <head>의 스크립트에도 있다 */
     --edge-sy: calc(var(--stitch-width) / 2 + var(--edge-amp) + 1);   /* 점선 곡선 가운데 높이 */
@@ -92,7 +92,7 @@
     right: 0;
     bottom: calc(var(--edge-h) * -1);
     background:
-      var(--edge-tile) left bottom / calc(var(--edge-wave) * 1px) var(--edge-h) repeat-x,
+      var(--edge-tile) left bottom / auto var(--edge-h) no-repeat,
       linear-gradient(var(--header-bg), var(--header-bg)) left top / 100% calc(100% - var(--edge-h) + 1px) no-repeat;
     filter: drop-shadow(var(--shadow-soft));
   }
@@ -190,6 +190,23 @@
   }
 
   .modal-close:hover { background: #d8d2c9; }
+
+  /* 탭: 할 일은 제목 줄 x 버튼 옆, 일정은 '일정' 소제목 줄 오른쪽 */
+  .tab-bar { display: flex; gap: 4px; }
+  .tab-bar button {
+    height: 32px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 16px;
+    background: transparent;
+    color: #666;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .tab-bar button:hover { background: #e6e2dc; }
+  .tab-bar button.active { background: #b8203a; color: #fff; font-weight: bold; }
+  .modal-panel .tab-bar.title-tabs { position: absolute; top: var(--modal-pad); right: calc(var(--modal-pad) + 40px); }
+  .section-head { display: flex; align-items: center; justify-content: space-between; }
 
   .screen h1 {
     font-size: 18px;
@@ -570,28 +587,39 @@
   .step-menu .menu-hint { color: #777; font-size: 11px; }
 </style>
 <script>
-  // 헤더 아랫단 그림을 CSS 값(--stitch-*, --edge-*, --header-bg)으로 만들어 --edge-tile에 넣는다. 한 주기 조각을 가로로 반복한다
+  // 헤더 아랫단 그림(천 끝 + 털실 점선)을 CSS 값(--stitch-*, --edge-*, --header-bg)으로 만들어 --edge-tile에 넣는다.
+  // 조각을 반복하면 이음새에 틈이 비쳐서, 화면 폭만큼 한 장으로 그린다. 창 크기가 바뀌면 다시 그린다
   (function () {
-    const cs = getComputedStyle(document.documentElement);
+    const root = document.documentElement;
+    const cs = getComputedStyle(root);
     const num = name => parseFloat(cs.getPropertyValue(name));
-    const bg = cs.getPropertyValue('--header-bg').trim();
-    const yarn = cs.getPropertyValue('--stitch-color').trim();
-    const w = num('--edge-wave'), amp = num('--edge-amp');
-    const dash = num('--stitch-dash'), gap = num('--stitch-gap'), width = num('--stitch-width');
-    const sy = width / 2 + amp + 1, ey = sy + num('--edge-offset'), h = ey + amp + 1;
     const r = n => +n.toFixed(2);
-    // 오른쪽 끝에서 왼쪽 끝으로: 아래로 불룩 → 위로 불룩 (한 주기)
-    const wave = y => `Q${r(w * 0.75)} ${r(y + 2 * amp)} ${r(w / 2)} ${r(y)}Q${r(w * 0.25)} ${r(y - 2 * amp)} 0 ${r(y)}`;
-    // 점선이 이음새에서 끊기지 않게, 곡선 길이를 점 한 주기의 정수 배로 맞춘다
-    let len = 0;
-    for (let i = 1; i <= 200; i++) len += Math.hypot(w / 200, amp * (Math.sin(2 * Math.PI * i / 200) - Math.sin(2 * Math.PI * (i - 1) / 200)));
-    const period = dash + gap;
-    const pathLength = r(Math.max(1, Math.round(len / period)) * period);
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${r(h)}' viewBox='0 0 ${w} ${r(h)}'>`
-      + `<path d='M0 0H${w}V${r(ey)}${wave(ey)}Z' fill='${bg}'/>`
-      + `<path d='M${w} ${r(sy)}${wave(sy)}' fill='none' stroke='${yarn}' stroke-width='${width}' stroke-linecap='round' stroke-dasharray='${dash} ${gap}' stroke-dashoffset='${dash / 2}' pathLength='${pathLength}'/>`
-      + `</svg>`;
-    document.documentElement.style.setProperty('--edge-tile', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+    function draw() {
+      const bg = cs.getPropertyValue('--header-bg').trim();
+      const yarn = cs.getPropertyValue('--stitch-color').trim();
+      const wave = num('--edge-wave'), amp = num('--edge-amp');
+      const dash = num('--stitch-dash'), gap = num('--stitch-gap'), width = num('--stitch-width');
+      const sy = width / 2 + amp + 1, ey = sy + num('--edge-offset'), h = ey + amp + 1;
+      const w = Math.ceil((root.clientWidth + 32) / wave) * wave; // 헤더 폭(좌우로 16px씩 삐져나감)을 한 주기의 배수로 올림
+      // 오른쪽 끝에서 왼쪽 끝으로 한 주기씩: 아래로 불룩 → 위로 불룩
+      const curve = y => {
+        let d = '';
+        for (let x = w - wave; x >= 0; x -= wave) d += `Q${r(x + wave * 0.75)} ${r(y + 2 * amp)} ${r(x + wave / 2)} ${r(y)}Q${r(x + wave * 0.25)} ${r(y - 2 * amp)} ${x} ${r(y)}`;
+        return d;
+      };
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${r(h)}' viewBox='0 0 ${w} ${r(h)}'>`
+        + `<path d='M0 0H${w}V${r(ey)}${curve(ey)}Z' fill='${bg}'/>`
+        + `<path d='M${w} ${r(sy)}${curve(sy)}' fill='none' stroke='${yarn}' stroke-width='${width}' stroke-linecap='round' stroke-dasharray='${dash} ${gap}'/>`
+        + `</svg>`;
+      root.style.setProperty('--edge-tile', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+    }
+    draw();
+    let queued = false;
+    window.addEventListener('resize', () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; draw(); });
+    });
   })();
 </script>
 </head>
@@ -627,6 +655,10 @@
   <button class="modal-close" type="button" aria-label="닫기">×</button>
   <section id="screen-goals" class="screen">
     <h1>할 일</h1>
+    <div class="tab-bar title-tabs" id="goal-tabs">
+      <button type="button" data-tab="active"></button>
+      <button type="button" data-tab="done"></button>
+    </div>
     <div class="goal-add-form">
       <input type="text" id="new-goal-title" placeholder="할 일 제목">
       <input type="date" id="new-goal-deadline">
@@ -654,7 +686,13 @@
   <section id="screen-settings" class="screen">
     <h1>일정과 설정</h1>
 
-    <h2>일정</h2>
+    <div class="section-head">
+      <h2>일정</h2>
+      <div class="tab-bar" id="event-tabs">
+        <button type="button" data-tab="current"></button>
+        <button type="button" data-tab="over"></button>
+      </div>
+    </div>
     <div class="event-add-form">
       <input type="text" id="new-event-title" placeholder="일정 제목">
       <select id="new-event-repeat">
@@ -907,6 +945,7 @@
             <span>${expanded ? '▲' : '▼'}</span>
           </div>
           <div class="goal-actions">
+            ${steps.some(s => !s.done) ? `<button type="button" class="btn" data-action="complete-goal" data-goal-id="${goal.id}">완료</button>` : ''}
             <button type="button" class="btn btn-danger" data-action="delete-goal" data-goal-id="${goal.id}">삭제</button>
           </div>
         </div>
@@ -933,12 +972,40 @@
   const goalList = document.getElementById('goal-list');
   const newStepDrafts = {}; // goalId -> { load }
 
+  let goalTab = 'active'; // 'active'(진행 중) | 'done'(완료)
+
+  function renderTabs(barId, current, tabs) {
+    document.querySelectorAll(`#${barId} button`).forEach(btn => {
+      const t = tabs.find(x => x.key === btn.dataset.tab);
+      btn.textContent = `${t.label} (${t.count})`;
+      btn.classList.toggle('active', btn.dataset.tab === current);
+    });
+  }
+
   function renderGoals() {
     const sorted = [...state.goals].sort((a, b) => a.deadline.localeCompare(b.deadline));
-    goalList.innerHTML = sorted.length
-      ? sorted.map(goalCardHtml).join('')
-      : '<div class="empty-hint">아직 할 일이 없습니다. 위에서 추가하세요.</div>';
+    const isDone = g => Placement.isGoalDone(stepsForGoal(g.id));
+    const doneGoals = sorted.filter(isDone);
+    const activeGoals = sorted.filter(g => !isDone(g));
+    renderTabs('goal-tabs', goalTab, [
+      { key: 'active', label: '진행 중', count: activeGoals.length },
+      { key: 'done', label: '완료', count: doneGoals.length },
+    ]);
+    const shown = goalTab === 'done' ? doneGoals : activeGoals;
+    const empty = goalTab === 'done'
+      ? '완료한 할 일이 없습니다.'
+      : (state.goals.length ? '진행 중인 할 일이 없습니다.' : '아직 할 일이 없습니다. 위에서 추가하세요.');
+    goalList.innerHTML = shown.length
+      ? shown.map(goalCardHtml).join('')
+      : `<div class="empty-hint">${empty}</div>`;
   }
+
+  document.getElementById('goal-tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-tab]');
+    if (!btn) return;
+    goalTab = btn.dataset.tab;
+    renderGoals();
+  });
 
   document.getElementById('add-goal-btn').addEventListener('click', () => {
     const titleInput = document.getElementById('new-goal-title');
@@ -962,6 +1029,17 @@
     if (action === 'toggle-expand') {
       const goalId = target.dataset.goalId;
       expandedGoals.has(goalId) ? expandedGoals.delete(goalId) : expandedGoals.add(goalId);
+      renderGoals();
+      return;
+    }
+
+    if (action === 'complete-goal') {
+      const goalId = target.dataset.goalId;
+      const left = stepsForGoal(goalId).filter(s => !s.done);
+      if (!confirm(`남은 중간 단계 ${left.length}개를 오늘 완료한 것으로 기록하고, 이 할 일을 완료로 옮길까요?`)) return;
+      const date = todayStr();
+      left.forEach(s => { s.done = true; s.doneDate = date; });
+      saveState();
       renderGoals();
       return;
     }
@@ -1138,12 +1216,32 @@
       </div>`;
   }
 
+  let eventTab = 'current'; // 'current'(현재) | 'over'(지난 일정)
+
   function renderEvents() {
     const sorted = [...state.events].sort((a, b) => eventSortKey(a).localeCompare(eventSortKey(b)));
-    eventList.innerHTML = sorted.length
-      ? sorted.map(eventRowHtml).join('')
-      : '<div class="empty-hint">아직 일정이 없습니다.</div>';
+    const today = todayStr();
+    const overEvents = sorted.filter(ev => Placement.isEventOver(ev, today));
+    const currentEvents = sorted.filter(ev => !Placement.isEventOver(ev, today));
+    renderTabs('event-tabs', eventTab, [
+      { key: 'current', label: '현재', count: currentEvents.length },
+      { key: 'over', label: '지난 일정', count: overEvents.length },
+    ]);
+    const shown = eventTab === 'over' ? overEvents : currentEvents;
+    const empty = eventTab === 'over'
+      ? '지난 일정이 없습니다.'
+      : (state.events.length ? '현재 일정이 없습니다.' : '아직 일정이 없습니다.');
+    eventList.innerHTML = shown.length
+      ? shown.map(eventRowHtml).join('')
+      : `<div class="empty-hint">${empty}</div>`;
   }
+
+  document.getElementById('event-tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-tab]');
+    if (!btn) return;
+    eventTab = btn.dataset.tab;
+    renderEvents();
+  });
 
   function renderNewEventLoadPicker() {
     document.getElementById('new-event-load-picker').innerHTML = loadPickerHtml('new-event', newEventDraft.load);
@@ -1911,6 +2009,8 @@
       const target = btn.dataset.screen;
       closeModals();
       if (modals[target]) {
+        if (target === 'goals') renderGoals();
+        if (target === 'settings') renderEvents();
         modals[target].classList.add('open');
         document.body.style.overflow = 'hidden';
       }

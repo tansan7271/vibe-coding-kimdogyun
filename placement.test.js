@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange, weekSummary, canDropPin } = require('./placement.js');
+const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange, weekSummary, canDropPin, isGoalDone, isEventOver } = require('./placement.js');
 
 const defaultSettings = {
   capacity: 10,
@@ -451,4 +451,26 @@ test('canDropPin: 같은 날은 조용히 무시, 지난 날은 이유와 함께
   assert.deepEqual(canDropPin({ fromDate: today, toDate: '2026-10-02', today }), { ok: true, reason: null });
   assert.equal(canDropPin({ fromDate: '2026-12-31', toDate: '2026-12-30', today: '2027-01-01' }).ok, false);
   assert.equal(canDropPin({ fromDate: '2026-12-30', toDate: '2027-01-01', today: '2026-12-31' }).ok, true);
+});
+
+test('isGoalDone: 단계가 1개 이상이고 전부 완료일 때만 완료', () => {
+  assert.equal(isGoalDone([]), false);
+  assert.equal(isGoalDone([{ done: true }, { done: false }]), false);
+  assert.equal(isGoalDone([{ done: true }, {}]), false);
+  assert.equal(isGoalDone([{ done: true }, { done: true }]), true);
+});
+
+test('isEventOver: 반복 없는 일정은 날짜가 지났을 때, 오늘은 아직 지난 것이 아니다', () => {
+  assert.equal(isEventOver({ repeat: 'none', date: '2026-10-09' }, '2026-10-10'), true);
+  assert.equal(isEventOver({ repeat: 'none', date: '2026-10-10' }, '2026-10-10'), false);
+  assert.equal(isEventOver({ repeat: 'none', date: '2026-10-11' }, '2026-10-10'), false);
+  assert.equal(isEventOver({ date: '2026-10-09' }, '2026-10-10'), true); // repeat 없는 옛 데이터
+});
+
+test('isEventOver: 반복 일정은 반복 종료일이 지났을 때만. 종료일이 없으면 끝나지 않는다', () => {
+  for (const repeat of ['weekly', 'biweekly', 'monthly']) {
+    assert.equal(isEventOver({ repeat, date: '2026-01-01', repeatUntil: '2026-10-09' }, '2026-10-10'), true);
+    assert.equal(isEventOver({ repeat, date: '2026-01-01', repeatUntil: '2026-10-10' }, '2026-10-10'), false);
+    assert.equal(isEventOver({ repeat, date: '2026-01-01' }, '2026-10-10'), false);
+  }
 });

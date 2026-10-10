@@ -347,7 +347,26 @@
     return { steps: next, pushedIds };
   }
 
+  /**
+   * 완료된 할 일인가. 단계가 1개 이상이고 전부 완료일 때만 완료다 (단계가 없는 할 일은 끝난 것으로 보지 않는다)
+   * @param {Array} goalSteps 그 할 일에 속한 단계들
+   */
+  function isGoalDone(goalSteps) {
+    return goalSteps.length > 0 && goalSteps.every(s => s.done);
+  }
+
+  /**
+   * 더 이상 생기지 않는 일정인가. 반복 없는 일정은 날짜가 오늘 이전, 반복 일정은 반복 종료일이 오늘 이전일 때다.
+   * 오늘 일어나는 일정은 아직 지난 것이 아니다. 반복 종료일이 없는 반복 일정은 끝나지 않는다
+   */
+  function isEventOver(ev, today) {
+    if (ev.repeat === 'none' || !ev.repeat) return Boolean(ev.date) && ev.date < today;
+    return Boolean(ev.repeatUntil) && ev.repeatUntil < today;
+  }
+
   return {
+    isGoalDone,
+    isEventOver,
     placeSteps,
     autoPush,
     weekSummary,
