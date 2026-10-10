@@ -269,41 +269,83 @@
     });
   }
 
-  // 견출지로 팝업 안의 페이지를 바꿀 때: 지금 페이지의 복제본을 위에 얹어 두고 진짜 내용은 바로 새 페이지로 바꾼 뒤,
-  // 복제본을 아래에서 위로 말아 올려 새 페이지가 드러나게 한다. 말린 가장자리의 명암과 그림자는 --turn-* 값(style.css)으로 만든다.
-  // 3D 변환 없이 clip-path와 transform만 쓴다(날아다니는 팝업의 그림자가 연출 중 사라지던 문제를 피하려고)
-  function pageTurn(modal, change) {
+  // 견출지로 팝업 안의 페이지를 바꿀 때: 오른쪽 아래 모서리에서 들춰 왼쪽 위로 넘기는 페이지 넘김.
+  //  - 'next'(지금보다 아래쪽 탭): 지금 페이지가 모서리부터 접혀 올라가며 넘어가고 그 밑에서 새 페이지가 드러난다
+  //  - 'prev'(지금보다 위쪽 탭): 같은 동작을 거꾸로. 새 페이지가 위쪽 왼쪽에서부터 펴지며 지금 페이지를 덮는다
+  // 접히는 선(꺾임선)이 대각선으로 지나가므로 요소 하나에 애니메이션을 걸 수 없어, 매 프레임 꺾임선 위치로 도형(clip-path)을 계산해 그린다.
+  // 3D 변환은 쓰지 않는다(날아다니는 팝업의 그림자가 연출 중 사라지던 문제를 피하려고). 모양 값은 --turn-* (style.css)
+  function clipPolygon(poly, keep) { // 볼록 다각형을 반평면 keep(p) >= 0 으로 자른다
+    const out = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length], ka = keep(a), kb = keep(b);
+      if (ka >= 0) out.push(a);
+      if ((ka >= 0) !== (kb >= 0)) { const r = ka / (ka - kb); out.push([a[0] + (b[0] - a[0]) * r, a[1] + (b[1] - a[1]) * r]); }
+    }
+    return out;
+  }
+  const polyCss = poly => (poly.length < 3 ? 'polygon(0 0, 0 0, 0 0)' : `polygon(${poly.map(p => `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px`).join(',')})`);
+
+  function pageTurn(modal, change, dir) {
     modal.querySelectorAll('.page-curl').forEach(el => el.remove()); // 진행 중이던 것은 즉시 끝낸다
     if (reduceMotion.matches || modalBusy || !modal.classList.contains('open')) { change(); return; }
     const panel = modal.querySelector('.modal-panel');
     const scroll = modal.querySelector('.modal-scroll');
-    const h = scroll.clientHeight;
-    const roll = cssMs('--turn-roll-h');
+    const W = scroll.clientWidth, H = scroll.clientHeight;
+    const cloneOf = () => { // 지금 화면의 복제본. 아이디가 겹치면 진짜 요소를 못 찾으니 걷어 낸다
+      const c = scroll.cloneNode(true);
+      c.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+      c.removeAttribute('id');
+      c.classList.add('pc-page');
+      c.scrollTop = scroll.scrollTop;
+      return c;
+    };
 
-    const curl = document.createElement('div'); // 말려 올라가는 동안 덮어 둘 층
+    const curl = document.createElement('div');
     curl.className = 'page-curl';
-    const old = scroll.cloneNode(true); // 지금 페이지. 아이디가 겹치면 진짜 요소를 못 찾으니 걷어 낸다
-    old.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-    old.classList.add('page-curl-old');
-    const edge = document.createElement('div'); // 말린 종이 두루마리
-    edge.className = 'page-roll';
-    curl.append(old, edge);
+    const oldPage = cloneOf(); // 바꾸기 전 모습
+    change();                  // 진짜 내용을 새 페이지로
+    const mover = dir === 'prev' ? cloneOf() : oldPage; // 넘어가는(접히는) 쪽: next면 옛 페이지, prev면 새 페이지
+    const shade = document.createElement('div'); shade.className = 'pc-shade'; // 드러난 쪽에 드리우는 그림자
+    const flap = document.createElement('div'); flap.className = 'pc-flap';    // 접혀 넘어온 뒷면
+    if (dir === 'prev') curl.append(oldPage, shade, mover, flap); // 아래에 옛 페이지가 깔려 있고 그 위를 새 페이지가 덮는다
+    else curl.append(shade, mover, flap);                         // 아래는 진짜 새 페이지
     panel.appendChild(curl); // 진짜 요소보다 뒤에 둬야 getElementById가 진짜를 먼저 찾는다
-    old.scrollTop = scroll.scrollTop;
+    mover.scrollTop = scroll.scrollTop;
+    oldPage.scrollTop = scroll.scrollTop;
 
-    change(); // 진짜 내용을 새 페이지로
+    // 꺾임선: 오른쪽 아래 모서리(BR)에서 왼쪽 위(TL)로 대각선 방향 d를 따라 s만큼 지난 곳, d에 수직
+    const L = Math.hypot(W, H), dx = -W / L, dy = -H / L;
+    const rect = [[0, 0], [W, 0], [W, H], [0, H]];
+    const t = p => (p[0] - W) * dx + (p[1] - H) * dy; // BR에서 d 방향으로 잰 거리
+    const shadeW = cssMs('--turn-shadow-w'), shadeA = cssMs('--turn-shadow-a'), flapW = cssMs('--turn-flap-shade-w');
+    const gradAngle = Math.atan2(W, -H) * 180 / Math.PI; // BR 쪽을 향하는 그라디언트(시작점이 TL이라 위치 q = L − t)
+    flap.style.backgroundImage = `linear-gradient(${gradAngle}deg, transparent 0, transparent calc(var(--q) - ${flapW}px), rgba(0,0,0,${cssMs('--turn-flap-shade-a')}) var(--q), transparent calc(var(--q) + 1px))`;
+
+    function draw(s) { // s: 0이면 전부 붙어 있고 L이면 전부 넘어갔다 (넘어가는 쪽 기준)
+      const kept = clipPolygon(rect, p => t(p) - s);          // 아직 붙어 있는 쪽
+      const removed = clipPolygon(rect, p => s - t(p));       // 넘어간 쪽
+      const folded = removed.map(p => { const k = 2 * (s - t(p)); return [p[0] + k * dx, p[1] + k * dy]; }).reverse(); // 꺾임선 너머로 접혀 온 모양(반사하면 순서가 뒤집힌다)
+      mover.style.clipPath = polyCss(kept);
+      flap.style.clipPath = polyCss(folded);
+      shade.style.clipPath = polyCss(removed);
+      const q = L - s; // 꺾임선의 그라디언트 위치
+      flap.style.setProperty('--q', `${q}px`);
+      shade.style.background = `linear-gradient(${gradAngle}deg, transparent 0, transparent ${q}px, rgba(0,0,0,${shadeA}) ${q}px, transparent ${q + shadeW}px)`;
+    }
 
     const timing = { duration: cssMs('--turn-ms'), easing: cssVar('--turn-ease'), fill: 'both' };
-    const anims = [
-      old.animate([{ clipPath: 'inset(0px 0px 0px 0px)' }, { clipPath: `inset(0px 0px ${h}px 0px)` }], timing),
-      // 두루마리의 아랫면이 잘린 가장자리에 놓인다. 시작할 때는 서서히 나타난다
-      edge.animate([
-        { transform: `translateY(${h - roll}px)`, opacity: 0 },
-        { transform: `translateY(${(h - roll) * 0.92}px)`, opacity: 1, offset: 0.08 },
-        { transform: `translateY(${-roll}px)`, opacity: 1 },
-      ], timing),
-    ];
-    Promise.all(anims.map(a => a.finished)).then(() => curl.remove()).catch(() => {});
+    const clock = curl.animate([{ opacity: 1 }, { opacity: 1 }], timing); // 곡선이 적용된 진행도를 얻는 시계
+    let alive = true;
+    const frame = () => {
+      if (!alive || !curl.isConnected) return;
+      const p = clock.effect.getComputedTiming().progress ?? 1;
+      draw((dir === 'prev' ? 1 - p : p) * L);
+      if (clock.playState === 'finished') { curl.remove(); return; }
+      requestAnimationFrame(frame);
+    };
+    draw(dir === 'prev' ? L : 0);
+    requestAnimationFrame(frame);
+    clock.finished.then(() => { alive = false; curl.remove(); }).catch(() => { alive = false; });
   }
 
   function openModal(target, btn) {

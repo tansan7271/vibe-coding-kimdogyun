@@ -90,7 +90,10 @@
 
   document.getElementById('settings-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
-    if (btn && btn.dataset.tab !== settingsTab) pageTurn(document.getElementById('modal-settings'), () => showSettingsTab(btn.dataset.tab));
+    if (!btn || btn.dataset.tab === settingsTab) return;
+    const order = ['current', 'over', 'prefs'];
+    const dir = order.indexOf(btn.dataset.tab) > order.indexOf(settingsTab) ? 'next' : 'prev'; // 아래쪽 탭이면 지금 페이지가 넘어가고, 위쪽 탭이면 새 페이지가 덮는다
+    pageTurn(document.getElementById('modal-settings'), () => showSettingsTab(btn.dataset.tab), dir);
   });
 
   function renderNewEventLoadPicker() {

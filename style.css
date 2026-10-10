@@ -125,7 +125,10 @@
   --modal-anim-ms: 560ms;              /* 버튼이 커지며 뒤집혀 팝업이 되는 시간(여는 쪽). 닫는 쪽은 아래 --modal-*-close 값 */
   --turn-ms: 520ms;                    /* 견출지로 페이지를 바꿀 때 페이지가 말려 올라가는 시간 */
   --turn-ease: cubic-bezier(0.55, 0.05, 0.4, 1); /* 말려 올라가는 빠르기 곡선: 천천히 말리기 시작해 속도가 붙고 끝에서 줄어든다 */
-  --turn-roll-h: 26px;                 /* 말린 종이 두루마리의 두께 */
+  --turn-shadow-w: 70px;               /* 드러난 페이지에 드리우는 그림자의 폭 */
+  --turn-shadow-a: 0.28;               /* 그 그림자의 진하기 */
+  --turn-flap-shade-w: 80px;           /* 접혀 넘어온 뒷면에서 꺾임선 쪽이 어두워지는 폭 */
+  --turn-flap-shade-a: 0.3;            /* 그 어두운 정도 */
   --modal-shadow-ms: 220ms;            /* 팝업 그림자가 나타나고 사라지는 시간 */
   --modal-swap-start-close: 0.02;     /* 닫을 때의 --modal-swap-start. 닫을 때 도착한 뒤 가만히 있는 시간을 줄이려고 따로 둔다 */
   --modal-swap-close: 0.16;           /* 닫을 때의 --modal-swap. 길게 둔 이유: '일정과 설정' 버튼은 원래 '할 일' 버튼 뒤에 있는데 날아오는 동안은 앞에 있어서, 도착한 뒤 클론이 천천히 사라져야 겹친 부분의 앞뒤가 툭 바뀌어 보이지 않는다 */
@@ -982,7 +985,7 @@ html.carpet-next-on #carpet-next { display: block; min-height: 60vh; color: #999
   pointer-events: none;
 }
 
-/* 페이지 넘김: 견출지로 페이지를 바꿀 때 팝업 안에서 옛 페이지가 아래에서 위로 말려 올라간다 */
+/* 페이지 넘김: 견출지로 페이지를 바꿀 때 팝업 안에서 오른쪽 아래 모서리에서 들춰 넘기는 효과. 도형은 JS가 프레임마다 계산한다 */
 .page-curl {
   position: absolute;
   inset: 0;
@@ -995,18 +998,5 @@ html.carpet-next-on #carpet-next { display: block; min-height: 60vh; color: #999
 #modal-goals .page-curl { --turn-paper: var(--note-paper); }
 #modal-settings .page-curl { --turn-paper: var(--cal-paper); }
 
-.page-curl-old { position: absolute; inset: 0; } /* 진짜 .modal-scroll을 복제한 것이라 종이·여백·글자가 같다 */
-
-.page-roll {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: var(--turn-roll-h);
-  border-radius: 0 0 14px 14px / 0 0 8px 8px;
-  /* 가로로 누운 원통처럼: 위는 종이 색, 가운데에 밝은 줄, 아래로 갈수록 어두워진다 */
-  background:
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 0%, rgba(255, 255, 255, 0.75) 32%, rgba(0, 0, 0, 0.06) 62%, rgba(0, 0, 0, 0.32) 100%),
-    var(--turn-paper);
-  box-shadow: 0 8px 14px rgba(0, 0, 0, 0.3); /* 드러난 새 페이지에 드리우는 그림자 */
-}
+.pc-page, .pc-shade, .pc-flap { position: absolute; inset: 0; } /* .pc-page는 진짜 .modal-scroll의 복제본이라 종이·여백·글자가 같다 */
+.pc-flap { background-color: color-mix(in srgb, var(--turn-paper) 90%, #000); } /* 접혀 넘어온 종이의 뒷면. 앞면보다 살짝 어둡다 */

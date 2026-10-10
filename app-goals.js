@@ -97,10 +97,12 @@
   document.getElementById('goal-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
     if (!btn || btn.dataset.tab === goalTab) return;
+    const order = ['active', 'done'];
+    const dir = order.indexOf(btn.dataset.tab) > order.indexOf(goalTab) ? 'next' : 'prev'; // 아래쪽 탭이면 지금 페이지가 넘어가고, 위쪽 탭이면 새 페이지가 덮는다
     pageTurn(document.getElementById('modal-goals'), () => {
       goalTab = btn.dataset.tab;
       renderGoals();
-    });
+    }, dir);
   });
 
   document.getElementById('add-goal-btn').addEventListener('click', () => {
