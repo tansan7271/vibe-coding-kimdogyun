@@ -96,9 +96,11 @@
 
   document.getElementById('goal-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
-    if (!btn) return;
-    goalTab = btn.dataset.tab;
-    renderGoals();
+    if (!btn || btn.dataset.tab === goalTab) return;
+    pageTurn(document.getElementById('modal-goals'), () => {
+      goalTab = btn.dataset.tab;
+      renderGoals();
+    });
   });
 
   document.getElementById('add-goal-btn').addEventListener('click', () => {

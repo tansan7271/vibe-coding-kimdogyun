@@ -90,7 +90,7 @@
 
   document.getElementById('settings-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
-    if (btn) showSettingsTab(btn.dataset.tab);
+    if (btn && btn.dataset.tab !== settingsTab) pageTurn(document.getElementById('modal-settings'), () => showSettingsTab(btn.dataset.tab));
   });
 
   function renderNewEventLoadPicker() {

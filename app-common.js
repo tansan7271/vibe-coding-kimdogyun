@@ -269,6 +269,43 @@
     });
   }
 
+  // 견출지로 팝업 안의 페이지를 바꿀 때: 지금 페이지의 복제본을 위에 얹어 두고 진짜 내용은 바로 새 페이지로 바꾼 뒤,
+  // 복제본을 아래에서 위로 말아 올려 새 페이지가 드러나게 한다. 말린 가장자리의 명암과 그림자는 --turn-* 값(style.css)으로 만든다.
+  // 3D 변환 없이 clip-path와 transform만 쓴다(날아다니는 팝업의 그림자가 연출 중 사라지던 문제를 피하려고)
+  function pageTurn(modal, change) {
+    modal.querySelectorAll('.page-curl').forEach(el => el.remove()); // 진행 중이던 것은 즉시 끝낸다
+    if (reduceMotion.matches || modalBusy || !modal.classList.contains('open')) { change(); return; }
+    const panel = modal.querySelector('.modal-panel');
+    const scroll = modal.querySelector('.modal-scroll');
+    const h = scroll.clientHeight;
+    const roll = cssMs('--turn-roll-h');
+
+    const curl = document.createElement('div'); // 말려 올라가는 동안 덮어 둘 층
+    curl.className = 'page-curl';
+    const old = scroll.cloneNode(true); // 지금 페이지. 아이디가 겹치면 진짜 요소를 못 찾으니 걷어 낸다
+    old.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    old.classList.add('page-curl-old');
+    const edge = document.createElement('div'); // 말린 종이 두루마리
+    edge.className = 'page-roll';
+    curl.append(old, edge);
+    panel.appendChild(curl); // 진짜 요소보다 뒤에 둬야 getElementById가 진짜를 먼저 찾는다
+    old.scrollTop = scroll.scrollTop;
+
+    change(); // 진짜 내용을 새 페이지로
+
+    const timing = { duration: cssMs('--turn-ms'), easing: cssVar('--turn-ease'), fill: 'both' };
+    const anims = [
+      old.animate([{ clipPath: 'inset(0px 0px 0px 0px)' }, { clipPath: `inset(0px 0px ${h}px 0px)` }], timing),
+      // 두루마리의 아랫면이 잘린 가장자리에 놓인다. 시작할 때는 서서히 나타난다
+      edge.animate([
+        { transform: `translateY(${h - roll}px)`, opacity: 0 },
+        { transform: `translateY(${(h - roll) * 0.92}px)`, opacity: 1, offset: 0.08 },
+        { transform: `translateY(${-roll}px)`, opacity: 1 },
+      ], timing),
+    ];
+    Promise.all(anims.map(a => a.finished)).then(() => curl.remove()).catch(() => {});
+  }
+
   function openModal(target, btn) {
     if (modalBusy) return;
     if (target === 'goals') renderGoals();
