@@ -598,7 +598,7 @@ button.btn-plain {
 #ai-draft { margin-bottom: 14px; }
 
 /* 카드 바깥 상자: 화면 밖 카드는 그리지 않는다(content-visibility). 그리기를 건너뛰는 영역이 상자 안쪽으로 잘리므로 카드 그림자가 잘리지 않게 위·옆·아래에 여유를 두고, 같은 만큼 음수 여백으로 상쇄해 카드 간격(14px)은 그대로 둔다. 옆 여유는 팝업 안쪽 여백(24px)보다 작아야 가로 스크롤이 안 생긴다 */
-#goal-list { display: flex; flex-direction: column; } /* 카드 바깥 상자의 음수 여백끼리 겹쳐 합쳐지지(collapse) 않게 한다 */
+#goal-list, #event-list { display: flex; flex-direction: column; } /* 카드 바깥 상자의 음수 여백끼리 겹쳐 합쳐지지(collapse) 않게 한다 */
 .goal-item {
   content-visibility: auto;
   contain-intrinsic-size: auto 56px;
@@ -866,6 +866,7 @@ button.btn-plain {
 }
 
 .week-patch .week-label { color: #fff; }
+.week-patch .wbtn { background: var(--header-bg); color: #fff; --wbtn-press-bg: #9c1a30; --wbtn-stitch-color: #86162a; } /* 주 이동 버튼: 종이색 대신 헤더 천 색 바탕에 흰 글자. 누르면 더 진한 빨강. 점선은 바탕보다 어두운 빨강 */
 
 /* 팝업의 스티치 버튼: 바탕이 팝업 종이와 같은 색이라 그림자로 떠 보이게 하고, 그림자 색은 팝업 종이를 진하게 한 색으로 은은하게 */
 #modal-goals { --paper-shadow-rgb: 150, 118, 40; --paper: var(--note-paper); --card-bg: #fff; --btn-bg: var(--note-paper); }

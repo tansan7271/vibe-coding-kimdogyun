@@ -60,13 +60,12 @@ const STAGE_STYLE = {
   resizeDebounceMs: 150,       // 창 크기를 바꿀 때 마지막 변화 뒤 이만큼 기다렸다가 한 번만 다시 놓는다(ms)
   rollTuckRatio: 0.4,          // 처음 롤 윗부분이 헤더 뒤로 들어가는 정도(롤 지름의 비율). 클수록 위쪽 여백이 줄어든다. 위쪽 여백 ≈ 롤 지름 × (1 − 이 값)
   gridMaxLines: 5,             // 가로 눈금선 최대 개수
-  gridColor: '#e6e1da',        // 눈금선 색
+  gridColor: '#ece8e2',        // 눈금선 색(실선)
   gridWidth: 2,                // 눈금선 두께(px)
-  budgetColor: '#b9b2a8',      // 예산선(맨 아래 눈금) 색
-  dividerColor: '#d6cfc4',     // 날짜 구분 점선 색(모양은 스티치). 안전선은 스티치 색(주황)을 그대로 쓴다
+  budgetColor: '#dcd6cd',      // 예산선(맨 아래 눈금) 색(실선)
   todayFill: 'rgba(184,32,58,0.08)', // 오늘 칸 배경. 마지막 숫자를 올리면 진해진다
   // --- 날짜 숫자: 헤더 아랫단과 카펫 선 사이(위쪽 여백)에 칸마다 왼쪽 정렬. 숫자 모양은 barista-digits.js의 윤곽선 ---
-  dateColor: '#d6cfc4',        // 숫자 색. 날짜 구분 점선과 같은 흐린 색
+  dateColor: '#d6cfc4',        // 숫자 색
   dateHeightRatio: 0.5,        // 숫자 높이 / 위쪽 여백. 숫자는 위쪽 여백의 세로 가운데에 놓인다(클수록 크고 위아래 패딩이 줄어든다)
   datePadXRatio: 0.08,         // 칸 왼쪽에서 숫자까지 띄우는 거리 / 칸 폭
   // --- 박스: 일정·완료·남은 단계. 높이 = 부하 × (예산 깊이 / 예산) 이라 부하 1이 눈금 한 칸이고, 날짜의 더미 높이가 곧 카펫이 처지는 깊이다 ---
@@ -283,7 +282,8 @@ const STAGE_STYLE = {
       + (intro ? '<div class="cn-cover"></div><div class="cn-laid"></div>' : '')
       + '<canvas class="cn-shadow" aria-hidden="true"></canvas>'
       + '<canvas class="cn-carpet" aria-hidden="true"></canvas>'
-      + '<div class="cn-drop"></div><div class="cn-boxes"></div><div class="cn-seals"></div><div class="cn-focus"></div>'
+      + '<div class="cn-drop"></div><div class="cn-boxes"></div><div class="cn-seals"></div>'
+      + '<div class="cn-focus"></div>'
       + (intro ? '<svg class="cn-roll" aria-hidden="true"><path/></svg>' : '');
     pagesEl.appendChild(el);
     const q = sel => el.querySelector(sel);
@@ -430,10 +430,10 @@ const STAGE_STYLE = {
     const todayIdx = dates.indexOf(todayStr());
     page.gridG.innerHTML =
       (todayIdx >= 0 ? `<rect x="${columns[todayIdx].left}" y="${m.groundY}" width="${colW}" height="${m.sag}" fill="${G.todayFill}"/>` : '')
-      + shape.gridLines.map(g => `<line x1="0" y1="${g.y}" x2="${width}" y2="${g.y}" stroke="${g.isBudget ? G.budgetColor : G.gridColor}" stroke-width="${G.gridWidth}"/>`).join('')
-      + (shape.safeLine ? `<line x1="0" y1="${shape.safeLine.y}" x2="${width}" y2="${shape.safeLine.y}" stroke="${yarn}" ${stitch}/>` : '')
-      + shape.dividers.map(x => `<line x1="${x}" y1="${m.groundY}" x2="${x}" y2="${m.groundY + m.sag}" stroke="${G.dividerColor}" ${stitch}/>`).join('')
-      + dateNumbers(columns, dates, colW, m.groundY, m.topSpace);
+      + shape.gridLines.filter(g => !shape.safeLine || Math.abs(g.y - shape.safeLine.y) > 0.5).map(g => `<line x1="0" y1="${g.y}" x2="${width}" y2="${g.y}" stroke="${g.isBudget ? G.budgetColor : G.gridColor}" stroke-width="${G.gridWidth}"/>`).join('')
+      + shape.dividers.map(x => `<line x1="${x}" y1="${m.groundY}" x2="${x}" y2="${m.groundY + m.sag}" stroke="${G.gridColor}" ${stitch}/>`).join('')
+      + dateNumbers(columns, dates, colW, m.groundY, m.topSpace)
+      + (shape.safeLine ? `<line x1="0" y1="${shape.safeLine.y}" x2="${width}" y2="${shape.safeLine.y}" stroke="${yarn}" ${stitch}/>` : ''); // 안전선은 눈금 중 맨 위
   }
 
   // ---- 첫 입장 롤 그리기. eased는 0~1(곡선을 입힌 진행도). 눈금은 이미 그려 있고, 가리개를 오른쪽으로 밀어 드러낸다 ----
@@ -652,6 +652,7 @@ const STAGE_STYLE = {
   const SHADOW_STYLE = {
     rgb: '0,0,0',        // 그림자 색(처음엔 검정)
     overRgb: '170,25,45', // 예산을 넘긴 날짜 칸의 그림자 색(붉은 톤). 이웃 칸과 경계에서 부드럽게 섞인다
+    overAlphaScale: 1.9, // 붉은 그림자는 진하기를 이 배수까지 키운다(1이면 검정과 같다). 붉은 정도가 커질수록 같이 진해져 경계에서도 끊기지 않는다
     mixSteps: 16,        // 검정과 붉은색 사이를 몇 단계로 나눠 섞을지. 줄마다 그라데이션을 새로 만들지 않고 이 단계 수만큼 만들어 재사용한다
     alpha: 0.15,         // 카펫 곡선 바로 아래의 진하기(0~1). 아래로 갈수록 곡선을 따라 옅어진다
     fadeLength: 160,     // 곡선에서 완전히 투명해지기까지의 깊이(px)
@@ -708,11 +709,11 @@ const STAGE_STYLE = {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, Math.floor(y0 * k), el.width, Math.ceil((y1 - y0) * k) + 1);
     if (!page.shadowGrads) { // 검정(0)에서 붉은색(steps)까지 단계마다 그라데이션 하나. 모양이 고정이라 한 번 만들어 계속 쓴다. 곡선 높이를 0으로 둔 것을 줄마다 옮겨 재사용한다
-      const stops = CarpetShadow.falloffStops(SHADOW_STYLE.alpha);
       page.shadowGrads = Array.from({ length: steps + 1 }, (_, b) => {
         const rgb = CarpetShadow.mixRgb(SHADOW_STYLE.rgb, SHADOW_STYLE.overRgb, b / steps);
         const g = ctx.createLinearGradient(0, 0, 0, fade);
-        stops.forEach(([t, a]) => g.addColorStop(t, `rgba(${rgb},${a})`));
+        const alpha = SHADOW_STYLE.alpha * (1 + (SHADOW_STYLE.overAlphaScale - 1) * (b / steps)); // 붉을수록 진하다
+        CarpetShadow.falloffStops(alpha).forEach(([t, a]) => g.addColorStop(t, `rgba(${rgb},${a})`));
         return g;
       });
     }
