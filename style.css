@@ -445,7 +445,7 @@ main {
 #modal-settings .pc-band { /* 종이에 딸린 붉은 윗줄. 페이지 넘김 때는 .pc-band가 넘어가는 종이와 함께 움직이고, 아래 새 페이지의 것은 이 ::before가 그대로 보인다 */
   content: '';
   position: absolute;
-  z-index: 2; /* 페이지 넘김 층(z-index 3) 아래: 넘어가는 종이가 이 위를 지나간다 */
+  z-index: 4; /* 평소에는 고정 머리(z-index 3)의 종이색 바탕 위에 있어야 가려지지 않는다. 페이지를 넘기는 동안만 아래 .turning 규칙이 낮춘다 */
   top: 0;
   left: 0;
   right: 0;
@@ -458,6 +458,8 @@ main {
     var(--cal-band);
   box-shadow: var(--cal-band-shadow);
 }
+/* 페이지를 넘기는 동안: 접합부를 페이지 넘김 층(z-index 3) 아래로 내려 넘어가는 종이(.pc-band)가 그 위를 지나가게 한다. 끝나면 원래대로 */
+#modal-settings.turning .modal-panel::before { z-index: 2; }
 
 .modal-panel .screen { display: block; }
 .modal-panel .screen h1 { margin: 0 48px 16px 0; height: 32px; line-height: 32px; } /* 제목 줄 높이를 x 버튼(32px)과 같게 해서 세로 중심을 맞춘다 */
@@ -944,7 +946,7 @@ button.btn-plain {
 .goal-head {
   position: sticky;
   top: 0; /* 스크롤 영역의 안쪽 여백(--modal-top) 위쪽 끝에 붙으므로 처음 자리와 같은 곳이다 */
-  z-index: 3;
+  z-index: 1; /* 지나가는 카드는 덮되, 팝업 틀에 붙은 장식(스프링·붉은 접합부, 평소 z-index 4)과 넘기는 층(3)보다는 아래 */
   padding-bottom: 14px;
   margin-bottom: 24px; /* 아래 그라데이션(16px)이 첫 카드를 덮지 않도록 인위적으로 띄운다 */
 }

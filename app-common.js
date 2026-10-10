@@ -335,6 +335,7 @@
     book.append(lit, back);
     if (tab) for (const b of [tab.back, tab.front]) book.append(b.parentNode); // 탭은 페이지 오른쪽 바깥으로 튀어나와 있다
     panel.append(curl, book); // 진짜 요소보다 뒤에 둬야 getElementById가 진짜를 먼저 찾는다
+    modal.classList.add('turning'); // 넘기는 동안 팝업 틀에 붙은 장식(접합부)의 층을 바꾼다
     mover.scrollTop = scroll.scrollTop;
     oldPage.scrollTop = scroll.scrollTop;
 
@@ -365,7 +366,11 @@
     // 진행도 u는 시간에 선형으로 간다(구간마다 곡선은 phiAt이 준다)
     const clock = curl.animate([{ opacity: 1 }, { opacity: 1 }], { duration: cssMs('--turn-ms'), easing: 'linear', fill: 'both' });
     let alive = true;
-    const cleanup = () => { alive = false; curl.remove(); book.remove(); if (hiddenTab) hiddenTab.style.visibility = ''; };
+    const cleanup = () => {
+      alive = false; curl.remove(); book.remove();
+      if (hiddenTab) hiddenTab.style.visibility = '';
+      if (!modal.querySelector('.page-curl')) modal.classList.remove('turning'); // 새로 시작된 넘김이 있으면 그쪽이 끝낼 때까지 둔다
+    };
     const frame = () => {
       if (!alive || !curl.isConnected) return;
       const p = clock.effect.getComputedTiming().progress ?? 1;
