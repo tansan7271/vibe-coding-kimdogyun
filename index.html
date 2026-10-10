@@ -3,8 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RAD CARPET</title>
+<title>Red Carpet</title>
+<meta name="description" content="마감 뒤에 숨은 중간 단계를 날짜별 부하로 깔아 진짜 여유 있는 날을 찾는 웹앱">
+<meta name="application-name" content="Red Carpet">
+<meta name="theme-color" content="#b8203a">
+<meta property="og:title" content="Red Carpet">
+<meta property="og:description" content="마감 뒤에 숨은 중간 단계를 날짜별 부하로 깔아 진짜 여유 있는 날을 찾는 웹앱">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
+  /* 로고 버튼 모양 값. 바꾸고 새로고침하면 바로 보인다 */
+  :root {
+    --logo-height: 30px;      /* 로고 그림 높이. 가로는 비율대로 따라온다 */
+    --logo-pad-x: 10px;       /* 로고 버튼 좌우 안쪽 여백 */
+    --logo-pad-y: 2px;        /* 로고 버튼 위아래 안쪽 여백 */
+    --logo-active-bg: rgba(255,255,255,0.32); /* 카펫 화면일 때 로고 버튼 배경. 로고가 흰색이라 흰 배경을 못 쓴다 */
+    --logo-nudge-y: 0px;      /* 글자 무게중심 미세 조정. 양수면 아래로 내려간다 */
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -37,10 +52,26 @@
     cursor: pointer;
   }
 
+  nav button.logo {
+    padding: var(--logo-pad-y) var(--logo-pad-x);
+    display: flex;
+    align-items: center;
+  }
+
+  nav button.logo img {
+    display: block;
+    height: var(--logo-height);
+    transform: translateY(var(--logo-nudge-y));
+  }
+
   nav button.active {
     background: #fff;
     color: #b8203a;
     font-weight: bold;
+  }
+
+  nav button.logo.active {
+    background: var(--logo-active-bg);
   }
 
   .place-mode-toggle {
@@ -449,7 +480,7 @@
 
 <header>
   <nav>
-    <button data-screen="carpet" class="active">카펫</button>
+    <button data-screen="carpet" class="logo active" aria-label="Red Carpet, 카펫 화면"><img src="logo.svg" alt="Red Carpet"></button>
     <button data-screen="goals">할 일</button>
     <button data-screen="settings">일정과 설정</button>
   </nav>
@@ -1319,7 +1350,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `radcarpet-${todayStr()}.json`;
+    a.download = `redcarpet-${todayStr()}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
