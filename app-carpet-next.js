@@ -103,6 +103,8 @@ const STAGE_STYLE = {
   focusCoverPad: 3,            // 커진 박스가 원래 박스보다 사방으로 이만큼 더 덮는다(px). 기울어 있던 박스의 모서리가 삐져나오지 않게
   // --- 날짜별 막대(부하, 남은 시간): 눈금 맨 아래 가로선 밑. 카펫이 그 선 밑으로 처지면 그 날의 막대가 카펫 그림자 밑으로 같은 여백을 두고 따라 내려온다. 색은 흐린 회색만 ---
   barsGap: 16,                 // 막대 묶음 위쪽 여백(px): 예산선(또는 카펫 그림자) 밑에서 얼마나 띄울지
+  barsShadowClear: 80,         // 카펫 아래 그림자가 눈에 보이는 깊이(px). 카펫이 선 밑으로 처지면 막대는 카펫 선에서 이 깊이 + barsGap 만큼 아래에 놓인다
+  barsShadowRamp: 240,         // 카펫이 예산선을 넘고 이만큼 처지는 동안 위 간격(barsShadowClear)이 서서히 자란다(px). 작을수록 막대가 카펫보다 빨리 내려간다
   barsPadBottom: 28,           // 가장 아래 막대 밑에 남기는 여백(px). 아래 두 버튼에 가려도 끝까지 스크롤하면 보인다
   barWidthRatio: 0.8,          // 막대 폭 / 칸 폭. 칸 왼쪽에서 날짜 숫자와 같은 거리(datePadXRatio)만큼 띄워 왼쪽 정렬
   barLabelFont: 12,            // 막대 위 글자 크기(px)
@@ -349,7 +351,7 @@ const STAGE_STYLE = {
     page.mKey = key;
     const deepest = b.unit * Math.max(b.capacity, maxLoad);
     // 가장 깊이 처진 날의 막대 묶음 아래까지 페이지에 넣는다(예산선 밑 막대도 마찬가지). 아래 버튼에 가려지는 부분은 끝까지 스크롤하면 보인다
-    const barsBottom = DayBars.barsTop({ carpetY: b.groundY + deepest, budgetY: b.groundY + b.sag, gap: G.barsGap, clear: SHADOW_STYLE.fadeLength }) + barsBlockHeight() + G.barsPadBottom;
+    const barsBottom = DayBars.barsTop({ carpetY: b.groundY + deepest, budgetY: b.groundY + b.sag, gap: G.barsGap, clear: G.barsShadowClear, ramp: G.barsShadowRamp }) + barsBlockHeight() + G.barsPadBottom;
     const height = Math.ceil(Math.max(b.groundY + deepest + G.scrollTail + 2, barsBottom));
     const m = page.m = { ...b, maxLoad, deepest, height };
     // 층 크기: 모든 층이 같은 좌표계(왼쪽 위가 (0,0))를 쓴다
@@ -390,7 +392,7 @@ const STAGE_STYLE = {
   function positionBars(page, world, m) {
     const budgetY = m.groundY + m.sag;
     page.barCols.forEach((el, c) => {
-      const y = DayBars.barsTop({ carpetY: m.groundY + world.sag[c], budgetY, gap: G.barsGap, clear: SHADOW_STYLE.fadeLength }).toFixed(1);
+      const y = DayBars.barsTop({ carpetY: m.groundY + world.sag[c], budgetY, gap: G.barsGap, clear: G.barsShadowClear, ramp: G.barsShadowRamp }).toFixed(1);
       if (page.barsY[c] !== y) { page.barsY[c] = y; el.style.translate = `0 ${y}px`; }
     });
   }
