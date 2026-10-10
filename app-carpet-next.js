@@ -14,6 +14,8 @@
 //  [x] 눈금: 가로 눈금, 예산선, 안전선, 날짜 구분선, 오늘 칸 배경. 예산선 아래에는 아무것도 없다
 //  [x] 날짜 숫자: 카펫 선 위쪽 여백 안, 칸마다 왼쪽 정렬. 폰트 파일 없이 숫자 윤곽선(barista-digits.js)으로 그린다(눈금 숫자와 요일 글자는 아직 안 넣음)
 //  [x] 헤더의 월 표시: Red Carpet ∙ 10월
+//  [x] 박스(일정·완료·남은 단계) 낙하: 위에서 떨어져 부딪히고 쌓이며 카펫이 무게만큼 눌렸다 정착한다. 첫 입장 때 한 번(carpet-physics.js)
+//  [ ] 박스 위 글자, 박스 누르기(단계 메뉴), 끌어 놓으면 다시 낙하
 //  [ ] 좁은 화면(가로 스크롤)
 //  숨은 부작용(빠뜨리기 쉬움)
 //  [ ] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
@@ -53,6 +55,15 @@ const STAGE_STYLE = {
   dateColor: '#d6cfc4',        // 숫자 색. 날짜 구분 점선과 같은 흐린 색
   dateHeightRatio: 0.5,        // 숫자 높이 / 위쪽 여백. 숫자는 위쪽 여백의 세로 가운데에 놓인다(클수록 크고 위아래 패딩이 줄어든다)
   datePadXRatio: 0.08,         // 칸 왼쪽에서 숫자까지 띄우는 거리 / 칸 폭
+  // --- 박스: 일정·완료·남은 단계. 높이 = 부하 × (예산 깊이 / 예산) 이라 부하 1이 눈금 한 칸이고, 날짜의 더미 높이가 곧 카펫이 처지는 깊이다 ---
+  // 색과 스티치는 style.css의 --box-* 값
+  boxWidthMin: 0.6,            // 박스 폭 / 칸 폭의 최소. 박스마다 이 사이에서 정해진다
+  boxWidthMax: 0.86,           // 최대
+  boxTiltDeg: 1.4,             // 박스마다 살짝 기운 각도의 최대(±도). 쌓인 모양이 손으로 놓은 듯하게
+  boxStaggerMs: 70,            // 박스가 하나씩 떨어지는 간격(ms). 날짜 칸들이 돌아가며 떨어진다
+  boxSpawnVx: 120,             // 떨어질 때 옆으로 흔들리는 속도의 최대(px/s)
+  carpetFlatRatio: 0.75,       // 카펫이 처졌을 때 칸 폭 중 평평한 바닥 비율. 키우면 바닥이 넓고 날짜 사이 경사가 가팔라진다(박스 폭보다 작으면 박스 끝이 경사 위로 살짝 나온다)
+  physics: {},                 // carpet-physics.js의 DEFAULTS를 덮어쓰는 값. 예: { gravity: 3000, restitution: 0.4 } (튕김·출렁임 조절)
 };
 
 (function () {
@@ -62,12 +73,14 @@ const STAGE_STYLE = {
   const stage = document.getElementById('carpet-next');
   stage.hidden = false;
   stage.innerHTML = '<svg class="carpet-intro" aria-hidden="true">'
-    + '<clipPath id="carpet-reveal"><rect class="reveal"/></clipPath>'
-    + '<g class="grid" clip-path="url(#carpet-reveal)"></g><path class="laid"/><path class="roll"/></svg>';
+    + '<defs><clipPath id="carpet-reveal"><rect class="reveal"/></clipPath>'
+    + '<filter id="cn-shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.2"/></filter></defs>'
+    + '<g class="grid" clip-path="url(#carpet-reveal)"></g><path class="laid"/><g class="boxes"></g><path class="roll"/></svg>';
   const svg = stage.querySelector('svg');
   const laidPath = svg.querySelector('.laid');
   const rollPath = svg.querySelector('.roll');
   const gridG = svg.querySelector('.grid');
+  const boxesG = svg.querySelector('.boxes');
   const revealRect = svg.querySelector('.reveal');
   const S = INTRO_STYLE;
   const G = STAGE_STYLE;
@@ -153,7 +166,7 @@ const STAGE_STYLE = {
     const budgetY = corner === null ? window.innerHeight - topSpace : corner + G.budgetBelowCorner;
     const sag = Math.max(G.minSag, budgetY - lineY);
     const height = Math.ceil(groundY + sag + 2);   // 그림 높이는 예산선까지(선 두께 여유 2px)
-    L = { P, startMargin, groundY, lift, sag, height, topSpace };
+    L = { P, startMargin, groundY, lift, sag, height, topSpace, svgTop };
     return L;
   }
 
@@ -228,11 +241,137 @@ const STAGE_STYLE = {
   let workDone = 0;
   const nextTask = () => new Promise(res => requestAnimationFrame(() => setTimeout(res, 0)));
 
+  // ---- 박스: 날짜별 일정(fixed)·완료한 단계(done)·남은 단계(todo)가 위에서 떨어져 쌓이고, 카펫이 무게만큼 눌린다 ----
+
+  // 문자열에서 0~1 값을 결정적으로 뽑는다. 같은 박스는 늘 같은 크기·자리·기울기다(새로고침·창 크기 변경에도)
+  function hash01(text, salt) {
+    let h = 2166136261;
+    const s = text + '#' + salt;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0) / 4294967296;
+  }
+
+  // 이번 주 항목을 박스 목록으로. 한 날짜 안에서는 일정 -> 완료 -> 남은 단계 순(먼저 떨어진 것이 아래에 깔린다)
+  function boxItems() {
+    const items = [];
+    (work.weekStats || []).forEach((st, col) => { // 계산 단계가 실패했으면 박스 없이 간다
+      st.events.forEach(ev => items.push({ id: `ev:${ev.id}:${st.date}`, col, load: ev.load, kind: 'fixed' }));
+      st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done' }));
+      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo' }));
+    });
+    return items.filter(it => it.load > 0);
+  }
+
+  let sim = null; // { world, pending, els, raf, start, last, width }
+  stage.carpetSim = () => sim; // 확인용(개발자 도구에서 stage.carpetSim()으로 지금 세계를 볼 수 있다)
+
+  function cssNum(name) { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)); }
+
+  // 박스 하나를 SVG로: 몸통(둥근 사각형) + 안쪽 털실 점선. 색은 style.css의 .cn-box 규칙
+  function makeBoxEl(box, kind) {
+    const radius = cssNum('--box-radius'), inset = cssNum('--box-stitch-inset');
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', `cn-box ${kind}`);
+    g.setAttribute('filter', 'url(#cn-shadow)');
+    g.innerHTML = `<rect class="body" x="${-box.w / 2}" y="${-box.h / 2}" width="${box.w}" height="${box.h}" rx="${radius}"/>`
+      + `<rect class="stitch" x="${-box.w / 2 + inset}" y="${-box.h / 2 + inset}" width="${box.w - inset * 2}" height="${box.h - inset * 2}" rx="${Math.max(0, radius - inset)}"/>`;
+    boxesG.appendChild(g);
+    return g;
+  }
+
+  // 지금 세계 상태를 화면에 반영: 카펫 선(처짐)과 박스 위치
+  function renderSim() {
+    const { world, els, width } = sim;
+    const Lr = layout(width);
+    const shape = Carpet.carpetShape({
+      loads: world.sag.map(s => (s / Lr.sag) * world.capacity), capacity: world.capacity, safeRatio: state.settings.safeRatio,
+      columns: world.columns, width, baseY: Lr.groundY, maxSag: Lr.sag, flatRatio: G.carpetFlatRatio, curve: 0.5,
+    });
+    laidPath.setAttribute('d', shape.linePath);
+    world.boxes.forEach(b => {
+      const el = els.get(b.id);
+      if (el) el.setAttribute('transform', `translate(${b.x.toFixed(2)} ${b.y.toFixed(2)}) rotate(${b.tilt.toFixed(2)})`);
+    });
+  }
+
+  // 박스를 세계에 넣는다. 같은 열에서 방금 떨어진 박스와 겹치지 않게, 그 위쪽에서 시작한다
+  function spawn(item) {
+    const { world, width, unit, colW } = sim;
+    const col = world.columns[item.col];
+    const w = colW * (G.boxWidthMin + (G.boxWidthMax - G.boxWidthMin) * hash01(item.id, 'w'));
+    const h = item.load * unit;
+    const x = (col.left + col.right) / 2 + (hash01(item.id, 'x') - 0.5) * (colW - w) * 0.85;
+    let bottom = -layout(width).svgTop - 24; // 화면 맨 위 바로 위(헤더 뒤)에서 시작
+    world.boxes.forEach(b => { if (b.col === item.col) bottom = Math.min(bottom, b.y - b.h / 2 - 8); });
+    const box = CarpetPhysics.addBox(world, {
+      id: item.id, col: item.col, x, y: bottom - h / 2, w, h, load: item.load,
+      vx: (hash01(item.id, 'v') - 0.5) * 2 * G.boxSpawnVx,
+    });
+    box.tilt = (hash01(item.id, 't') - 0.5) * 2 * G.boxTiltDeg;
+    sim.els.set(item.id, makeBoxEl(box, item.kind === 'todo' ? 'todo' : 'paper'));
+  }
+
+  // 날짜 칸들이 돌아가며 하나씩 떨어지도록 순서를 짠다(열마다 k번째 박스를 한 바퀴씩)
+  function releaseOrder(items) {
+    const byCol = [];
+    items.forEach(it => { (byCol[it.col] = byCol[it.col] || []).push(it); });
+    const order = [];
+    for (let k = 0; ; k++) {
+      let any = false;
+      byCol.forEach(list => { if (list && list[k]) { order.push(list[k]); any = true; } });
+      if (!any) break;
+    }
+    return order;
+  }
+
+  function stopSim() { if (sim && sim.raf) cancelAnimationFrame(sim.raf); }
+
+  // animate=true: 하나씩 떨어지는 연출. false: 보이지 않게 끝까지 계산해 정착한 모습만 보여 준다(창 크기가 바뀐 때, 모션 줄이기)
+  function startBoxes(animate) {
+    stopSim();
+    boxesG.innerHTML = '';
+    const width = svg.clientWidth || stage.clientWidth + 32;
+    const Lr = layout(width);
+    const capacity = state.settings.capacity;
+    const colW = width / 7;
+    const columns = Array.from({ length: 7 }, (_, i) => ({ left: i * colW, right: (i + 1) * colW }));
+    const world = CarpetPhysics.createWorld({
+      columns, capacity, maxSag: Lr.sag, baseY: Lr.groundY - S.lineWidth / 2, // 박스는 카펫 선의 윗면에 얹힌다
+      params: G.physics,
+    });
+    sim = { world, width, colW, unit: Lr.sag / capacity, els: new Map(), pending: releaseOrder(boxItems()), raf: 0, start: 0, last: 0, released: 0 };
+    stage.dataset.boxes = String(sim.pending.length);
+    if (!animate) {
+      sim.pending.forEach(spawn);
+      sim.pending = [];
+      CarpetPhysics.settle(world, 15);
+      renderSim();
+      stage.dataset.boxState = 'settled';
+      return;
+    }
+    stage.dataset.boxState = 'falling';
+    function frame(now) {
+      if (!sim.start) { sim.start = now; sim.last = now; }
+      const due = Math.floor((now - sim.start) / G.boxStaggerMs) + 1; // 지금까지 떨어뜨렸어야 할 박스 수
+      while (sim.released < due && sim.pending.length) { spawn(sim.pending.shift()); sim.released++; }
+      CarpetPhysics.advance(world, Math.min(50, now - sim.last));
+      sim.last = now;
+      renderSim();
+      if (sim.pending.length || !world.settled) sim.raf = requestAnimationFrame(frame);
+      else { sim.raf = 0; stage.dataset.boxState = 'settled'; }
+    }
+    sim.raf = requestAnimationFrame(frame);
+  }
+
   function finish() {
     draw(1);
     gridG.removeAttribute('clip-path'); // 다 펼쳐졌으니 눈금을 가리던 틀을 걷는다
     stage.classList.add('intro-done');
-    window.addEventListener('resize', () => draw(1)); // 다 펼쳐진 선은 화면 너비를 따라간다
+    startBoxes(!window.matchMedia('(prefers-reduced-motion: reduce)').matches); // 첫 입장 때만 떨어지는 연출
+    window.addEventListener('resize', () => { // 폭·높이가 바뀌면 선과 박스를 새 크기로 다시 놓는다(연출 없이)
+      draw(1);
+      startBoxes(false);
+    });
   }
 
   async function runWork() {

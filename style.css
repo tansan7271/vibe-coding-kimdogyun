@@ -15,10 +15,19 @@
   --header-pad-y: 12px;     /* 헤더 위아래 여백 */
   --header-height: calc(var(--logo-height) + var(--header-pad-y) * 2); /* 헤더 기본 높이 */
   --header-month-gap: 14px;       /* 로고와 월 표시 사이 간격 */
-  --header-month-dot-size: 6px;   /* 로고와 월 사이 가운데 점 크기 */
+  --header-month-dot-size: 4px;   /* 로고와 월 사이 가운데 점 크기 */
   --header-month-num-size: 36px;  /* 월 숫자 크기(날짜 숫자와 같은 폰트) */
   --header-month-unit-size: 17px; /* '월' 글자 크기 */
   --header-month-color: rgba(255, 255, 255, 0.92); /* 월 표시 색 */
+
+  /* 박스(새 카펫): 버튼과 같은 스티치 모양. 일정·완료 박스는 버튼과 같은 색, 남은 단계 박스는 붉은 기운.
+     점선 길이·간격·두께는 공용 스티치 값(--stitch-*)을 그대로 쓴다. 숫자만 쓰는 값은 px 단위다 */
+  --box-radius: 12;                      /* 박스 모서리 둥글기 */
+  --box-stitch-inset: 8;                 /* 점선이 가장자리에서 안쪽으로 들어간 거리 */
+  --box-paper: var(--note-paper);        /* 일정·완료 박스 색(버튼 종이색) */
+  --box-stitch: var(--wbtn-stitch-color);/* 그 박스의 스티치 색(버튼과 같다) */
+  --box-todo-bg: #f6d2d7;                /* 남은 단계 박스 색: 붉은 음영 */
+  --box-todo-stitch: #cf5a6c;            /* 그 박스의 스티치 색: 배경에 맞춘 붉은 계열 */
 
   /* 털실 스티치 공용 값. 헤더 말고 다른 요소에도 가져다 쓴다.
      점선: SVG 요소는 CSS로 stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-width: var(--stitch-width); stroke: var(--stitch-color);
@@ -975,6 +984,12 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .header-month .dot { width: var(--header-month-dot-size); height: var(--header-month-dot-size); border-radius: 50%; background: currentColor; align-self: center; } /* 가운데 점: 글자 대신 동그라미로 그려 숫자 높이의 가운데에 놓는다 */
 .header-month .num { display: flex; line-height: 0; } /* 월 숫자는 윤곽선 그림(app-carpet-next.js). 크기는 --header-month-num-size */
 .header-month .unit { font-size: var(--header-month-unit-size); }
+
+/* 새 카펫의 박스(app-carpet-next.js가 SVG로 만든다) */
+.cn-box .body { fill: var(--box-paper); }
+.cn-box .stitch { fill: none; stroke: var(--box-stitch); stroke-width: var(--stitch-width); stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-linecap: round; }
+.cn-box.todo .body { fill: var(--box-todo-bg); }
+.cn-box.todo .stitch { stroke: var(--box-todo-stitch); }
 
 /* 새 카펫(작업 중). ?carpet=next 일 때만 켜진다(app-carpet-next.js). 교체가 끝나면 이 블록과 옛 카펫 규칙을 정리한다 */
 #carpet-next { display: none; }
