@@ -49,25 +49,27 @@
     /* 기울이면 한쪽 위 모서리가 화면 안으로 내려오므로, 폭의 절반×sin(기울기)만큼 헤더를 화면 위로 더 늘려 가린다 */
     --header-bleed: calc(sin(var(--header-tilt-deg)) * 50vw + 4px);
 
-    /* 아래쪽 버튼: 스프링 메모장(할 일)과 일마다 찢는 달력(일정과 설정). 크기·기울기·색은 여기서 바꾼다 */
-    --dock-bottom: 16px;         /* 화면 아래에서 띄우는 거리 */
-    --dock-gap: 8px;             /* 두 버튼 사이 간격 */
+    /* 아래쪽 버튼: 스프링 메모장(할 일)과 일마다 찢는 달력(일정과 설정). 크기·기울기·색은 여기서 바꾼다.
+       화면 아래로 일부러 잘려 나가고, 두 버튼이 서로 겹친다 */
+    --dock-bottom: -30px;        /* 화면 아래에서 띄우는 거리. 음수면 그만큼 화면 밖으로 잘려 나간다 */
+    --dock-gap: 8px;             /* 두 버튼 사이 간격. 음수로 줄이면 더 겹친다 */
     --dock-z: 150;               /* 본문 위, 팝업(200) 아래 */
-    --note-w: 132px;             /* 메모장 크기. 자주 쓰는 버튼이라 달력보다 크게 */
-    --note-h: 84px;
+    --dock-shadow: 0 8px 16px rgba(0, 0, 0, 0.18); /* 두 버튼 공통 그림자. 연한 회색 */
+    --note-w: 334px;             /* 메모장 크기. 자주 쓰는 버튼이라 달력보다 크게 */
+    --note-h: 190px;
     --note-tilt: -3deg;          /* 메모장 기울기. 음수는 반시계 */
     --note-paper: #fffbea;       /* 메모지 색 */
-    --note-line: #eadfc2;        /* 메모지 줄 색 */
     --note-ink: #3a2f2a;         /* 글자 색 */
-    --note-font: 20px;
-    --note-shadow: 0 7px 12px rgba(var(--shadow-rgb), 0.45); /* 메모장 그림자. 달력보다 약간 진하다 */
-    --cal-w: 104px;              /* 달력 크기 */
-    --cal-h: 68px;
+    --note-font: 34px;
+    --spring-pitch: 28px;        /* 스프링 알약 사이 간격(가로) */
+    --spring-h: 30px;            /* 스프링 알약 길이. 절반이 메모지 위로 튀어나온다 */
+    --cal-w: 224px;              /* 달력 크기 */
+    --cal-h: 138px;
     --cal-tilt: 2.5deg;          /* 달력 기울기. 양수는 시계 방향 */
     --cal-paper: #fffdf8;        /* 달력 종이 색 */
     --cal-band: #b8203a;         /* 달력 윗줄 색 */
-    --cal-band-h: 17px;          /* 달력 윗줄 높이 */
-    --cal-font: 14px;
+    --cal-band-h: 30px;          /* 달력 윗줄 높이 */
+    --cal-font: 24px;
 
     /* 팝업(할 일, 일정과 설정) 모양 값 */
     --modal-dim: rgba(30, 20, 20, 0.45); /* 뒤 화면을 덮는 어두운 막 */
@@ -144,24 +146,22 @@
   .dock-note {
     width: var(--note-w);
     height: var(--note-h);
-    padding-top: 12px;
+    padding-top: calc(var(--spring-h) / 2);
     font-size: var(--note-font);
-    border-radius: 3px 3px 7px 7px;
+    border-radius: 6px 6px 12px 12px;
     transform: rotate(var(--note-tilt));
-    background:
-      repeating-linear-gradient(to bottom, transparent 0 21px, var(--note-line) 21px 22px) left 0 top 26px / 100% 100% no-repeat,
-      var(--note-paper);
-    box-shadow: var(--note-shadow);
+    background: var(--note-paper);
+    box-shadow: var(--dock-shadow);
   }
 
-  .dock-note::before {
+  .dock-note::before { /* 스프링: 세로로 선 알약을 가로로 늘어놓는다 */
     content: '';
     position: absolute;
-    top: -8px;
-    left: 8px;
-    right: 8px;
-    height: 18px;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='18' viewBox='0 0 16 18'%3E%3Ccircle cx='8' cy='13.5' r='1.8' fill='%23cdbf9c'/%3E%3Crect x='5' y='1' width='6' height='12' rx='3' fill='none' stroke='%23555' stroke-width='2'/%3E%3C/svg%3E") left top / 16px 18px repeat-x;
+    top: calc(var(--spring-h) / -2);
+    left: 20px;
+    right: 20px;
+    height: var(--spring-h);
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='30' viewBox='0 0 28 30'%3E%3Crect x='9' y='0' width='10' height='30' rx='5' fill='%23666'/%3E%3C/svg%3E") left top / var(--spring-pitch) var(--spring-h) repeat-x;
   }
 
   /* 일정과 설정: 일마다 찢는 달력 */
@@ -170,10 +170,10 @@
     height: var(--cal-h);
     padding-top: var(--cal-band-h);
     font-size: var(--cal-font);
-    border-radius: 4px;
+    border-radius: 6px;
     transform: rotate(var(--cal-tilt));
     background: var(--cal-paper);
-    box-shadow: 0 2px 0 #eadfce, 0 4px 0 #dccfba, var(--shadow-soft); /* 아래로 겹친 종이 두 장 + 그림자 */
+    box-shadow: 0 3px 0 #eadfce, 0 6px 0 #dccfba, var(--dock-shadow); /* 아래로 겹친 종이 두 장 + 그림자 */
   }
 
   .dock-cal::before {
@@ -183,10 +183,10 @@
     left: 0;
     right: 0;
     height: var(--cal-band-h);
-    border-radius: 4px 4px 0 0;
+    border-radius: 6px 6px 0 0;
     background:
-      radial-gradient(circle at 22% 50%, var(--cal-paper) 0 2.5px, transparent 3px),
-      radial-gradient(circle at 78% 50%, var(--cal-paper) 0 2.5px, transparent 3px),
+      radial-gradient(circle at 22% 50%, var(--cal-paper) 0 calc(var(--cal-band-h) * 0.15), transparent calc(var(--cal-band-h) * 0.15 + 0.5px)),
+      radial-gradient(circle at 78% 50%, var(--cal-paper) 0 calc(var(--cal-band-h) * 0.15), transparent calc(var(--cal-band-h) * 0.15 + 0.5px)),
       var(--cal-band);
   }
 
@@ -196,7 +196,7 @@
     top: var(--cal-band-h);
     left: 0;
     right: 0;
-    border-top: 1px dashed #d4c6aa;
+    border-top: 1px solid #d4c6aa;
   }
 
   .dock-note span, .dock-cal span {
