@@ -77,7 +77,8 @@ const STAGE_STYLE = {
   boxIcon: 13,                 // 아이콘 크기(px)
   boxPad: 6,                   // 점선과 글자 사이 여백(px). 가장 작은 박스는 boxPadTiny
   boxPadTight: 3,              // 박스가 낮을 때 점선과 글자 사이 여백
-  boxPadTiny: 2,               // 한 줄 배치일 때
+  boxPadTiny: 2,               // 한 줄 배치일 때 위아래 여백
+  boxPadXRow: 8,               // 한 줄 배치일 때 점선과 글자 사이 좌우 여백
   boxInsetMin: 4.5,            // 점선이 가장자리에서 들어가는 거리의 범위(px). 박스가 작을수록 가장자리에 붙여 글자 자리를 만든다
   boxInsetMax: 8,
   sealSize: 30,                // 완료 도장 지름(px). 가장 작은 박스는 sealSizeTiny
@@ -108,8 +109,8 @@ const STAGE_STYLE = {
     + '<svg class="cn-roll" aria-hidden="true"><path/></svg>'
     + '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="cn-seal-sym" viewBox="-50 -50 100 100">'
     + `<path style="fill:var(--seal-fill);stroke:var(--seal-edge);stroke-width:1.4" d="${BoxIcons.sealPath(STAGE_STYLE.sealLobes)}"/>`
-    + '<circle r="35" style="fill:none;stroke:var(--seal-ring);stroke-width:3.2;stroke-dasharray:5 6.2;stroke-linecap:round"/>'
-    + `<path transform="translate(-23 -23) scale(1.92)" style="fill:var(--seal-check)" d="${BoxIcons.paths.check}"/>`
+    // 체크: 선 두께를 스티치와 같게(--stitch-width, 화면 크기 그대로: non-scaling-stroke), 끝은 스티치처럼 둥글게
+    + '<polyline points="-23,2 -8,17 23,-17" style="fill:none;stroke:var(--seal-check);stroke-width:var(--stitch-width);stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke"/>'
     + '</symbol></svg>'
     + '</div>';
   const world_el = stage.querySelector('.cn-world');
@@ -350,9 +351,9 @@ const STAGE_STYLE = {
       + (tier === 'row' ? '' : metric('m-load', 'load', item.load));
     const lines = tier === 'row' ? 1 : Math.max(1, Math.min(4, Math.floor((h - 2 * pad - (G.boxIcon + 2) - 2) / lineH)));
     const font = tier === 'row' ? G.boxTinyFont : G.boxTitleFont;
-    // 완료 도장이 박스 안쪽으로 파고드는 만큼(도장 지름의 0.7배 - 이미 있는 여백) 글자 쪽을 비켜 준다
-    const sealPad = item.kind === 'done' ? Math.max(0, 0.7 * (h < G.sealTinyBelow ? G.sealSizeTiny : G.sealSize) - pad) : 0;
-    return `<div class="bx bx-${tier}" style="--bx-seal:${sealPad.toFixed(1)}px;--bx-pad:${pad.toFixed(1)}px;--bx-lines:${lines};--bx-font:${font}px;--bx-icon:${G.boxIcon}px;--bx-lh:${G.boxLineHeight}">`
+    // 한 줄 배치는 위아래 여백은 작아도 되지만 좌우는 더 둔다(점선에 글자가 붙어 보이지 않게). 완료 도장은 글자 자리에 영향을 주지 않는다(위에 얹힐 뿐)
+    const padX = tier === 'row' ? inset + G.boxPadXRow : pad;
+    return `<div class="bx bx-${tier}" style="--bx-padx:${padX.toFixed(1)}px;--bx-pad:${pad.toFixed(1)}px;--bx-lines:${lines};--bx-font:${font}px;--bx-icon:${G.boxIcon}px;--bx-lh:${G.boxLineHeight}">`
       + `<div class="bx-title">${escapeHtml(item.title || '')}</div><div class="bx-metrics">${metrics}</div></div>`;
   }
 

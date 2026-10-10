@@ -2,8 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const B = require('./box-icons.js');
 
-test('쓰는 아이콘 4개의 경로가 모두 있다', () => {
-  for (const name of ['load', 'time', 'push', 'check']) {
+test('쓰는 아이콘 3개의 경로가 모두 있다', () => {
+  for (const name of ['load', 'time', 'push']) {
     assert.ok(typeof B.paths[name] === 'string' && B.paths[name].length > 40, name);
     assert.match(B.paths[name], /^[Mm]/);
   }
