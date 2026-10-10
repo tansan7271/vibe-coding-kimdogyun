@@ -61,8 +61,12 @@ const STAGE_STYLE = {
   boxWidthMax: 0.86,           // 최대
   boxTiltDeg: 1.4,             // 박스마다 살짝 기운 각도의 최대(±도). 쌓인 모양이 손으로 놓은 듯하게. 맨 아래 박스는 기울지 않는다
   bottomBoxFit: 0.96,          // 맨 아래 박스는 칸 가운데에 놓이고 가로로 움직이지 않는다. 폭은 카펫 평평한 바닥(carpetFlatRatio)의 이 비율까지만
-  boxStaggerMs: 70,            // 박스가 하나씩 떨어지는 간격(ms). 날짜 칸들이 돌아가며 떨어진다
-  boxSpawnVx: 120,             // 떨어질 때 옆으로 흔들리는 속도의 최대(px/s)
+  boxStaggerMs: 130,           // 박스가 하나씩 떨어지는 기본 간격(ms). 날짜 칸들이 돌아가며 떨어진다
+  boxStaggerJitterMs: 110,     // 박스마다 여기에 더해지는 0~이 값의 어긋남(ms). 칸들이 같은 박자로 한 줄로 떨어지지 않게 한다
+  boxDropJitter: 220,          // 박스마다 떨어지기 시작하는 높이가 0~이 값(px)만큼 더 높다. 도착하는 때가 제각각이 된다
+  boxSpawnGap: 80,             // 같은 칸에서 앞서 떨어진 박스와 새 박스 사이 최소 간격(px). 떨어지는 박스들이 한 줄로 붙지 않게 한다
+  boxBounce: 0.5,              // 박스가 부딪힐 때 튕기는 정도(0~1). 클수록 통통 튄다. carpet-physics.js의 restitution
+  boxSpawnVx: 190,             // 떨어질 때 옆으로 흔들리는 속도의 최대(px/s). 클수록 옆으로 흩어지며 떨어진다
   maxSettleMs: 12000,          // 마지막 박스가 떨어진 뒤 이 시간이 지나면 정착하지 못했어도 멈춘다(배터리를 쓰며 계속 도는 것을 막는 안전장치)
   carpetFlatRatio: 0.75,       // 카펫이 처졌을 때 칸 폭 중 평평한 바닥 비율. 키우면 바닥이 넓고 날짜 사이 경사가 가팔라진다(박스 폭보다 작으면 박스 끝이 경사 위로 살짝 나온다)
   physics: {},                 // carpet-physics.js의 DEFAULTS를 덮어쓰는 값. 예: { gravity: 3000, restitution: 0.4 } (튕김·출렁임 조절)
@@ -340,8 +344,9 @@ const STAGE_STYLE = {
     if (isBottom) w = Math.min(w, colW * G.carpetFlatRatio * G.bottomBoxFit);
     const h = item.load * unit;
     const x = (col.left + col.right) / 2 + (isBottom ? 0 : (hash01(item.id, 'x') - 0.5) * (colW - w) * 0.85);
-    let bottom = -layout(width).svgTop - 24; // 화면 맨 위 바로 위(헤더 뒤)에서 시작
-    world.boxes.forEach(b => { if (b.col === item.col) bottom = Math.min(bottom, b.y - b.h / 2 - 8); });
+    // 화면 맨 위 바로 위(헤더 뒤)에서 시작하되 박스마다 시작 높이가 다르다. 같은 칸의 앞 박스보다는 boxSpawnGap만큼 위에서 시작한다
+    let bottom = -layout(width).svgTop - 24 - hash01(item.id, 'drop') * G.boxDropJitter;
+    world.boxes.forEach(b => { if (b.col === item.col) bottom = Math.min(bottom, b.y - b.h / 2 - G.boxSpawnGap); });
     const box = CarpetPhysics.addBox(world, {
       id: item.id, col: item.col, x, y: bottom - h / 2, w, h, load: item.load,
       vx: isBottom ? 0 : (hash01(item.id, 'v') - 0.5) * 2 * G.boxSpawnVx,
@@ -351,7 +356,8 @@ const STAGE_STYLE = {
     sim.els.set(item.id, makeBoxEl(box, item.kind === 'todo' ? 'todo' : 'paper'));
   }
 
-  // 날짜 칸들이 돌아가며 하나씩 떨어지도록 순서를 짠다(열마다 k번째 박스를 한 바퀴씩)
+  // 날짜 칸들이 돌아가며 하나씩 떨어지도록 순서를 짜고(열마다 k번째 박스를 한 바퀴씩), 박스마다 떨어뜨릴 시각(at, ms)을 정한다.
+  // 순서 × 간격에 박스마다 다른 어긋남을 더해 한 박자로 몰리지 않게 한다. 같은 칸 안의 먼저 떨어질 박스(아래에 깔릴 박스)가 늦지 않게 칸 안에서는 시각이 뒤집히지 않는다
   function releaseOrder(items) {
     const byCol = [];
     items.forEach(it => { (byCol[it.col] = byCol[it.col] || []).push(it); });
@@ -361,7 +367,14 @@ const STAGE_STYLE = {
       byCol.forEach(list => { if (list && list[k]) { order.push(list[k]); any = true; } });
       if (!any) break;
     }
-    return order;
+    const lastAt = [];
+    order.forEach((it, i) => {
+      let at = i * G.boxStaggerMs + hash01(it.id, 'delay') * G.boxStaggerJitterMs;
+      if (lastAt[it.col] !== undefined) at = Math.max(at, lastAt[it.col] + 1); // 같은 칸에서는 앞선 박스가 먼저
+      lastAt[it.col] = at;
+      it.at = at;
+    });
+    return order.sort((a, b) => a.at - b.at);
   }
 
   function stopSim() { if (sim && sim.raf) cancelAnimationFrame(sim.raf); }
@@ -377,7 +390,7 @@ const STAGE_STYLE = {
     const columns = Array.from({ length: 7 }, (_, i) => ({ left: i * colW, right: (i + 1) * colW }));
     const world = CarpetPhysics.createWorld({
       columns, capacity, maxSag: Lr.sag, baseY: Lr.groundY - S.lineWidth / 2, // 박스는 카펫 선의 윗면에 얹힌다
-      params: G.physics,
+      params: { restitution: G.boxBounce, ...G.physics },
     });
     sim = { world, width, colW, unit: Lr.sag / capacity, els: new Map(), pending: releaseOrder(boxItems()), raf: 0, start: 0, last: 0, released: 0, carpetShown: false };
     stage.dataset.boxes = String(sim.pending.length);
@@ -393,8 +406,7 @@ const STAGE_STYLE = {
     renderSim(); // 카펫 선을 처지는 카펫으로 먼저 넘겨 둔다(처음엔 직선)
     function frame(now) {
       if (!sim.start) { sim.start = now; sim.last = now; }
-      const due = Math.floor((now - sim.start) / G.boxStaggerMs) + 1; // 지금까지 떨어뜨렸어야 할 박스 수
-      while (sim.released < due && sim.pending.length) { spawn(sim.pending.shift()); sim.released++; sim.lastSpawnAt = now; }
+      while (sim.pending.length && now - sim.start >= sim.pending[0].at) { spawn(sim.pending.shift()); sim.released++; sim.lastSpawnAt = now; } // 때가 된 박스를 떨어뜨린다
       CarpetPhysics.advance(world, Math.min(50, now - sim.last));
       sim.last = now;
       if (!sim.pending.length && now - sim.lastSpawnAt > G.maxSettleMs) world.settled = true; // 안전장치

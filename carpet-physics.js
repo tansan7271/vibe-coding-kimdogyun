@@ -107,7 +107,8 @@
           if (rel > 0) {
             if (rel > p.restSpeed) {
               b.vy = fv - rel * p.restitution;
-              if (last) world.kick[b.col] += rel * (b.load / world.capacity) * p.impactKick;
+              // 부딪힌 반복에서 속도가 줄어드니(튕김) 이 충격은 한 번만 세어진다. 마지막 반복에서만 세면 이미 튕긴 뒤라 한 번도 안 센다
+              world.kick[b.col] += rel * (b.load / world.capacity) * p.impactKick;
             } else {
               b.vy = fv;
             }
@@ -139,7 +140,7 @@
               const jv = (1 + e) * rn / (1 / upper.mass + 1 / lower.mass);
               upper.vy -= jv / upper.mass;
               lower.vy += jv / lower.mass;
-              if (last && rn > p.restSpeed) world.kick[upper.col] += rn * (upper.load / world.capacity) * p.impactKick * 0.5;
+              if (rn > p.restSpeed) world.kick[upper.col] += rn * (upper.load / world.capacity) * p.impactKick * 0.5;
             }
             // 받침이 모자라면 옆으로 미끄러진다(한 프레임에 한 번만 가속한다)
             if (last && ox / upper.w < p.slideSupportRatio) {

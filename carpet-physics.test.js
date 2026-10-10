@@ -131,6 +131,17 @@ test('카펫은 충격으로 목표보다 더 깊이 눌렸다가 돌아온다(�
   assert.ok(Math.abs(w.sag[2] - 4 * unit) < 1.5);
 });
 
+test('박스가 떨어진 충격이 카펫을 흔든다(impactKick). 충격을 끄면 덜 눌린다', () => {
+  const maxSagWith = kick => {
+    const w = world({ params: { impactKick: kick } });
+    drop(w, 'a', 2, 3, { y: -800 });
+    let m = 0;
+    for (let i = 0; i < 4 * 120; i++) { P.step(w, w.p.dt); m = Math.max(m, w.sag[2]); }
+    return m;
+  };
+  assert.ok(maxSagWith(0.9) > maxSagWith(0) + 2, `충격 있음 ${maxSagWith(0.9)} vs 없음 ${maxSagWith(0)}`);
+});
+
 test('advance는 고정 간격으로 진행하고, 정착하면 멈춘다', () => {
   const w = world();
   drop(w, 'a', 0, 1);
