@@ -306,9 +306,14 @@
     change();                  // 진짜 내용을 새 페이지로
     const mover = dir === 'prev' ? cloneOf() : oldPage; // 넘어가는(접히는) 쪽: next면 옛 페이지, prev면 새 페이지
     const shade = document.createElement('div'); shade.className = 'pc-shade'; // 드러난 쪽에 드리우는 그림자
-    const flap = document.createElement('div'); flap.className = 'pc-flap';    // 접혀 넘어온 뒷면
-    if (dir === 'prev') curl.append(oldPage, shade, mover, flap); // 아래에 옛 페이지가 깔려 있고 그 위를 새 페이지가 덮는다
-    else curl.append(shade, mover, flap);                         // 아래는 진짜 새 페이지
+    const flapWrap = document.createElement('div'); flapWrap.className = 'pc-flap-wrap'; // 바깥으로 그림자를 드리우는 층(clip-path와 drop-shadow는 한 요소에 같이 못 쓴다)
+    const flap = document.createElement('div'); flap.className = 'pc-flap';              // 접혀 넘어온 뒷면
+    const ghost = mover.cloneNode(true); // 뒷면에 거울상으로 비치는 앞면 내용
+    ghost.classList.add('pc-ghost'); ghost.classList.remove('pc-page');
+    ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    flap.appendChild(ghost); flapWrap.appendChild(flap);
+    if (dir === 'prev') curl.append(oldPage, shade, mover, flapWrap); // 아래에 옛 페이지가 깔려 있고 그 위를 새 페이지가 덮는다
+    else curl.append(shade, mover, flapWrap);                         // 아래는 진짜 새 페이지
     panel.appendChild(curl); // 진짜 요소보다 뒤에 둬야 getElementById가 진짜를 먼저 찾는다
     mover.scrollTop = scroll.scrollTop;
     oldPage.scrollTop = scroll.scrollTop;
@@ -317,20 +322,36 @@
     const L = Math.hypot(W, H), dx = -W / L, dy = -H / L;
     const rect = [[0, 0], [W, 0], [W, H], [0, H]];
     const t = p => (p[0] - W) * dx + (p[1] - H) * dy; // BR에서 d 방향으로 잰 거리
-    const shadeW = cssMs('--turn-shadow-w'), shadeA = cssMs('--turn-shadow-a'), flapW = cssMs('--turn-flap-shade-w');
+    const rgb = cssVar('--turn-shadow-rgb'), liftScale = cssMs('--turn-flap-scale');
+    const shadeW = cssMs('--turn-shadow-w'), shadeA = cssMs('--turn-shadow-a'), flapW = cssMs('--turn-flap-shade-w'), flapA = cssMs('--turn-flap-shade-a');
     const gradAngle = Math.atan2(W, -H) * 180 / Math.PI; // BR 쪽을 향하는 그라디언트(시작점이 TL이라 위치 q = L − t)
-    flap.style.backgroundImage = `linear-gradient(${gradAngle}deg, transparent 0, transparent calc(var(--q) - ${flapW}px), rgba(0,0,0,${cssMs('--turn-flap-shade-a')}) var(--q), transparent calc(var(--q) + 1px))`;
+    // 그림자는 선형이 아니라 부드럽게 줄어든다(바깥으로 갈수록 천천히). stops: [꺾임선에서의 거리 비율, 진하기 비율]
+    const FALL = [[0, 1], [0.12, 0.72], [0.3, 0.4], [0.55, 0.16], [0.8, 0.05], [1, 0]];
+    const drgb = a => `rgba(${rgb}, ${(a).toFixed(3)})`;
 
     function draw(s) { // s: 0이면 전부 붙어 있고 L이면 전부 넘어갔다 (넘어가는 쪽 기준)
       const kept = clipPolygon(rect, p => t(p) - s);          // 아직 붙어 있는 쪽
       const removed = clipPolygon(rect, p => s - t(p));       // 넘어간 쪽
       const folded = removed.map(p => { const k = 2 * (s - t(p)); return [p[0] + k * dx, p[1] + k * dy]; }).reverse(); // 꺾임선 너머로 접혀 온 모양(반사하면 순서가 뒤집힌다)
       mover.style.clipPath = polyCss(kept);
-      flap.style.clipPath = polyCss(folded);
+      flap.style.clipPath = polyCss(folded); // 팝업 틀 밖으로 나가도 자르지 않는다
+      // 접힌 부분이 눈앞으로 들려 올라온 듯 꺾임선 중심으로 살짝 키운다. 그래서 팝업 틀 밖으로 넘쳐 나오고 그림자도 틀 밖에 드리운다
+      const k = t([W / 2, H / 2]) - s, cx = W / 2 - k * dx, cy = H / 2 - k * dy; // 꺾임선 위에서 팝업 중심과 가장 가까운 점
+      flapWrap.style.transformOrigin = `${cx}px ${cy}px`;
+      flapWrap.style.transform = `scale(${liftScale})`;
       shade.style.clipPath = polyCss(removed);
       const q = L - s; // 꺾임선의 그라디언트 위치
-      flap.style.setProperty('--q', `${q}px`);
-      shade.style.background = `linear-gradient(${gradAngle}deg, transparent 0, transparent ${q}px, rgba(0,0,0,${shadeA}) ${q}px, transparent ${q + shadeW}px)`;
+
+      // 드러난 쪽 그림자: 꺾임선에서 멀어질수록 은은하게 사라진다
+      shade.style.background = `linear-gradient(${gradAngle}deg, transparent ${q}px, ${FALL.map(([d, a]) => `${drgb(shadeA * a)} ${q + shadeW * d}px`).join(',')})`;
+
+      // 접혀 넘어온 뒷면: 꺾임선 가장자리는 어둡고, 바로 안쪽에 둥글게 말린 듯한 밝은 줄, 안쪽으로 갈수록 은은하게 사라진다
+      const stops = [[flapW, 0], [flapW * 0.6, 0.05], [flapW * 0.3, 0.12], [14, 0.04], [9, -0.22], [3, 0.2], [0, 0.42]]; // [꺾임선에서의 거리px, 진하기(음수는 밝은 줄)]
+      flap.style.setProperty('--flap-shade', `linear-gradient(${gradAngle}deg, ${stops.map(([d, a]) => `${a < 0 ? `rgba(255,255,255,${(-a).toFixed(3)})` : drgb(flapA * a / 0.42)} ${q - d}px`).join(',')}, transparent ${q + 0.5}px)`);
+
+      // 뒷면에 비치는 앞면: 꺾임선을 기준으로 거울상(R = I − 2ddᵀ). 은은하게만 보인다
+      const bd = dx * W + dy * H;
+      ghost.style.transform = `matrix(${1 - 2 * dx * dx}, ${-2 * dx * dy}, ${-2 * dx * dy}, ${1 - 2 * dy * dy}, ${2 * dx * (bd + s)}, ${2 * dy * (bd + s)})`;
     }
 
     const timing = { duration: cssMs('--turn-ms'), easing: cssVar('--turn-ease'), fill: 'both' };
