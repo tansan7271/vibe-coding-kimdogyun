@@ -150,7 +150,8 @@
   // 팝업은 헤더 위에 뜬다. 닫는 길: 바깥 배경, 왼쪽 위 x, Esc
   const modals = { goals: document.getElementById('modal-goals'), settings: document.getElementById('modal-settings') };
 
-  // 열고 닫는 연출: 아래쪽 버튼 자리·크기에서 시작해 세로축으로 돌며 팝업 자리로 커진다. 닫을 때는 거꾸로. 모양 값은 style.css 맨 위 --modal-*
+  // 열고 닫는 연출: 아래쪽 버튼이 그 자리에서 커지며 180도 뒤집혀(앞면 = 버튼, 뒷면 = 팝업) 팝업이 된다. 닫을 때는 거꾸로 줄어들며 버튼 자리에 맞춰 들어간다.
+  // 열려 있는 동안 진짜 버튼은 숨기고, 버튼 복제본(앞면)이 대신 움직인다. 모양 값은 style.css 맨 위 --modal-*
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let modalBusy = false; // 연출이 도는 동안은 열기·닫기를 받지 않는다
 
@@ -172,19 +173,50 @@
     const scroll = modal.querySelector('.modal-scroll');
     const b = btn.getBoundingClientRect(); // 기울어진 버튼의 바깥 사각형. 중심은 그대로다
     const p = panel.getBoundingClientRect();
-    const dx = (b.left + b.width / 2) - (p.left + p.width / 2);
-    const dy = (b.top + b.height / 2) - (p.top + p.height / 2);
+    const bw = btn.offsetWidth, bh = btn.offsetHeight;
+    const bx = b.left + b.width / 2, by = b.top + b.height / 2; // 버튼 중심
+    const px = p.left + p.width / 2, py = p.top + p.height / 2; // 팝업 중심
     const persp = cssVar('--modal-perspective');
-    const ms = cssMs('--modal-anim-ms');
-    const timing = { duration: ms, easing: cssVar('--modal-ease'), direction: reverse ? 'reverse' : 'normal', fill: 'both' };
-    const fadeTiming = { duration: cssMs('--modal-fade-ms'), easing: 'ease', direction: reverse ? 'reverse' : 'normal', fill: 'both' };
+    const half = parseFloat(cssVar('--modal-flip-deg')) / 2; // 앞면이 이만큼 돌아 옆면이 되고, 거기서 뒷면이 이어받는다
     const delay = cssMs('--modal-content-delay');
+    const dir = reverse ? 'reverse' : 'normal';
+    const timing = { duration: cssMs('--modal-anim-ms'), easing: cssVar('--modal-ease'), direction: dir, fill: 'both' };
 
+    // 앞면: 버튼 복제본. 크기를 확대하지 않고 실제 가로·세로를 바꿔서 글자가 찌그러지지 않는다
+    const front = btn.cloneNode(true);
+    front.removeAttribute('data-screen');
+    front.setAttribute('aria-hidden', 'true');
+    front.tabIndex = -1;
+    front.classList.add('flip-front');
+    modal.appendChild(front);
+
+    modal.classList.add('flipping');
+    const flipOut = `perspective(${persp}) rotateY(${half}deg)`;
+    const flipIn = `perspective(${persp}) rotateY(${-half}deg)`;
+    const flat = `perspective(${persp}) rotateY(0deg)`;
     const anims = [
-      modal.animate([{ opacity: 0 }, { opacity: 1 }], fadeTiming),
+      modal.animate([{ opacity: 0 }, { opacity: 1 }], { duration: cssMs('--modal-fade-ms'), easing: 'ease', direction: dir, fill: 'both' }),
+      // 앞면(버튼): 버튼 자리에서 팝업 자리로 커지며 옆면까지 돌고 사라진다
+      front.animate([
+        { left: `${bx - bw / 2}px`, top: `${by - bh / 2}px`, width: `${bw}px`, height: `${bh}px`, rotate: `${tiltDeg(btn)}deg` },
+        { left: `${p.left}px`, top: `${p.top}px`, width: `${p.width}px`, height: `${p.height}px`, rotate: '0deg' },
+      ], timing),
+      front.animate([
+        { transform: flat, opacity: 1, offset: 0 },
+        { transform: flipOut, opacity: 1, offset: 0.5 },
+        { transform: flipOut, opacity: 0, offset: 0.5001 },
+        { transform: flipOut, opacity: 0, offset: 1 },
+      ], timing),
+      // 뒷면(팝업): 옆면에서 이어받아 펴지며 자리를 잡는다
       panel.animate([
-        { transform: `perspective(${persp}) translate(${dx}px, ${dy}px) rotate(${tiltDeg(btn)}deg) scale(${btn.offsetWidth / p.width}, ${btn.offsetHeight / p.height}) rotateY(0deg)` },
-        { transform: `perspective(${persp}) translate(0px, 0px) rotate(0deg) scale(1, 1) rotateY(${cssVar('--modal-spin-deg')})` },
+        { width: `${bw}px`, height: `${bh}px`, translate: `${bx - px}px ${by - py}px`, rotate: `${tiltDeg(btn)}deg` },
+        { width: `${p.width}px`, height: `${p.height}px`, translate: '0px 0px', rotate: '0deg' },
+      ], timing),
+      panel.animate([
+        { transform: flipIn, opacity: 0, offset: 0 },
+        { transform: flipIn, opacity: 0, offset: 0.4999 },
+        { transform: flipIn, opacity: 1, offset: 0.5 },
+        { transform: flat, opacity: 1, offset: 1 },
       ], timing),
       ...[...scroll.children].map(el => el.animate([{ opacity: 0 }, { opacity: 0, offset: delay }, { opacity: 1 }], timing)),
     ];
@@ -192,6 +224,8 @@
     Promise.all(anims.map(a => a.finished)).then(() => {
       modalBusy = false;
       anims.forEach(a => a.cancel()); // fill을 걷어 평소 상태로 돌린다
+      front.remove();
+      modal.classList.remove('flipping');
       done();
     });
   }
@@ -203,14 +237,17 @@
     document.body.style.overflow = 'hidden';
     modals[target].classList.add('open');
     playModal(modals[target], btn, false, () => {});
+    btn.classList.add('dock-away'); // 버튼은 팝업이 됐으니 그 자리에서 빠진다
   }
 
   function closeModals() {
     if (modalBusy) return;
     const key = Object.keys(modals).find(k => modals[k].classList.contains('open'));
     if (!key) { document.body.style.overflow = ''; return; }
-    playModal(modals[key], document.querySelector(`[data-screen="${key}"]`), true, () => {
+    const btn = document.querySelector(`[data-screen="${key}"]`);
+    playModal(modals[key], btn, true, () => {
       modals[key].classList.remove('open');
+      btn.classList.remove('dock-away'); // 제자리에 챡 맞춰 들어간 뒤 진짜 버튼이 돌아온다
       document.body.style.overflow = '';
       renderCarpet();
     });
