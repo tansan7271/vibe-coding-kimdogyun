@@ -14,12 +14,24 @@
 <meta property="og:type" content="website">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
-  /* 로고 모양 값. 바꾸고 새로고침하면 바로 보인다 */
+  /* 로고·헤더 모양 값. 바꾸고 새로고침하면 바로 보인다 */
   :root {
     --logo-height: 42px;      /* 로고 그림 높이. 가로는 비율대로 따라온다 */
     --logo-nudge-y: 0px;      /* 글자 무게중심 미세 조정. 양수면 아래로 내려간다 */
     --header-pad-y: 12px;     /* 헤더 위아래 여백 */
-    --header-height: calc(var(--logo-height) + var(--header-pad-y) * 2); /* 고정 헤더가 덮는 높이. 본문이 이만큼 내려온다 */
+    --header-height: calc(var(--logo-height) + var(--header-pad-y) * 2); /* 헤더 기본 높이 */
+
+    /* 털실 스티치 헤더 */
+    --header-bg: #b8203a;        /* 헤더 천 색. 아래 --edge-tile 안의 %23b8203a도 같이 바꿔야 한다 */
+    --header-tilt-deg: 1deg;     /* 기울기. 반시계 방향으로 이만큼 기운다 */
+    --header-shadow: 0 3px 5px rgba(184,32,58,0.3); /* 헤더 그림자(오프셋X 오프셋Y 번짐 색) */
+    --edge-h: 20px;              /* 울렁이는 아랫단 그림 높이. --edge-tile의 height와 같아야 한다 */
+    --edge-depth: 16px;          /* 아랫단이 헤더 밑으로 실제 내려오는 깊이. 본문이 이만큼 더 내려온다 */
+    /* 울렁임 한 주기 56px × 높이 20px. 천 모양(%23b8203a)과 털실 점선(%23e0a030 주황, 두께 2.4, 점 길이 5 간격 4)이 들어 있다.
+       화면 폭이 달라도 이 조각을 가로로 반복할 뿐이라 울렁임 크기가 그대로다 */
+    --edge-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='20' viewBox='0 0 56 20'%3E%3Cpath d='M0 0H56V12Q42 20 28 12Q14 4 0 12Z' fill='%23b8203a'/%3E%3Cpath d='M56 6Q42 14 28 6Q14 -2 0 6' fill='none' stroke='%23e0a030' stroke-width='2.4' stroke-linecap='round' stroke-dasharray='5 4' stroke-dashoffset='2.5' pathLength='63'/%3E%3C/svg%3E");
+    /* 기울이면 한쪽 위 모서리가 화면 안으로 내려오므로, 폭의 절반×sin(기울기)만큼 헤더를 화면 위로 더 늘려 가린다 */
+    --header-bleed: calc(sin(var(--header-tilt-deg)) * 50vw + 4px);
   }
   * { box-sizing: border-box; }
   body {
@@ -27,21 +39,37 @@
     font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     background: #f5f2ee;
     color: #222;
-    padding-top: var(--header-height);
+    padding-top: calc(var(--header-height) + var(--edge-depth));
   }
 
   header {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: calc(var(--header-bleed) * -1);
+    left: -16px;
+    right: -16px;
     z-index: 100;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--header-pad-y) 16px;
-    background: #b8203a;
+    padding: calc(var(--header-bleed) + var(--header-pad-y)) 32px var(--header-pad-y);
     color: #fff;
+    transform: rotate(calc(var(--header-tilt-deg) * -1));
+    transform-origin: 50% 0;
+  }
+
+  /* 천 + 울렁이는 아랫단 + 털실 점선. 그림자는 여기에만 걸어 로고와 버튼에는 번지지 않게 한다 */
+  header::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--edge-h) * -1);
+    background:
+      var(--edge-tile) left bottom / 56px var(--edge-h) repeat-x,
+      linear-gradient(var(--header-bg), var(--header-bg)) left top / 100% calc(100% - var(--edge-h) + 1px) no-repeat;
+    filter: drop-shadow(var(--header-shadow));
   }
 
   nav {
