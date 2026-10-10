@@ -550,7 +550,6 @@ main {
   min-width: 160px;
 }
 
-#place-mode-slot-manual, #place-mode-slot-ai { display: inline-flex; }
 
 /* AI 입력기: 입력줄 자리를 대신한다 */
 #ai-panel .ai-lead { font-size: 14px; color: var(--hint-color); }
@@ -781,6 +780,10 @@ button.btn-plain {
 .pref-label { color: #444; }
 .pref-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .pref-card .line-field { margin-top: 8px; }
+.place-modes { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.place-mode-row { display: flex; align-items: center; gap: 12px; }
+.place-mode-row .sbtn { flex: none; min-width: 104px; justify-content: center; }
+.place-mode-desc { font-size: 13px; color: var(--hint-color); line-height: 1.35; }
 .pref-status { margin-top: 10px; font-size: 13px; color: rgba(var(--paper-shadow-rgb), 0.95); }
 
 .week-patch {

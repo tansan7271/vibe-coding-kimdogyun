@@ -97,25 +97,27 @@
     saveState();
   })();
 
-  const PLACE_MODE_LABELS = {
-    fill: '깔기 방식: 채우기 우선',
-    even: '깔기 방식: 고르게',
-  };
+  // 깔기 방식: 일정과 설정 > 전체 설정의 두 버튼 중 고른 쪽이 눌린 모양(sbtn-accent)이다
+  const placeModeOptions = document.getElementById('place-mode-options');
 
-  const placeModeToggle = document.getElementById('place-mode-toggle');
-
-  function renderPlaceModeToggle() {
-    placeModeToggle.querySelector('span').textContent = PLACE_MODE_LABELS[state.settings.placeMode]; // 버튼 안의 털실 점선 svg를 지우지 않게 글자만 바꾼다
+  function renderPlaceModeOptions() {
+    placeModeOptions.querySelectorAll('[data-place-mode]').forEach(btn => {
+      const on = btn.dataset.placeMode === state.settings.placeMode;
+      btn.classList.toggle('sbtn-accent', on);
+      btn.setAttribute('aria-pressed', String(on));
+    });
   }
 
-  placeModeToggle.addEventListener('click', () => {
-    state.settings.placeMode = state.settings.placeMode === 'fill' ? 'even' : 'fill';
+  placeModeOptions.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-place-mode]');
+    if (!btn || btn.dataset.placeMode === state.settings.placeMode) return;
+    state.settings.placeMode = btn.dataset.placeMode;
     saveState();
-    renderPlaceModeToggle();
+    renderPlaceModeOptions();
     renderCarpet();
   });
 
-  renderPlaceModeToggle();
+  renderPlaceModeOptions();
 
   function pad2(n) {
     return String(n).padStart(2, '0');

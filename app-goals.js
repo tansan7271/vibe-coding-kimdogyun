@@ -344,16 +344,12 @@
   // 입력줄 상태: 키가 없으면 직접 입력줄만. 키가 있으면 AI 입력기가 입력줄을 대체하고(기본), '직접 추가'를 누르면 직접 입력줄로 바뀌어 'AI와 추가' 버튼이 나타난다
   let composeAi = true; // 키가 있을 때 AI 입력기를 보여 주는가
   const addForm = document.getElementById('goal-add-form');
-  const placeModeBtn = document.getElementById('place-mode-toggle');
-  const placeSlotManual = document.getElementById('place-mode-slot-manual');
-  const placeSlotAi = document.getElementById('place-mode-slot-ai');
 
   function renderCompose() {
     const useAi = hasAiKey() && composeAi;
     addForm.hidden = useAi;
     aiPanel.hidden = !useAi;
     aiOpenBtn.hidden = !hasAiKey() || useAi; // AI와 추가: 키가 있는데 직접 입력줄을 보고 있을 때만
-    (useAi ? placeSlotAi : placeSlotManual).appendChild(placeModeBtn); // 깔기 방식 버튼은 어느 상태에서나 보이게 옮겨 둔다
   }
 
   function renderAiKeyUi() {

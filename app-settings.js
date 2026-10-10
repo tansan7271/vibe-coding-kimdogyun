@@ -356,7 +356,7 @@
     document.getElementById('setting-safe-ratio').value = Math.round(state.settings.safeRatio * 100);
     document.getElementById('setting-sleep-hours').value = state.settings.sleepHours;
     document.getElementById('setting-life-hours').value = state.settings.lifeHours;
-    renderPlaceModeToggle();
+    renderPlaceModeOptions();
     renderGoals();
     renderEvents();
     renderCarpet();
