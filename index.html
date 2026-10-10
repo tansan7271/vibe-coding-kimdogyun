@@ -49,6 +49,16 @@
     /* 기울이면 한쪽 위 모서리가 화면 안으로 내려오므로, 폭의 절반×sin(기울기)만큼 헤더를 화면 위로 더 늘려 가린다 */
     --header-bleed: calc(sin(var(--header-tilt-deg)) * 50vw + 4px);
 
+    /* 주 이동 패치: 헤더에 꿰맨 듯 걸린 둥근 사각형. 이전 주·날짜·다음 주·이번 주 버튼이 올라간다 */
+    --patch-bg: #a51d34;         /* 패치 천 색. 헤더(--header-bg)보다 약간 어둡게 */
+    --patch-top: 28px;           /* 화면 위에서 내려오는 거리. 헤더 아랫단 밑으로 삐져나오도록 정한다 */
+    --patch-right: -14px;        /* 화면 오른쪽에서 띄우는 거리. 음수면 화면 밖으로 조금 나간다 */
+    --patch-pad: 18px 28px 22px; /* 안쪽 여백(위 / 좌우 / 아래) */
+    --patch-radius: 18px;        /* 모서리 둥글기 */
+    --patch-tilt-deg: 2deg;      /* 기울기. 시계 방향으로 이만큼 기운다 */
+    --patch-stitch-inset: 8px;   /* 털실 점선이 가장자리에서 안쪽으로 들어간 거리. 점선 모서리 둥글기는 HTML의 rx(= 둥글기 − 이 값)로 맞춘다 */
+    --patch-z: 110;              /* 헤더(100) 바로 위 */
+
     /* 아래쪽 버튼: 스프링 메모장(할 일)과 일마다 찢는 달력(일정과 설정). 크기·기울기·색은 여기서 바꾼다.
        화면 아래로 일부러 잘려 나가고, 두 버튼이 서로 겹친다 */
     --dock-bottom: -30px;        /* 화면 아래에서 띄우는 거리. 음수면 그만큼 화면 밖으로 잘려 나간다 */
@@ -546,12 +556,46 @@
     width: 90px;
   }
 
-  .week-nav {
+  .week-patch {
+    position: fixed;
+    top: var(--patch-top);
+    right: var(--patch-right);
+    z-index: var(--patch-z);
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 12px;
+    padding: var(--patch-pad);
+    border-radius: var(--patch-radius);
+    background: var(--patch-bg);
+    color: #fff;
+    box-shadow: var(--shadow-soft);
+    transform: rotate(var(--patch-tilt-deg));
   }
+
+  .week-patch .patch-stitch { /* 털실 점선: 공용 토큰(--stitch-*)을 그대로 쓴다 */
+    position: absolute;
+    inset: var(--patch-stitch-inset);
+    width: calc(100% - var(--patch-stitch-inset) * 2);
+    height: calc(100% - var(--patch-stitch-inset) * 2);
+    overflow: visible;
+    pointer-events: none;
+    fill: none;
+    stroke: var(--stitch-color);
+    stroke-width: var(--stitch-width);
+    stroke-dasharray: var(--stitch-dash) var(--stitch-gap);
+    stroke-linecap: round;
+  }
+
+  .week-patch .btn-plain { /* 붉은 천 위라 종이색 버튼으로 */
+    background: var(--note-paper);
+    color: var(--note-ink);
+    border: none;
+    border-radius: 6px;
+  }
+
+  .week-patch .week-label { color: #fff; }
+
+  .week-patch > :not(.patch-stitch) { position: relative; } /* 점선 위에 버튼이 오게 */
 
   .week-summary {
     font-size: 13px;
@@ -746,6 +790,14 @@
   <button data-screen="carpet" class="logo-link" type="button" aria-label="Red Carpet, 카펫 화면"><img src="logo.svg" alt="Red Carpet"></button>
 </header>
 
+<div class="week-patch">
+  <svg class="patch-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="10"/></svg>
+  <button class="btn btn-plain" id="week-prev" type="button">◀ 이전 주</button>
+  <span class="week-label" id="week-label"></span>
+  <button class="btn btn-plain" id="week-next" type="button">다음 주 ▶</button>
+  <button class="btn btn-plain" id="week-today" type="button">이번 주</button>
+</div>
+
 <nav>
   <button data-screen="goals" class="dock-note" type="button"><span>할 일</span></button>
   <button data-screen="settings" class="dock-cal" type="button"><span>일정과 설정</span></button>
@@ -753,13 +805,6 @@
 
 <main>
   <section id="screen-carpet" class="screen active">
-    <h1>카펫</h1>
-    <div class="week-nav">
-      <button class="btn btn-plain" id="week-prev" type="button">◀ 이전 주</button>
-      <span class="week-label" id="week-label"></span>
-      <button class="btn btn-plain" id="week-next" type="button">다음 주 ▶</button>
-      <button class="btn btn-plain" id="week-today" type="button">이번 주</button>
-    </div>
     <div id="week-summary" class="week-summary" style="display:none"></div>
     <div class="week-scroll">
       <svg id="carpet-svg" height="170" aria-label="이번 주 카펫: 부하만큼 아래로 처집니다"></svg>
