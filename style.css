@@ -6,6 +6,7 @@
    - 아직 처리하지 않은 지점: 폭 약 530px 이하에서는 날짜를 숨겨도 패치가 로고를 덮는다. */
 :root {
   --bp-patch-hide-label: 700px;  /* 이 폭 이하: 주 이동 패치의 날짜 표시를 숨긴다 */
+  --bp-mobile: 1100px;           /* 이 폭 이하: 모바일 판(헤더 아이콘이 월 표시에 닿는 폭. 화면 아래 버튼이 나온다) */
 }
 
 /* 로고·헤더 모양 값. 바꾸고 새로고침하면 바로 보인다 */
@@ -123,6 +124,16 @@
   --cal-font: 24px;
   --cal-band-shadow: 0 3px 9px rgba(var(--shadow-rgb), 0.32); /* 달력 붉은 윗줄 그림자. 붉은 기운 */
 
+  /* 헤더 아이콘(데스크톱): 날짜 컨트롤 왼쪽에 매달린 메모장·달력 축소판. 위아래를 뒤집어 스프링·붉은 줄이 아래에 온다 */
+  --hd-s: 0.5;                 /* 축소 배율. 펼치면 1(현행 크기) */
+  --hd-tuck: 18px;             /* 달력 오른쪽 끝이 날짜 컨트롤 밑으로 들어가는 폭 */
+  --hd-overlap: 28px;          /* 펼쳤을 때 달력이 메모장 위를 덮는 폭 */
+  --hd-hang: 98px;             /* 축소 상태에서 화면 위에서 아이콘 아래 끝까지의 깊이. 헤더 아랫단보다 조금 더 내려온다 */
+  --hd-ms: 220ms;              /* 펼쳐지고 접히는 시간 */
+  --hd-z: 105;                 /* 헤더(100)보다 위, 날짜 컨트롤(110)보다 아래 */
+  --hd-glyph-size: 58px;       /* 축소 상태의 + 원·톱니 크기(축소 배율 적용 전) */
+  --hd-gear-color: #7a6656;    /* 톱니 색 */
+
   /* 팝업(할 일, 일정과 설정) 모양 값 */
   --modal-dim: rgba(30, 20, 20, 0.45); /* 뒤 화면을 덮는 어두운 막 */
   --modal-blur: 6px;                   /* 뒤 화면 흐림 정도 */
@@ -227,7 +238,7 @@ nav {
   align-items: flex-end;
 }
 
-nav button, .flip-front {
+nav button, .hd-btn, .flip-front {
   position: relative;
   display: flex;               /* button은 안쪽을 세로 가운데로 맞추려 해서, 위에서부터 놓도록 flex로 바꾼다 */
   align-items: flex-start;
@@ -242,7 +253,7 @@ nav button, .flip-front {
 }
 
 /* 할 일: 위에 스프링이 달린 메모장 */
-.dock-note {
+.dock-note, .hd-note {
   width: var(--note-w);
   height: var(--note-h);
   padding-top: calc(var(--spring-h) / 2);
@@ -271,7 +282,7 @@ nav button, .flip-front {
     var(--note-plus-bg);
 }
 
-.dock-note::before { /* 스프링: 세로로 선 알약을 가로로 늘어놓는다 */
+.dock-note::before, .hd-note::before { /* 스프링: 세로로 선 알약을 가로로 늘어놓는다 */
   content: '';
   position: absolute;
   top: calc(var(--spring-h) / -2);
@@ -282,7 +293,7 @@ nav button, .flip-front {
 }
 
 /* 일정과 설정: 일마다 찢는 달력 */
-.dock-cal {
+.dock-cal, .hd-cal {
   margin-left: var(--dock-gap);
   width: var(--cal-w);
   height: var(--cal-h);
@@ -294,7 +305,7 @@ nav button, .flip-front {
   box-shadow: 0 3px 0 #eadfce, 0 6px 0 #dccfba, var(--dock-shadow); /* 아래로 겹친 종이 두 장 + 그림자 */
 }
 
-.dock-cal::before {
+.dock-cal::before, .hd-cal::before {
   content: '';
   position: absolute;
   top: 0;
@@ -334,6 +345,81 @@ nav button, .flip-front {
 /* 호버: 기울기는 그대로 두고 위로 올라온다 */
 .dock-note:hover, .dock-note:focus-visible { transform: translateY(calc(var(--dock-hover-lift) * -1)) rotate(var(--note-tilt)); }
 .dock-cal:hover, .dock-cal:focus-visible { transform: translateY(calc(var(--dock-hover-lift) * -1)) rotate(var(--cal-tilt)); }
+
+/* ---- 헤더 아이콘(데스크톱) ----
+   컨테이너 오른쪽 끝(--hd-right는 JS가 날짜 컨트롤 왼쪽 끝에 맞춘다)에 달력이 붙고, 메모장은 그 왼쪽에서 달력 밑으로 겹친다(위에서부터: 날짜 컨트롤 > 달력 > 메모장).
+   두 버튼은 늘 현행 크기이고 transform(translate·scale)만 줄여 축소 상태를 만든다. 호버하면 현행 크기로 펼쳐지고 글자가 나타난다 */
+.hd-icons { display: none; }
+.hd-icons {
+  position: fixed;
+  top: 0;
+  right: var(--hd-right, 560px);
+  width: 0;
+  height: 0;
+  z-index: var(--hd-z);
+}
+.hd-btn {
+  position: absolute;
+  top: var(--dock-bottom);          /* 현행과 같은 크기의 위쪽이 화면 밖으로 잘린다(위아래를 뒤집은 모양) */
+  transform-origin: 100% 0;
+  transition: translate var(--hd-ms) ease-out, scale var(--hd-ms) ease-out;
+  will-change: translate, scale;
+}
+.hd-note {
+  right: calc(var(--cal-w) - var(--hd-overlap));
+  z-index: 1;
+  transform: none;
+  rotate: var(--note-tilt);
+  translate: calc((1 - var(--hd-s)) * (var(--cal-w) - var(--hd-overlap))) calc(var(--hd-hang) - var(--dock-bottom) - var(--note-h) * var(--hd-s));
+  scale: var(--hd-s);
+  padding: calc(var(--dock-bottom) * -1) 0 calc(var(--spring-h) / 2);
+  align-items: stretch;
+  border-radius: 12px 12px 6px 6px;
+}
+.hd-cal {
+  right: 0;
+  z-index: 2;
+  margin-left: 0;
+  transform: none;
+  rotate: var(--cal-tilt);
+  translate: 0 calc(var(--hd-hang) - var(--dock-bottom) - var(--cal-h) * var(--hd-s));
+  scale: var(--hd-s);
+  padding: calc(var(--dock-bottom) * -1) 0 var(--cal-band-h);
+  align-items: stretch;
+}
+.hd-note::before { top: auto; bottom: calc(var(--spring-h) / -2); }                       /* 스프링은 아래 */
+.hd-cal::before { top: auto; bottom: 0; border-radius: 0 0 6px 6px; }                      /* 붉은 줄도 아래 */
+.hd-icons:hover .hd-btn, .hd-icons:focus-within .hd-btn { translate: 0 0; scale: 1; }       /* 호버: 현행 크기로 */
+.hd-label { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--hd-ms) ease-out; }
+.hd-note .hd-label::after { /* 글자 왼쪽 + 표시(현행과 같다) */
+  content: ''; flex: none; width: var(--note-plus-size); height: var(--note-plus-size); order: -1; margin-right: 12px; border-radius: 50%;
+  background:
+    linear-gradient(var(--note-plus-fg), var(--note-plus-fg)) center / 44% 3px no-repeat,
+    linear-gradient(var(--note-plus-fg), var(--note-plus-fg)) center / 3px 44% no-repeat,
+    var(--note-plus-bg);
+}
+.hd-note .hd-label { font-size: var(--note-font); }
+.hd-cal .hd-label { font-size: var(--cal-font); }
+.hd-glyph { position: absolute; left: 50%; top: 50%; width: var(--hd-glyph-size); height: var(--hd-glyph-size); margin: calc(var(--hd-glyph-size) / -2) 0 0 calc(var(--hd-glyph-size) / -2); opacity: 1; transition: opacity var(--hd-ms) ease-out; pointer-events: none; }
+.hd-note .hd-glyph { top: calc((var(--note-h) - var(--spring-h) / 2 + var(--dock-bottom) * -1) / 2); }
+.hd-cal .hd-glyph { top: calc((var(--cal-h) - var(--cal-band-h) + var(--dock-bottom) * -1) / 2); }
+.hd-plus { border-radius: 50%; background:
+    linear-gradient(var(--note-plus-fg), var(--note-plus-fg)) center / 44% 4px no-repeat,
+    linear-gradient(var(--note-plus-fg), var(--note-plus-fg)) center / 4px 44% no-repeat,
+    var(--note-plus-bg); }
+.hd-gear { fill: var(--hd-gear-color); }
+.hd-icons:hover .hd-glyph, .hd-icons:focus-within .hd-glyph { opacity: 0; }                 /* 펼치면 아이콘이 사라지고 */
+.hd-icons:hover .hd-label, .hd-icons:focus-within .hd-label { opacity: 1; }                 /* 글자가 나타난다 */
+.hd-btn:focus-visible { outline: none; }
+/* 팝업으로 바뀌는 동안의 복제본은 늘 펼친 모양이다(컨테이너 밖이라 호버 규칙이 안 걸리므로 직접 준다) */
+.flip-front.hd-btn { right: auto; translate: none; scale: none; rotate: none; transition: none; }
+.flip-front.hd-btn .hd-label { opacity: 1; }
+.flip-front.hd-btn .hd-glyph { opacity: 0; }
+
+@media (min-width: 1101px) { /* --bp-mobile */
+  .hd-icons { display: block; }
+  nav { display: none; }
+}
 
 .logo-link {
   border: none;

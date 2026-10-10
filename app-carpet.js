@@ -199,7 +199,7 @@ const STAGE_STYLE = {
   // 아래쪽 '할 일' 메모지의 왼쪽 위 꼭짓점의 화면 높이. 메모지는 가운데를 기준으로 기울어 있어서 기울기(변환 행렬)를 반영해 계산한다
   function noteCornerY() {
     const el = document.querySelector('.dock-note');
-    if (!el) return null;
+    if (!el || el.getClientRects().length === 0) return null; // 화면 아래 버튼은 모바일 판에서만 보인다. 숨겨져 있으면 기준이 없다
     const m = new DOMMatrix(getComputedStyle(el).transform);
     const r = el.getBoundingClientRect();
     const w = el.offsetWidth, h = el.offsetHeight;
@@ -383,7 +383,7 @@ const STAGE_STYLE = {
   // 보이는 페이지의 높이를 바깥 틀에 반영. 화면보다 길어지면 아래로 스크롤된다. 맨 아래까지 내려도 고정된 아래 두 버튼에 카펫이 가리지 않게 그 높이만큼 아래 여백을 둔다
   function applyContainer(m) {
     pagesEl.style.height = `${m.height}px`;
-    const dockClear = Math.max(0, window.innerHeight - (m.corner === null ? window.innerHeight - 170 : m.corner)) + 16;
+    const dockClear = m.corner === null ? 16 : Math.max(0, window.innerHeight - m.corner) + 16; // 화면 아래 버튼이 없으면(데스크톱) 작은 여백만
     pagesEl.style.marginBottom = m.svgTop + m.height > window.innerHeight ? `${dockClear}px` : '0px';
   }
 

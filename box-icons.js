@@ -30,5 +30,20 @@
     return 'M' + pts.join('L') + 'Z';
   }
 
-  return { paths, sealPath };
+  // 설정 아이콘(톱니바퀴) 윤곽선: 우리가 만든 모양이다. 바깥 둘레(이빨 teeth개)와 가운데 구멍 둘, 두 윤곽을 evenodd로 채워 구멍을 낸다. 중심은 (0, 0)
+  // outer: 이빨 끝 반지름, root: 이빨 사이 반지름, hole: 구멍 반지름. 이빨 끝은 한 이빨 각도(P)의 36%, 뿌리는 60% 폭이다
+  function gearPath(teeth = 8, outer = 10, root = 7.6, hole = 3.4) {
+    const P = (Math.PI * 2) / teeth;
+    const pt = (r, th) => (r * Math.cos(th)).toFixed(2) + ' ' + (r * Math.sin(th)).toFixed(2);
+    const pts = [];
+    for (let i = 0; i < teeth; i++) {
+      const a = i * P;
+      pts.push(pt(root, a - 0.3 * P), pt(outer, a - 0.18 * P), pt(outer, a + 0.18 * P), pt(root, a + 0.3 * P));
+    }
+    const ring = [];
+    for (let i = 0; i < 48; i++) ring.push(pt(hole, -(i / 48) * Math.PI * 2));
+    return 'M' + pts.join('L') + 'ZM' + ring.join('L') + 'Z';
+  }
+
+  return { paths, sealPath, gearPath };
 });

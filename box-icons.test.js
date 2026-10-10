@@ -33,3 +33,26 @@ test('도장 반지름은 안쪽과 바깥 사이를 오가고, 가장자리가 
 test('lobes를 바꾸면 모양이 달라진다', () => {
   assert.notEqual(B.sealPath(12), B.sealPath(20));
 });
+
+test('톱니바퀴 윤곽선은 바깥 둘레와 구멍, 두 개의 닫힌 경로다', () => {
+  const d = B.gearPath();
+  assert.equal((d.match(/M/g) || []).length, 2);
+  assert.equal((d.match(/Z/g) || []).length, 2);
+  const [outerPart, holePart] = d.split('ZM');
+  const pts = s => s.replace(/^M/, '').replace(/Z$/, '').split('L').map(p => p.split(' ').map(Number));
+  const outer = pts(outerPart + 'Z'), hole = pts('M' + holePart);
+  const ro = outer.map(([x, y]) => Math.hypot(x, y));
+  assert.ok(Math.max(...ro) <= 10.01 && Math.min(...ro) >= 7.59);
+  assert.ok(hole.every(([x, y]) => Math.abs(Math.hypot(x, y) - 3.4) < 0.01));
+});
+
+test('톱니바퀴 이빨 수는 teeth와 같다(이빨 끝 반지름을 오르내리는 횟수)', () => {
+  for (const teeth of [6, 8, 10]) {
+    const d = B.gearPath(teeth, 10, 7.6, 3.4);
+    const outer = d.split('ZM')[0].replace(/^M/, '').split('L').map(p => p.split(' ').map(Number));
+    const rs = outer.map(([x, y]) => Math.hypot(x, y));
+    let up = 0;
+    for (let i = 0; i < rs.length; i++) if (rs[i] < 9 && rs[(i + 1) % rs.length] >= 9) up++;
+    assert.equal(up, teeth, `teeth ${teeth}`);
+  }
+});

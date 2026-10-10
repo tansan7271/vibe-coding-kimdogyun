@@ -160,6 +160,27 @@
     });
   }
 
+  // 같은 일을 하는 버튼이 둘이다(데스크톱의 헤더 아이콘, 모바일 판의 화면 아래 버튼). 지금 화면에 보이는 쪽을 돌려준다
+  function dockBtn(key) {
+    const all = [...document.querySelectorAll(`[data-screen="${key}"]`)];
+    return all.find(b => b.getClientRects().length > 0) || all[0];
+  }
+
+  // 헤더 아이콘은 날짜 컨트롤(.week-patch) 왼쪽 끝에 붙는다. 컨트롤 폭은 날짜 글자에 따라 변하므로 위치를 재서 --hd-right로 준다
+  (function placeHeaderIcons() {
+    const patch = document.querySelector('.week-patch');
+    const root = document.documentElement;
+    const gear = document.querySelector('.hd-gear path');
+    if (gear) gear.setAttribute('d', BoxIcons.gearPath()); // 톱니 모양은 한 곳(box-icons.js)에서 만든다
+    const set = () => {
+      const tuck = parseFloat(getComputedStyle(root).getPropertyValue('--hd-tuck')) || 0;
+      root.style.setProperty('--hd-right', `${Math.max(0, window.innerWidth - patch.getBoundingClientRect().left - tuck).toFixed(1)}px`);
+    };
+    if (window.ResizeObserver) new ResizeObserver(set).observe(patch);
+    window.addEventListener('resize', set);
+    set();
+  })();
+
   // 팝업은 헤더 위에 뜬다. 닫는 길: 바깥 배경, 왼쪽 위 x, Esc
   const modals = { goals: document.getElementById('modal-goals'), settings: document.getElementById('modal-settings') };
 
@@ -176,7 +197,10 @@
 
   // 버튼의 기울어진 각도(도)
   function tiltDeg(el) {
-    const m = getComputedStyle(el).transform.match(/matrix\(([^)]+)\)/);
+    const cs = getComputedStyle(el);
+    const r = parseFloat(cs.rotate); // 헤더 아이콘은 transform이 아니라 rotate 속성으로 기운다
+    if (cs.rotate && cs.rotate !== 'none' && !Number.isNaN(r)) return r;
+    const m = cs.transform.match(/matrix\(([^)]+)\)/);
     if (!m) return 0;
     const [a, b] = m[1].split(',').map(Number);
     return Math.atan2(b, a) * 180 / Math.PI;
@@ -228,7 +252,9 @@
 
     // 변환 모양: 이동 → 기울기 → 확대 → 세로축 회전. 모든 키프레임이 같은 순서라야 부드럽게 이어진다.
     // 중간(0.5) 값은 양 끝의 평균이라 앞뒤 구간이 한 줄로 이어진다
-    const tf = (x, y, rot, sx, sy, ry) => `perspective(${persp}) translate(${x}px, ${y}px) rotate(${rot}deg) scale(${sx}, ${sy}) rotateY(${ry}deg)`;
+    // 헤더 아이콘(스프링이 아래)은 가로축으로, 화면 아래 버튼(스프링이 위)은 세로축으로 뒤집는다. 아이콘의 아래쪽 스프링이 팝업의 위쪽 스프링으로 이어지게 하려는 것이다
+    const axis = btn.classList.contains('hd-btn') ? 'rotateX' : 'rotateY';
+    const tf = (x, y, rot, sx, sy, ry) => `perspective(${persp}) translate(${x}px, ${y}px) rotate(${rot}deg) scale(${sx}, ${sy}) ${axis}(${ry}deg)`;
     const bg = getComputedStyle(modal).backgroundColor;
     const blur = cssVar('--modal-blur');
     const anims = [
@@ -401,7 +427,7 @@
     if (modalBusy) return;
     const key = Object.keys(modals).find(k => modals[k].classList.contains('open'));
     if (!key) { document.body.style.overflow = ''; return; }
-    const btn = document.querySelector(`[data-screen="${key}"]`);
+    const btn = dockBtn(key);
     modals[key].classList.remove('settled'); // 움직임이 시작되자마자 그림자가 서서히 사라진다
     playModal(modals[key], btn, true, () => {
       modals[key].classList.remove('open');
