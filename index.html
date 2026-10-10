@@ -49,6 +49,26 @@
     /* 기울이면 한쪽 위 모서리가 화면 안으로 내려오므로, 폭의 절반×sin(기울기)만큼 헤더를 화면 위로 더 늘려 가린다 */
     --header-bleed: calc(sin(var(--header-tilt-deg)) * 50vw + 4px);
 
+    /* 아래쪽 버튼: 스프링 메모장(할 일)과 일마다 찢는 달력(일정과 설정). 크기·기울기·색은 여기서 바꾼다 */
+    --dock-bottom: 16px;         /* 화면 아래에서 띄우는 거리 */
+    --dock-gap: 8px;             /* 두 버튼 사이 간격 */
+    --dock-z: 150;               /* 본문 위, 팝업(200) 아래 */
+    --note-w: 132px;             /* 메모장 크기. 자주 쓰는 버튼이라 달력보다 크게 */
+    --note-h: 84px;
+    --note-tilt: -3deg;          /* 메모장 기울기. 음수는 반시계 */
+    --note-paper: #fffbea;       /* 메모지 색 */
+    --note-line: #eadfc2;        /* 메모지 줄 색 */
+    --note-ink: #3a2f2a;         /* 글자 색 */
+    --note-font: 20px;
+    --note-shadow: 0 7px 12px rgba(var(--shadow-rgb), 0.45); /* 메모장 그림자. 달력보다 약간 진하다 */
+    --cal-w: 104px;              /* 달력 크기 */
+    --cal-h: 68px;
+    --cal-tilt: 2.5deg;          /* 달력 기울기. 양수는 시계 방향 */
+    --cal-paper: #fffdf8;        /* 달력 종이 색 */
+    --cal-band: #b8203a;         /* 달력 윗줄 색 */
+    --cal-band-h: 17px;          /* 달력 윗줄 높이 */
+    --cal-font: 14px;
+
     /* 팝업(할 일, 일정과 설정) 모양 값 */
     --modal-dim: rgba(30, 20, 20, 0.45); /* 뒤 화면을 덮는 어두운 막 */
     --modal-blur: 6px;                   /* 뒤 화면 흐림 정도 */
@@ -56,7 +76,7 @@
     --modal-max-width: 880px;            /* 패널 최대 가로 */
     --modal-radius: 14px;                /* 패널 모서리 둥글기 */
     --modal-pad: 24px;                   /* 패널 안쪽 여백 */
-    --modal-z: 200;                      /* 헤더(100)보다 위 */
+    --modal-z: 200;                      /* 헤더(100)와 아래쪽 버튼(150)보다 위 */
   }
   * { box-sizing: border-box; }
   body {
@@ -65,6 +85,7 @@
     background: #f5f2ee;
     color: #222;
     padding-top: calc(var(--header-height) + var(--edge-depth));
+    padding-bottom: calc(var(--note-h) + var(--dock-bottom) + 24px); /* 아래쪽 버튼에 본문이 가리지 않게 */
   }
 
   header {
@@ -97,19 +118,93 @@
     filter: drop-shadow(var(--shadow-soft));
   }
 
+  /* 아래쪽 버튼 */
   nav {
+    position: fixed;
+    bottom: var(--dock-bottom);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--dock-z);
     display: flex;
-    gap: 8px;
+    align-items: flex-end;
+    gap: var(--dock-gap);
   }
 
   nav button {
+    position: relative;
     border: none;
-    background: rgba(255,255,255,0.15);
-    color: #fff;
-    padding: 8px 14px;
-    border-radius: 6px;
-    font-size: 14px;
+    padding: 0;
     cursor: pointer;
+    font-family: inherit;
+    font-weight: bold;
+    color: var(--note-ink);
+  }
+
+  /* 할 일: 위에 스프링이 달린 메모장 */
+  .dock-note {
+    width: var(--note-w);
+    height: var(--note-h);
+    padding-top: 12px;
+    font-size: var(--note-font);
+    border-radius: 3px 3px 7px 7px;
+    transform: rotate(var(--note-tilt));
+    background:
+      repeating-linear-gradient(to bottom, transparent 0 21px, var(--note-line) 21px 22px) left 0 top 26px / 100% 100% no-repeat,
+      var(--note-paper);
+    box-shadow: var(--note-shadow);
+  }
+
+  .dock-note::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 8px;
+    right: 8px;
+    height: 18px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='18' viewBox='0 0 16 18'%3E%3Ccircle cx='8' cy='13.5' r='1.8' fill='%23cdbf9c'/%3E%3Crect x='5' y='1' width='6' height='12' rx='3' fill='none' stroke='%23555' stroke-width='2'/%3E%3C/svg%3E") left top / 16px 18px repeat-x;
+  }
+
+  /* 일정과 설정: 일마다 찢는 달력 */
+  .dock-cal {
+    width: var(--cal-w);
+    height: var(--cal-h);
+    padding-top: var(--cal-band-h);
+    font-size: var(--cal-font);
+    border-radius: 4px;
+    transform: rotate(var(--cal-tilt));
+    background: var(--cal-paper);
+    box-shadow: 0 2px 0 #eadfce, 0 4px 0 #dccfba, var(--shadow-soft); /* 아래로 겹친 종이 두 장 + 그림자 */
+  }
+
+  .dock-cal::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--cal-band-h);
+    border-radius: 4px 4px 0 0;
+    background:
+      radial-gradient(circle at 22% 50%, var(--cal-paper) 0 2.5px, transparent 3px),
+      radial-gradient(circle at 78% 50%, var(--cal-paper) 0 2.5px, transparent 3px),
+      var(--cal-band);
+  }
+
+  .dock-cal::after { /* 찢는 선 */
+    content: '';
+    position: absolute;
+    top: var(--cal-band-h);
+    left: 0;
+    right: 0;
+    border-top: 1px dashed #d4c6aa;
+  }
+
+  .dock-note span, .dock-cal span {
+    position: relative; /* 장식 위에 글자가 오게 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
   }
 
   .logo-link {
@@ -124,12 +219,6 @@
     display: block;
     height: var(--logo-height);
     transform: translateY(var(--logo-nudge-y));
-  }
-
-  nav button.active {
-    background: #fff;
-    color: #b8203a;
-    font-weight: bold;
   }
 
   main {
@@ -627,11 +716,12 @@
 
 <header>
   <button data-screen="carpet" class="logo-link" type="button" aria-label="Red Carpet, 카펫 화면"><img src="logo.svg" alt="Red Carpet"></button>
-  <nav>
-    <button data-screen="goals">할 일</button>
-    <button data-screen="settings">일정과 설정</button>
-  </nav>
 </header>
+
+<nav>
+  <button data-screen="goals" class="dock-note" type="button"><span>할 일</span></button>
+  <button data-screen="settings" class="dock-cal" type="button"><span>일정과 설정</span></button>
+</nav>
 
 <main>
   <section id="screen-carpet" class="screen active">
@@ -2004,7 +2094,7 @@
     if (wasOpen) renderCarpet();
   }
 
-  document.querySelectorAll('header [data-screen]').forEach(btn => {
+  document.querySelectorAll('[data-screen]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.screen;
       closeModals();
