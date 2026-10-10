@@ -130,14 +130,14 @@
   --cal-band-shadow: 0 3px 9px rgba(var(--shadow-rgb), 0.32); /* 달력 붉은 윗줄 그림자. 붉은 기운 */
 
   /* 헤더 아이콘(데스크톱): 날짜 컨트롤 왼쪽에 매달린 메모장·달력 축소판. 위아래를 뒤집어 스프링·붉은 줄이 아래에 온다 */
-  --hd-note-scale: 0.42;       /* 헤더 메모장: 원래 버튼을 이 배율로 줄여 쓴다 */
-  --hd-cal-scale: 0.62;        /* 헤더 달력: 같은 방식. 두 버튼의 크기가 비슷해 보이도록 메모장보다 크게 둔다(달력 원본이 더 작다) */
-  --hd-rest: 66px;             /* 평소 두 버튼의 아래 끝이 화면 위에서 내려오는 깊이. 헤더 아랫단(약 80px)보다 위라 헤더 아랫단이 조금 비친다 */
+  --hd-note-scale: 0.38;       /* 헤더 메모장: 원래 버튼을 이 배율로 줄여 쓴다 */
+  --hd-cal-scale: 0.56;        /* 헤더 달력: 같은 방식. 두 버튼의 크기가 비슷해 보이도록 메모장보다 크게 둔다(달력 원본이 더 작다) */
+  --hd-rest: 60px;             /* 평소 두 버튼의 아래 끝이 화면 위에서 내려오는 깊이. 헤더 아랫단(약 80px)보다 위라 헤더 아랫단이 조금 비친다 */
   --hd-lift: 8px;              /* 호버하면 아래로 미끄러져 내려오는 거리. 위쪽 끝이 보이지 않게, 줄여 놓은 버튼 높이에서 --hd-rest를 뺀 잘린 길이보다 작게 둔다 */
   --hd-icon: 22px;             /* 버튼 가운데 + 원·톱니 크기 */
   --hd-gear-color: #7a6656;    /* 톱니 색 */
   --hd-tuck: 18px;             /* 달력 오른쪽 끝이 날짜 컨트롤 밑으로 들어가는 폭 */
-  --hd-z: 105;                 /* 헤더(100)보다 위, 날짜 컨트롤(110)보다 아래 */
+  --hd-z: 105;                 /* 메모장의 층 번호. 헤더(100)보다 위, 날짜 컨트롤(110)보다 아래. 달력은 +1 */
 
   /* 팝업(할 일, 일정과 설정) 모양 값 */
   --modal-dim: rgba(30, 20, 20, 0.45); /* 뒤 화면을 덮는 어두운 막 */
@@ -356,15 +356,7 @@ nav button, .hd-btn, .flip-front {
    위아래를 뒤집은 모양이다: 위쪽 끝이 화면 밖으로 잘리고(원래는 아래쪽이 잘렸다), 스프링·붉은 줄은 아래에 오고, 메모지의 줄무늬와 달력의 '다음 장' 두께도 뒤집는다.
    기울기는 원래와 반대 방향. 겹침은 날짜 컨트롤 > 달력 > 메모장. 호버·포커스하면 원래처럼 미끄러져 내려오고, 그 상태에서 팝업이 열리고 닫힌다.
    크기 값은 버튼 자신(.hd-btn)에 걸어 둔다: 팝업 연출의 복제본(컨테이너 밖에 붙는다)도 같은 크기와 글자를 쓰게 하려는 것이다 */
-.hd-icons { display: none; }
-.hd-icons {
-  position: fixed;
-  top: 0;
-  right: var(--hd-right, 560px);   /* 달력 오른쪽 끝. JS가 날짜 컨트롤 왼쪽 끝(+ --hd-tuck)에 맞춘다 */
-  width: 0;
-  height: 0;
-  z-index: var(--hd-z);
-}
+.hd-icons { display: none; } /* 모바일 판에서는 숨는다. 데스크톱에서는 display: contents라 층을 만들지 않고, 두 버튼이 각자 fixed와 층 번호를 가진다(복제본도 같은 번호를 쓰려는 것이다) */
 .hd-btn {
   --note-w: calc(334px * var(--hd-s)); --note-h: calc(190px * var(--hd-s)); --note-font: calc(34px * var(--hd-s));
   --note-plus-size: var(--hd-icon); --note-margin-x: calc(56px * var(--hd-s));
@@ -374,15 +366,15 @@ nav button, .hd-btn, .flip-front {
   --note-tilt: 3deg;                                /* 원래(-3deg)와 반대 방향 */
   --cal-tilt: -2.5deg;                              /* 원래(2.5deg)와 반대 방향 */
   --dock-hover-lift: var(--hd-lift);
-  position: absolute;
+  position: fixed;
   align-items: stretch;
 }
 .hd-btn span { flex: 1; z-index: 1; }
 .hd-note {
   --hd-s: var(--hd-note-scale);
   top: calc(var(--hd-rest) - var(--note-h));          /* 아래 끝이 --hd-rest에 오고, 위쪽은 화면 밖으로 잘린다 */
-  right: calc((224px - 28px) * var(--hd-cal-scale)); /* 달력 폭(224px × 달력 배율)에서 달력 밑으로 들어가는 28px(× 달력 배율)를 뺀 자리. 이 버튼의 --cal-w는 메모장 배율이라 쓰지 않는다 */
-  z-index: 1;
+  right: calc(var(--hd-right, 560px) + (224px - 28px) * var(--hd-cal-scale)); /* 달력 폭(224px × 달력 배율)에서 달력 밑으로 들어가는 28px(× 달력 배율)를 뺀 자리. 이 버튼의 --cal-w는 메모장 배율이라 쓰지 않는다 */
+  z-index: var(--hd-z);
   padding: calc(var(--note-h) - var(--hd-rest)) 0 calc(var(--spring-h) / 2); /* 잘려 나간 만큼 위를 비워 아이콘이 보이는 부분의 가운데에 오게 한다 */
   border-radius: 12px 12px 6px 6px;
   background: var(--note-paper);                        /* 줄무늬는 ::after에서 뒤집어 그린다 */
@@ -405,8 +397,8 @@ nav button, .hd-btn, .flip-front {
 .hd-cal {
   --hd-s: var(--hd-cal-scale);
   top: calc(var(--hd-rest) - var(--cal-h));
-  right: 0;
-  z-index: 2;
+  right: var(--hd-right, 560px);   /* 달력 오른쪽 끝. JS가 날짜 컨트롤 왼쪽 끝(+ --hd-tuck)에 맞춘다 */
+  z-index: calc(var(--hd-z) + 1);
   margin-left: 0;
   padding: calc(var(--cal-h) - var(--hd-rest)) 0 var(--cal-band-h);
   box-shadow: 0 -3px 0 #eadfce, 0 -6px 0 #dccfba, var(--dock-shadow); /* 겹친 종이 두 장의 두께가 위쪽(붉은 줄의 반대편)에 온다 */
@@ -415,12 +407,10 @@ nav button, .hd-btn, .flip-front {
 .hd-note:hover, .hd-note:focus-visible { transform: translateY(var(--dock-hover-lift)) rotate(var(--note-tilt)); }   /* 호버: 아래로 미끄러져 내려온다 */
 .hd-cal:hover, .hd-cal:focus-visible { transform: translateY(var(--dock-hover-lift)) rotate(var(--cal-tilt)); }
 .hd-btn:focus-visible { outline: none; }
-.flip-front.hd-btn { right: auto; top: auto; transform: none; } /* 팝업으로 바뀌는 동안의 복제본: 위치와 기울기는 JS가 준다 */
-/* 복제본이 사는 층: 원래 아이콘과 같은 층 순서(헤더 위, 날짜 컨트롤 아래)에 둔다. DOM에서 .hd-icons보다 앞이라 달력 원본이 메모장 복제본 위에 그려진다 */
-#hd-flip-layer { position: fixed; inset: 0; z-index: var(--hd-z); pointer-events: none; }
+.flip-front.hd-btn { right: auto; top: auto; transform: none; } /* 팝업으로 바뀌는 동안의 복제본: 위치와 기울기는 JS가 준다. position: fixed와 층 번호는 원래 버튼 규칙(.hd-note·.hd-cal)을 그대로 받아, 다른 아이콘·날짜 컨트롤과의 앞뒤가 원본과 같다 */
 
 @media (min-width: 1025px) { /* --bp-mobile 위: 데스크톱 판 */
-  .hd-icons { display: block; }
+  .hd-icons { display: contents; }
   nav { display: none; }
 }
 
