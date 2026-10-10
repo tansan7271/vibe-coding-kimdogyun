@@ -7,7 +7,7 @@
 //  [ ] 날짜 7칸: 일정, 그날의 단계, 부하/예산, 여유, 남은 시간, 오늘 표시
 //  [ ] 초과 표시 3종: 안전선 초과, 예산 초과, 시간 초과
 //  [ ] 단계를 누르면 메뉴: 완료(됨, 박스 누르기) / 이 날 안 함(밀림) / 다른 날에 고정(둘은 드래그가 맡는다)
-//  [ ] 단계 드래그로 다른 날에 고정(마우스, 터치는 길게 눌러 시작, 안내 토스트)
+//  [x] 단계 드래그로 다른 날에 고정(마우스, 터치는 길게 눌러 시작). 안내는 토스트 대신 화면 가장자리 구역
 //  [ ] 지남 박스(마감이 지나 깔리지 않은 단계)
 //  [ ] 지난 주 요약(총 부하, 초과한 날 수, 밀린 횟수)
 //  [ ] 카펫 선: 부하만큼 처짐, 시간 초과 짐 상자
@@ -16,7 +16,7 @@
 //  [x] 헤더의 월 표시: Red Carpet ∙ 10월
 //  [x] 박스(일정·완료·남은 단계) 낙하: 위에서 떨어져 부딪히고 쌓이며 카펫이 무게만큼 눌렸다 정착한다. 첫 입장 때 한 번(carpet-physics.js)
 //  [x] 박스 위 글자(제목)와 아이콘(부하·시간·밀림), 완료 도장. 박스 크기(부하)에 따라 배치가 달라진다
-//  [x] 박스 누르기: 제자리에서 커지며 모든 정보와 버튼(완료, 반복 일정의 이 날만 빼기)이 보인다  [ ] 끌어 놓으면 다시 낙하
+//  [x] 박스 누르기: 제자리에서 커지며 모든 정보와 버튼(완료, 반복 일정의 이 날만 빼기)이 보인다  [x] 끌어 놓으면 다시 낙하(박스를 끌어 날짜칸에 놓으면 그 날에 고정되고 위에서 떨어진다. 화면 끝에 머물면 주 이동, 위쪽에 놓으면 취소)
 //  [ ] 좁은 화면(가로 스크롤)
 //  숨은 부작용(빠뜨리기 쉬움)
 //  [x] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
@@ -102,6 +102,13 @@ const STAGE_STYLE = {
   focusMargin: 12,             // 커진 박스가 화면 가장자리(양옆·헤더 아래·아래 메모지 위)에서 띄우는 거리(px)
   focusCoverPad: 3,            // 커진 박스가 원래 박스보다 사방으로 이만큼 더 덮는다(px). 기울어 있던 박스의 모서리가 삐져나오지 않게
   vanishMs: 280,               // 없어지는 박스가 투명해지는 시간(ms). 그동안 카펫은 줄어든 무게만큼 올라온다
+  dragMovePx: 6,               // 마우스로 이만큼 움직이면 끌기가 시작된다(px). 그 전에 놓으면 그냥 누르기
+  dragLongPressMs: 300,        // 터치는 이만큼 길게 눌러야 끌기가 시작된다(ms). 그 전에 움직이면 스크롤·주 넘기기 스와이프
+  dragGhostOpacity: 0.62,      // 마우스를 따라오는 박스 복사본의 투명도
+  dragSourceOpacity: 0.35,     // 끄는 동안 원래 박스의 투명도
+  dragEdgeWidth: 72,           // 화면 왼쪽·오른쪽 끝의 주 이동 구역 폭(px). 날짜칸 바깥쪽 일부와 겹치고 이 구역이 우선한다
+  dragEdgeDwellMs: 700,        // 주 이동 구역에 이만큼 머물면 한 주 넘어간다(ms). 계속 머물면 또 넘어간다
+  dragTopExtra: 12,            // 위쪽 취소 구역은 헤더 높이에서 이만큼 더 아래까지(px)
   focusMs: 260,                // 커지고 줄어드는 시간(ms)
   focusTitleFont: 17,          // 커진 박스의 제목 글자 크기(px)
   focusFont: 13,               // 그 밖의 글자 크기(px)
@@ -262,14 +269,14 @@ const STAGE_STYLE = {
       + (intro ? '<div class="cn-cover"></div><div class="cn-laid"></div>' : '')
       + '<canvas class="cn-shadow" aria-hidden="true"></canvas>'
       + '<canvas class="cn-carpet" aria-hidden="true"></canvas>'
-      + '<div class="cn-boxes"></div><div class="cn-seals"></div><div class="cn-focus"></div>'
+      + '<div class="cn-drop"></div><div class="cn-boxes"></div><div class="cn-seals"></div><div class="cn-focus"></div>'
       + (intro ? '<svg class="cn-roll" aria-hidden="true"><path/></svg>' : '');
     pagesEl.appendChild(el);
     const q = sel => el.querySelector(sel);
     const page = {
       offset, dates, stats: [], el, sim: null, m: null, mKey: '', gridKey: '',
       gridSvg: q('.cn-grid'), gridG: q('.grid'), carpetCanvas: q('.cn-carpet'),
-      boxesEl: q('.cn-boxes'), sealsEl: q('.cn-seals'), focusEl: q('.cn-focus'), shadowEl: q('.cn-shadow'),
+      dropEl: q('.cn-drop'), boxesEl: q('.cn-boxes'), sealsEl: q('.cn-seals'), focusEl: q('.cn-focus'), shadowEl: q('.cn-shadow'),
       coverEl: q('.cn-cover'), laidEl: q('.cn-laid'), rollSvg: q('.cn-roll'), rollPath: q('.cn-roll path'),
     };
     [page.rollPath].filter(Boolean).forEach(p => {
@@ -692,7 +699,7 @@ const STAGE_STYLE = {
     let lastDraw = -Infinity;
     const tick = now => {
       if (page.sim !== sim) return; // 새로 놓았으면 옛 루프는 끝낸다
-      const paused = busy || !!drag || openModals.length > 0;
+      const paused = busy || !!drag || !!boxDrag || openModals.length > 0;
       stage.classList.toggle('cn-paused', paused);
       const scrolling = now - lastScrollAt < G.scrollPauseMs; // 스크롤 중에는 카펫만 멈춘다(CSS 박스 떨림은 그대로)
       if (!paused && !scrolling && now - lastDraw >= minGap) { lastDraw = now; renderSim(page, now, jigBoxes, true); }
@@ -970,11 +977,186 @@ const STAGE_STYLE = {
       return;
     }
     const el = e.target.closest('.cn-box');
-    if (!el || busy || drag || !introDone || !active.boxesEl.contains(el)) return;
+    if (!el || busy || drag || suppressClick || !introDone || !active.boxesEl.contains(el)) return;
     openFocus(active, el.dataset.id);
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && focus) closeFocus(); });
   window.addEventListener('scroll', () => { if (focus && Math.abs(window.scrollY - focus.scrollY) > 4) closeFocus(true); }, { passive: true });
+
+  // ---- 박스 끌기: 남은 단계(할 일) 박스를 끌면 반투명한 복사본이 포인터를 따라온다. 날짜칸(페이지 폭의 7등분 세로 줄)에 놓으면 그 날에 고정되고(SPEC 10장 pinnedDate)
+  // 다시 그리기가 날이 바뀐 박스를 위에서 떨어뜨린다. 화면 왼쪽·오른쪽 끝에 머물면 지난 주·다음 주로 넘어가고, 위쪽(헤더 자리)에 놓거나 Esc면 취소다.
+  // 놓는 자리 판정은 box-drag.js(순수 함수), 놓을 수 있는지는 Placement.canDropPin(같은 날·지난 날은 안 된다) ----
+  let boxDrag = null;         // 끌기 진행 상태. 눌렀지만 아직 시작 전(터치 길게 누르기 대기)이면 started가 false
+  let suppressClick = false;  // 끌고 난 직후의 클릭이 박스 누르기(커지기)로 이어지지 않게
+
+  const dz = document.createElement('div'); // 화면 고정 안내 구역(헤더·메모지 위). 끄는 동안만 보인다
+  dz.className = 'cn-dz';
+  dz.setAttribute('aria-hidden', 'true');
+  dz.style.setProperty('--dz-edge', `${G.dragEdgeWidth}px`);
+  const dzIcon = d => `<span class="dz-ic"><svg viewBox="0 0 24 24"><path d="${d}"/></svg></span>`;
+  dz.innerHTML = `<div class="dz dz-prev"><div class="dz-body">${dzIcon('M15 5L8 12l7 7')}<b>지난 주</b><span>잠깐 머물면 넘어가요</span></div><i class="dz-fill"></i></div>`
+    + `<div class="dz dz-next"><div class="dz-body">${dzIcon('M9 5l7 7-7 7')}<b>다음 주</b><span>잠깐 머물면 넘어가요</span></div><i class="dz-fill"></i></div>`
+    + `<div class="dz dz-cancel"><div class="dz-body">${dzIcon('M6 6l12 12M18 6L6 18')}<b>여기에 놓으면 취소</b><span>날짜 칸에 놓으면 그 날로 옮겨요</span></div></div>`;
+  document.body.appendChild(dz);
+  const dzEl = { prev: dz.querySelector('.dz-prev'), next: dz.querySelector('.dz-next'), cancel: dz.querySelector('.dz-cancel') };
+
+  // 놓을 날짜칸 강조(그 페이지 안, 박스 아래 층). t: 구역 판정 결과, 없으면 숨긴다
+  function showDrop(page, t) {
+    const el = page && page.dropEl;
+    if (!el) return;
+    if (!t || t.zone !== 'col') { el.classList.remove('on', 'invalid', 'same'); return; }
+    const colW = page.el.clientWidth / 7;
+    el.style.left = `${t.col * colW}px`;
+    el.style.width = `${colW}px`;
+    el.classList.add('on');
+    el.classList.toggle('invalid', t.status === 'past');
+    el.classList.toggle('same', t.status === 'same');
+  }
+
+  function updateBoxDrag() {
+    const d = boxDrag;
+    d.ghost.style.translate = `${d.x - d.grabDx}px ${d.y - d.grabDy}px`;
+    const pr = active.el.getBoundingClientRect(); // 스크롤·슬라이드가 반영된 지금 위치
+    const z = BoxDrag.zoneAt({ x: d.x, y: d.y, width: document.documentElement.clientWidth, edge: G.dragEdgeWidth, topHeight: d.topHeight, page: { left: pr.left, width: pr.width } });
+    const t = d.target = { zone: busy ? 'none' : z.zone, col: z.col, date: null, status: null }; // 페이지가 넘어가는 중에는 놓을 수 없다
+    if (t.zone === 'col') {
+      t.date = active.dates[t.col];
+      const r = Placement.canDropPin({ fromDate: d.fromDate, toDate: t.date, today: work.today });
+      t.status = r.ok ? 'ok' : r.reason ? 'past' : 'same';
+    }
+    if (d.hlPage && d.hlPage !== active) showDrop(d.hlPage, null);
+    d.hlPage = active;
+    showDrop(active, t);
+    ['prev', 'next', 'cancel'].forEach(k => dzEl[k].classList.toggle('active', t.zone === k || (k === 'cancel' && t.zone === 'cancel')));
+    const edge = t.zone === 'prev' || t.zone === 'next' ? t.zone : null; // 주 이동 구역에 닿은 시각부터 머문 시간을 잰다
+    if (edge !== d.dwellZone) { d.dwellZone = edge; d.dwellStart = performance.now(); dz.style.setProperty('--dz-progress', '0'); }
+  }
+
+  // 주 이동 구역에 머문 시간을 채움 표시로 보이고, 다 차면 한 주 넘긴다. 넘어가는 동안은 다시 재기 시작한다
+  function dwellTick(now) {
+    const d = boxDrag;
+    if (!d || !d.started) return;
+    if (busy) { d.dwellStart = now; dz.style.setProperty('--dz-progress', '0'); d.wasBusy = true; }
+    else {
+      if (d.wasBusy) { d.wasBusy = false; updateBoxDrag(); } // 슬라이드가 끝났으니 새 주의 칸으로 다시 판정한다
+      if (d.dwellZone) {
+        const p = Math.min(1, (now - d.dwellStart) / G.dragEdgeDwellMs);
+        dz.style.setProperty('--dz-progress', String(p));
+        if (p >= 1) { d.dwellStart = now; goTo(navTarget + (d.dwellZone === 'next' ? 1 : -1)); }
+      }
+    }
+    d.raf = requestAnimationFrame(dwellTick);
+  }
+
+  function startBoxDrag() {
+    const d = boxDrag;
+    clearTimeout(d.timer);
+    d.started = true;
+    drag = null; // 터치 주 넘기기 스와이프로 이어지지 않게
+    suppressClick = true;
+    closeFocus(true);
+    const r = d.el.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    d.grabDx = d.startX - cx; d.grabDy = d.startY - cy; // 박스를 잡은 자리를 그대로 유지한다
+    d.topHeight = (parseFloat(getComputedStyle(document.body).paddingTop) || 0) + G.dragTopExtra;
+    d.fromDate = d.page.dates[d.item.col];
+    const ghost = document.createElement('div');
+    ghost.className = 'cn-ghost';
+    ghost.style.setProperty('--ghost-op', String(G.dragGhostOpacity));
+    const copy = d.el.cloneNode(true); // 지금 모습 그대로의 복사본(떨림은 빼고 기울기는 그대로)
+    copy.classList.remove('jig');
+    copy.style.translate = ''; copy.style.visibility = ''; copy.style.opacity = '';
+    copy.removeAttribute('data-id');
+    ghost.appendChild(copy);
+    ghost.style.translate = `${cx}px ${cy}px`;
+    document.body.appendChild(ghost);
+    d.ghost = ghost;
+    d.el.style.opacity = String(G.dragSourceOpacity);
+    document.body.classList.add('dragging-box');
+    dz.classList.add('show');
+    requestAnimationFrame(() => dz.classList.add('on')); // 한 프레임 뒤에 켜야 서서히 나타난다
+    d.dwellZone = null; d.dwellStart = performance.now(); d.wasBusy = false;
+    updateBoxDrag();
+    d.raf = requestAnimationFrame(dwellTick);
+  }
+
+  function endBoxDrag(cancelled) {
+    const d = boxDrag;
+    if (!d) return;
+    document.removeEventListener('pointermove', onBoxDragMove);
+    document.removeEventListener('pointerup', onBoxDragUp);
+    document.removeEventListener('pointercancel', onBoxDragUp);
+    clearTimeout(d.timer);
+    cancelAnimationFrame(d.raf);
+    boxDrag = null;
+    setTimeout(() => { suppressClick = false; }, 0);
+    if (!d.started) return;
+    document.body.classList.remove('dragging-box');
+    dz.classList.remove('on');
+    setTimeout(() => dz.classList.remove('show'), 220);
+    Object.values(dzEl).forEach(el => el.classList.remove('active'));
+    showDrop(d.hlPage, null);
+    d.el.style.opacity = '';
+    const t = d.target;
+    const commit = !cancelled && t && t.zone === 'col' && t.status === 'ok';
+    const ghost = d.ghost;
+    if (commit) { // 놓은 칸에 고정하고 다시 그린다: 날이 바뀐 박스가 위에서 떨어진다
+      ghost.style.transition = 'opacity 120ms ease-out';
+      ghost.style.opacity = '0';
+      setTimeout(() => ghost.remove(), 160);
+      const step = state.steps.find(st => st.id === d.item.stepId);
+      if (step && !step.done) {
+        step.pinnedDate = t.date;
+        saveState();
+        renderCarpet();
+      }
+    } else if (d.el.isConnected && !reduceMotion()) { // 취소·놓을 수 없는 자리: 원래 자리로 돌아가며 사라진다
+      const r = d.el.getBoundingClientRect();
+      ghost.style.transition = `translate ${G.focusMs}ms ease-out, opacity ${G.focusMs}ms ease-out`;
+      ghost.style.translate = `${r.left + r.width / 2}px ${r.top + r.height / 2}px`;
+      ghost.style.opacity = '0';
+      setTimeout(() => ghost.remove(), G.focusMs + 40);
+    } else {
+      ghost.remove();
+    }
+    if (refreshQueued) refreshCarpet();
+  }
+
+  function onBoxDragMove(e) {
+    const d = boxDrag;
+    if (!d || e.pointerId !== d.pointerId) return;
+    d.x = e.clientX; d.y = e.clientY;
+    if (!d.started) {
+      const moved = Math.hypot(e.clientX - d.startX, e.clientY - d.startY);
+      if (d.touch) { if (moved > G.dragMovePx * 2) endBoxDrag(true); } // 길게 누르기 전에 움직였으면 스크롤·스와이프하려는 것이니 포기한다
+      else if (moved > G.dragMovePx) startBoxDrag();
+      return;
+    }
+    e.preventDefault();
+    updateBoxDrag();
+  }
+  function onBoxDragUp(e) {
+    const d = boxDrag;
+    if (!d || e.pointerId !== d.pointerId) return;
+    if (d.started && e.type === 'pointerup') { d.x = e.clientX; d.y = e.clientY; updateBoxDrag(); }
+    endBoxDrag(e.type === 'pointercancel');
+  }
+
+  pagesEl.addEventListener('pointerdown', e => {
+    if (boxDrag || focus || busy || !introDone || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const el = e.target.closest('.cn-box');
+    if (!el || !active.boxesEl.contains(el) || !active.sim) return;
+    const item = (active.items || []).find(it => it.id === el.dataset.id);
+    if (!item || item.kind !== 'todo') return; // 끌어 옮길 수 있는 것은 남은 단계뿐(고정 일정과 완료한 단계는 날짜를 옮기지 않는다)
+    const me = boxDrag = { page: active, item, el, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY, touch: e.pointerType === 'touch', started: false, timer: 0, ghost: null, target: null, hlPage: null };
+    if (me.touch) me.timer = setTimeout(() => { if (boxDrag === me && !me.started) startBoxDrag(); }, G.dragLongPressMs);
+    document.addEventListener('pointermove', onBoxDragMove);
+    document.addEventListener('pointerup', onBoxDragUp);
+    document.addEventListener('pointercancel', onBoxDragUp);
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && boxDrag && boxDrag.started) endBoxDrag(true); });
+  document.addEventListener('touchmove', e => { if (boxDrag && boxDrag.started) e.preventDefault(); }, { passive: false }); // 끌기가 시작된 뒤에는 터치가 화면을 스크롤하지 않게
+  pagesEl.addEventListener('contextmenu', e => { if (boxDrag) e.preventDefault(); }); // 길게 누르면 뜨는 메뉴 막기
 
   // ---- 다시 그리기: 할 일·일정·설정이 바뀌면 다른 화면이 전역 renderCarpet()을 부른다. 바뀐 게 없으면 아무것도 하지 않고,
   // 바뀌었으면 새로 생겼거나 옮겨졌거나 크기가 바뀐 박스만 위에서 떨어진다(나머지는 제자리). 슬라이드·끌기·첫 입장 중이면 끝난 뒤로 미룬다 ----
@@ -1000,7 +1182,7 @@ const STAGE_STYLE = {
   }
 
   function refreshCarpet() {
-    if (!introDone || busy || drag) { refreshQueued = true; return; }
+    if (!introDone || busy || drag || boxDrag) { refreshQueued = true; return; }
     refreshQueued = false;
     const page = active;
     syncWork(page);
@@ -1074,7 +1256,7 @@ const STAGE_STYLE = {
   // 터치 스와이프: 손가락을 따라 페이지가 움직이고, 놓을 때 충분히 밀었거나 빠르면 넘어가고 아니면 제자리로 돌아간다
   let drag = null;
   pagesEl.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'touch' || busy || !introDone || focus) return;
+    if (e.pointerType !== 'touch' || busy || !introDone || focus || boxDrag) return;
     drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, mode: 'wait', dir: 0, other: null, dx: 0, lastX: e.clientX, lastT: e.timeStamp, v: 0 };
   });
   pagesEl.addEventListener('pointermove', e => {
@@ -1148,7 +1330,7 @@ const STAGE_STYLE = {
     window.addEventListener('resize', () => { // 폭·높이가 바뀌면 보이는 주의 선과 박스를 새 크기로 다시 놓는다(연출 없이). 창을 끄는 동안은 기다렸다가 멈추면 한 번만
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        if (busy || drag) return;
+        if (busy || drag || boxDrag) return;
         const width = active.el.clientWidth;
         drawGrid(active, metrics(active, width), width);
         startBoxes(active, 'instant');

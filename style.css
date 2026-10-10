@@ -1193,6 +1193,54 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .fx-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; padding-top: 4px; } /* 버튼은 항상 박스 아래 오른쪽 끝. 나머지는 왼쪽 위부터 쌓인다 */
 .cn-fbox .sbtn { --wbtn-pad: 8px 16px; --wbtn-font: 14px; }
 
+/* 박스 끌기(app-carpet-next.js): 끄는 동안 화면 가장자리에 나타나는 안내 구역, 마우스를 따라오는 복사본, 놓을 날짜칸 강조. 색과 크기는 아래 변수 */
+:root {
+  --dz-red: 184, 32, 58;     /* 주 이동 구역·날짜칸 강조의 붉은색(RGB) */
+  --dz-dark: 38, 12, 18;     /* 취소 구역의 어두운 색(RGB). 붉은 헤더 위라서 붉은색이 아니라 어둡게 덮는다 */
+  --dz-ink: #fff6e8;         /* 안내 글자와 아이콘 색(종이색) */
+  --dz-glow: 190px;          /* 왼쪽·오른쪽 그라데이션이 퍼지는 폭. 실제로 반응하는 폭은 JS의 dragEdgeWidth */
+  --dz-top: 150px;           /* 위쪽 그라데이션 높이 */
+}
+.cn-dz { position: fixed; inset: 0; z-index: 900; pointer-events: none; display: none; } /* 헤더(100)·메모지(150)·팝업(200) 위 */
+.cn-dz.show { display: block; }
+.dz { position: absolute; color: var(--dz-ink); opacity: 0; transition: opacity 0.2s ease-out; }
+.cn-dz.on .dz { opacity: 0.8; }
+.cn-dz.on .dz.active { opacity: 1; }
+.dz-prev { left: 0; top: 0; bottom: 0; width: var(--dz-glow); background: linear-gradient(to right, rgba(var(--dz-red), 0.94), rgba(var(--dz-red), 0.52) 45%, rgba(var(--dz-red), 0)); }
+.dz-next { right: 0; top: 0; bottom: 0; width: var(--dz-glow); background: linear-gradient(to left, rgba(var(--dz-red), 0.94), rgba(var(--dz-red), 0.52) 45%, rgba(var(--dz-red), 0)); }
+.dz-cancel { left: 0; right: 0; top: 0; height: var(--dz-top); background: linear-gradient(to bottom, rgba(var(--dz-dark), 0.95), rgba(var(--dz-dark), 0.6) 55%, rgba(var(--dz-dark), 0)); }
+.dz-body { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; word-break: keep-all; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); }
+.dz-prev .dz-body, .dz-next .dz-body { top: 50%; width: var(--dz-edge); translate: 0 -50%; }
+.dz-prev .dz-body { left: 0; }
+.dz-next .dz-body { right: 0; }
+.dz-cancel .dz-body { top: 14px; left: 50%; translate: -50% 0; }
+.dz-body b { font-size: 15px; }
+.dz-body span:not(.dz-ic) { font-size: 11px; opacity: 0.85; line-height: 1.3; }
+.dz-ic { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 246, 232, 0.16); border: 2px dashed var(--dz-ink); transition: transform 0.15s ease-out, background-color 0.15s, color 0.15s; } /* 털실 점선 테두리 */
+.dz-ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.dz.active .dz-ic { transform: scale(1.18); background: var(--dz-ink); color: rgb(var(--dz-red)); }
+.dz-cancel.active .dz-ic { color: rgb(var(--dz-dark)); }
+.dz-fill { position: absolute; top: 12%; bottom: 12%; width: 4px; border-radius: 2px; background: var(--dz-ink); transform: scaleY(var(--dz-progress, 0)); opacity: 0; } /* 머문 시간만큼 차오른다 */
+.dz-prev .dz-fill { left: var(--dz-edge); }
+.dz-next .dz-fill { right: var(--dz-edge); }
+.dz.active .dz-fill { opacity: 0.9; }
+@keyframes dz-nudge-l { to { translate: -5px 0; } }
+@keyframes dz-nudge-r { to { translate: 5px 0; } }
+.dz-prev.active .dz-ic svg { animation: dz-nudge-l 0.5s ease-in-out infinite alternate; }
+.dz-next.active .dz-ic svg { animation: dz-nudge-r 0.5s ease-in-out infinite alternate; }
+
+.cn-ghost { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 1000; pointer-events: none; opacity: var(--ghost-op, 0.6); will-change: translate, opacity; } /* 마우스를 따라오는 박스 복사본. 박스 중심이 이 점에 놓인다 */
+.cn-ghost .cn-box { scale: 1.05; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32); }
+body.dragging-box, body.dragging-box * { user-select: none; -webkit-user-select: none; cursor: grabbing !important; }
+.cn-boxes .cn-box { transition: opacity 0.15s; } /* 끄는 동안 원래 박스가 흐려진다 */
+
+.cn-drop { top: 0; height: 100%; width: 0; box-sizing: border-box; pointer-events: none; opacity: 0; background: rgba(var(--dz-red), 0.1); border-left: 2px dashed rgba(var(--dz-red), 0.5); border-right: 2px dashed rgba(var(--dz-red), 0.5); transition: opacity 0.12s, left 0.1s ease-out; } /* 놓을 날짜칸. 박스 아래 층 */
+.cn-drop.on { opacity: 1; }
+.cn-drop.same { opacity: 0.45; }  /* 원래 날짜: 놓아도 아무 일 없다 */
+.cn-drop.invalid { background: rgba(110, 100, 90, 0.16); border-color: rgba(110, 100, 90, 0.45); }
+.cn-drop.invalid::after { content: "지난 날에는 놓을 수 없어요"; position: absolute; left: 0; right: 0; top: 96px; padding: 0 10px; text-align: center; font-size: 13px; color: #6b625a; word-break: keep-all; }
+@media (prefers-reduced-motion: reduce) { .dz, .dz-ic, .cn-drop, .cn-boxes .cn-box { transition: none; } .dz.active .dz-ic svg { animation: none; } }
+
 /* 예산 초과인 날의 박스 떨림(홈 화면 수정 모드). 위치는 translate, 기울기는 transform, 떨림은 rotate 속성이 맡아 곱해진다. 박스마다 빠르기·시작점은 JS가 --jig-dur, --jig-delay로 준다.
    슬라이드·끌기·팝업이 떠 있는 동안은 JS가 #carpet-next에 cn-paused를 붙여 멈춘다 */
 @keyframes cn-jig { from { rotate: calc(var(--jig-deg) * -1); } to { rotate: var(--jig-deg); } }
