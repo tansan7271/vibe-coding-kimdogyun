@@ -1208,7 +1208,10 @@ const STAGE_STYLE = {
     page.stats = statsFor(offset);
     const width = pagesEl.clientWidth;
     drawGrid(page, metrics(page, width), width);
-    startBoxes(page, 'empty');
+    // 박스를 끌어 옮기는 중에 넘어오는 주는 처음부터 정착한 모습으로 들어온다(빈 카펫이 보였다가 도착할 때 한꺼번에 채워지지 않게)
+    const settled = !!(boxDrag && boxDrag.started);
+    startBoxes(page, settled ? 'instant' : 'empty');
+    page.prebuilt = settled;
     return page;
   }
 
@@ -1232,8 +1235,10 @@ const STAGE_STYLE = {
     next.el.style.transform = '';
     busy = false;
     navTarget = next.offset;
+    const stale = refreshQueued; // 슬라이드 중에 데이터가 바뀌었으면 미리 만든 것도 다시 놓는다
     applyQueuedRefresh(next);
-    startBoxes(next, reduceMotion() || (boxDrag && boxDrag.started) ? 'instant' : 'drop'); // 박스를 끌어 옮기는 중에 넘어온 주는 떨어지는 연출 없이 바로 정착한 모습
+    if (!next.prebuilt || stale) startBoxes(next, reduceMotion() || next.prebuilt ? 'instant' : 'drop'); // 끌어 옮기는 중에 넘어온 주는 이미 정착해 있다(떨어지는 연출 없음)
+    else { stage.dataset.boxes = String(next.sim.world.boxes.length); stage.dataset.boxState = 'settled'; } // 확인용
     if (queued !== null) { const q = queued; queued = null; goTo(q); }
   }
 
