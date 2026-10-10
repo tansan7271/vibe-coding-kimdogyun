@@ -19,15 +19,15 @@
 //  [ ] 박스 누르기(단계 메뉴 등 동작은 따로 정한다), 끌어 놓으면 다시 낙하
 //  [ ] 좁은 화면(가로 스크롤)
 //  숨은 부작용(빠뜨리기 쉬움)
-//  [ ] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
-//  [ ] 다른 화면(팝업 닫기, 할 일·일정·설정 변경)이 전역 renderCarpet()을 불러 다시 그리게 한다
+//  [x] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
+//  [x] 다른 화면(팝업 닫기, 할 일·일정·설정 변경)이 전역 renderCarpet()을 불러 다시 그리게 한다. 바뀐 박스만 위에서 다시 떨어진다
 //  [ ] 오늘 날짜는 todayStr()로만 읽는다(UTC 쓰지 않기, 자정 전후·오전 9시 이전 확인)
 //
 // 새 연출 체크리스트
 //  [x] 첫 입장 롤 펼침: 페이지를 열 때마다 한 번. 주 이동이나 수정으로 다시 그릴 때는 없다. 모션 줄이기 설정이면 건너뛴다
 //  [x] 주 넘기기 슬라이드(버튼과 터치 스와이프)  [ ] 끌어 놓으면 낙하   (전체 보기는 기각, 밀린 단계 주름도 기각: 밀림은 박스의 알람 아이콘으로 한다)
 //  [x] 세로축: 부하 1당 높이는 일정하고(예산 15일 때의 눈금 간격), 예산 설정에 따라 예산선 깊이가 늘고 줄어 아래로 스크롤이 생긴다
-//  [x] 예산 초과: 카펫이 예산선 밑으로 부하만큼 계속 처지고, 그 날의 박스와 카펫이 아이폰 홈 화면 수정 모드처럼 떤다(예산 설정은 새로 읽어야 반영됨: 다시 그리기 연결은 아직)
+//  [x] 예산 초과: 카펫이 예산선 밑으로 부하만큼 계속 처지고, 그 날의 박스와 카펫이 아이폰 홈 화면 수정 모드처럼 떤다(예산을 바꾸면 눈금과 처짐이 바로 따라간다)
 
 // 첫 입장 롤 펼침 모양 값. 숫자나 색을 바꾸고 새로고침하면 바로 보인다
 const INTRO_STYLE = {
@@ -199,7 +199,7 @@ const STAGE_STYLE = {
     return r.top + r.height / 2 + m.b * (-w / 2) + m.d * (-h / 2);
   }
 
-  // ---- 로딩 단계. 옛 카펫이 처음 그릴 때 하는 계산을 읽기만 한다(저장은 하지 않는다). 단계마다 따로 실행해 그 사이에 화면이 그려지게 한다 ----
+  // ---- 로딩 단계. 옛 카펫이 처음 그릴 때 하는 계산(마지막 배치 결과 placedDate 저장 포함). 단계마다 따로 실행해 그 사이에 화면이 그려지게 한다. 처음 두 단계는 다시 그릴 때(refreshCarpet)도 다시 돌린다 ----
   const work = {};
   const phases = [
     () => { // 1. 읽기
@@ -214,6 +214,14 @@ const STAGE_STYLE = {
         capacity: s.capacity, safeRatio: s.safeRatio, sleepHours: s.sleepHours, lifeHours: s.lifeHours, placeMode: s.placeMode,
       };
       work.placements = Placement.placeSteps(work.params);
+      // 마지막 배치 결과를 저장해 둔다(다음에 앱을 열 때 자동 밀림 판정에 쓴다)
+      let placedChanged = false;
+      work.placements.forEach(p => {
+        const st = work.activeSteps.find(x => x.id === p.stepId);
+        const date = p.date || undefined;
+        if (st && st.placedDate !== date) { st.placedDate = date; placedChanged = true; }
+      });
+      if (placedChanged) saveState();
     },
     () => { // 3. 첫 주(이번 주) 7일 구성
       first.stats = statsFor(first.offset);
@@ -331,7 +339,7 @@ const STAGE_STYLE = {
 
   // ---- 눈금(7칸을 화면 너비로 똑같이 나눠 그린다. 오늘 칸은 배경). 폭이나 높이가 바뀔 때만 다시 만든다 ----
   function drawGrid(page, m, width) {
-    const key = [width, m.groundY, m.height, m.sag, m.topSpace, page.dates[0], m.capacity].join();
+    const key = [width, m.groundY, m.height, m.sag, m.topSpace, page.dates[0], m.capacity, state.settings.safeRatio, todayStr()].join();
     if (key === page.gridKey) return;
     page.gridKey = key;
     const cs = getComputedStyle(document.documentElement);
@@ -580,7 +588,8 @@ const STAGE_STYLE = {
   // mode 'drop': 박스가 위에서 하나씩 떨어진다(첫 입장, 주를 넘기는 슬라이드가 끝난 뒤).
   //      'instant': 보이지 않게 끝까지 계산해 정착한 모습만 보여 준다(창 크기가 바뀐 때, 모션 줄이기).
   //      'empty': 박스 없이 평평한 카펫만 둔다(슬라이드로 들어오는 동안. 눈금·날짜 숫자는 페이지에 붙어서 같이 들어온다)
-  function startBoxes(page, mode) {
+  // dropIds(Set): 'drop'일 때 이 박스들만 떨어뜨리고 나머지는 보이지 않게 먼저 자리를 잡아 둔다(다시 그릴 때). 없으면 전부 떨어진다
+  function startBoxes(page, mode, dropIds = null) {
     stopSim(page);
     page.boxesEl.innerHTML = '';
     page.sealsEl.innerHTML = '';
@@ -593,9 +602,13 @@ const STAGE_STYLE = {
       columns, capacity, maxSag: m.sag, baseY: m.groundY - S.lineWidth / 2, // 박스는 카펫 선의 윗면에 얹힌다
       params: { restitution: G.boxBounce, capSag: false, ...G.physics }, // capSag false: 예산을 넘으면 카펫이 예산선 밑으로 계속 처진다
     });
+    const all = boxItems(page);
+    const drops = dropIds ? all.filter(it => dropIds.has(it.id)) : all;
+    const stays = dropIds ? all.filter(it => !dropIds.has(it.id)) : [];
+    if (mode !== 'empty') { page.items = all.map(it => ({ ...it })); page.settingsKey = settingsKey(page); } // 다시 그릴 때 무엇이 달라졌는지 견주는 기준
     const over = page.stats.map(st => st.overBudget);
     const fidget = over.some(Boolean) && !reduceMotion();
-    const sim = page.sim = { world, width, colW, unit: m.unit, over, fidget, els: new Map(), seals: new Map(), pending: releaseOrder(boxItems(page)), raf: 0, fidgetRaf: 0, start: 0, last: 0, released: 0, carpetShown: false };
+    const sim = page.sim = { world, width, colW, unit: m.unit, over, fidget, els: new Map(), seals: new Map(), pending: releaseOrder(drops), raf: 0, fidgetRaf: 0, start: 0, last: 0, released: 0, carpetShown: false };
     const debug = state => { if (page === active) { stage.dataset.boxes = String(world.boxes.length + sim.pending.length); stage.dataset.boxState = state; } };
     if (mode === 'empty') {
       sim.pending = [];
@@ -613,6 +626,7 @@ const STAGE_STYLE = {
       startFidget(page);
       return;
     }
+    if (stays.length) { stays.forEach(item => spawn(page, item)); CarpetPhysics.settle(world, 15); } // 그대로인 박스는 떨어뜨리지 않고 자리만 잡아 둔다
     renderSim(page); // 카펫 선을 처지는 카펫으로 먼저 넘겨 둔다(처음엔 직선)
     function frame(now) {
       if (!sim.start) { sim.start = now; sim.last = now; }
@@ -626,6 +640,44 @@ const STAGE_STYLE = {
     }
     sim.raf = requestAnimationFrame(frame);
   }
+
+  // ---- 다시 그리기: 할 일·일정·설정이 바뀌면 다른 화면이 전역 renderCarpet()을 부른다. 바뀐 게 없으면 아무것도 하지 않고,
+  // 바뀌었으면 새로 생겼거나 옮겨졌거나 크기가 바뀐 박스만 위에서 떨어진다(나머지는 제자리). 슬라이드·끌기·첫 입장 중이면 끝난 뒤로 미룬다 ----
+  let refreshQueued = false;
+  const settingsKey = page => JSON.stringify([state.settings, work.today, page.dates[0]]);
+
+  // 읽기·배치를 다시 계산해 page의 7일 구성과 날짜를 새로 맞춘다
+  function syncWork(page) {
+    phases[0]();
+    phases[1]();
+    page.stats = statsFor(page.offset);
+    page.dates = page.stats.map(st => st.date);
+  }
+
+  // 미뤄 둔 다시 그리기가 있으면, 박스를 놓기 전에 page에 반영한다(이어서 전부 떨어지므로 견줄 필요가 없다)
+  function applyQueuedRefresh(page) {
+    if (!refreshQueued) return;
+    refreshQueued = false;
+    syncWork(page);
+    setHeader(page);
+    const width = page.el.clientWidth;
+    drawGrid(page, metrics(page, width), width);
+  }
+
+  function refreshCarpet() {
+    if (!introDone || busy || drag) { refreshQueued = true; return; }
+    refreshQueued = false;
+    const page = active;
+    syncWork(page);
+    setHeader(page);
+    const diff = BoxDiff.diffBoxes(page.items || [], boxItems(page));
+    if (!diff.changed && settingsKey(page) === page.settingsKey) return;
+    const width = page.el.clientWidth;
+    drawGrid(page, metrics(page, width), width);
+    const still = reduceMotion();
+    startBoxes(page, still ? 'instant' : 'drop', still ? null : new Set(diff.drop));
+  }
+  window.renderCarpet = refreshCarpet; // 옛 카펫의 같은 이름 함수를 이어받는다(옛 화면은 숨겨져 있다)
 
   // 이동할 주의 페이지를 만든다. 눈금과 날짜 숫자, 평평한 카펫만 있고 박스는 없다(롤 펼침은 첫 입장 때만, 박스는 슬라이드가 끝난 뒤 위에서 떨어진다)
   function buildPage(offset) {
@@ -657,6 +709,7 @@ const STAGE_STYLE = {
     next.el.style.transform = '';
     busy = false;
     navTarget = next.offset;
+    applyQueuedRefresh(next);
     startBoxes(next, reduceMotion() ? 'instant' : 'drop');
     if (queued !== null) { const q = queued; queued = null; goTo(q); }
   }
@@ -711,7 +764,7 @@ const STAGE_STYLE = {
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag;
     drag = null;
-    if (d.mode !== 'drag' || !d.other) return;
+    if (d.mode !== 'drag' || !d.other) { if (refreshQueued) refreshCarpet(); return; }
     const width = pagesEl.clientWidth, old = active, next = d.other;
     const commit = Math.abs(d.dx) > width * G.swipeCommitRatio || (Math.abs(d.v) > G.swipeCommitSpeed && Math.sign(d.v) === -d.dir);
     busy = true;
@@ -727,6 +780,7 @@ const STAGE_STYLE = {
       removePage(next);
       applyContainer(old.m);
       busy = false;
+      if (refreshQueued) refreshCarpet();
     }
   }
   pagesEl.addEventListener('pointerup', endDrag);
@@ -748,6 +802,7 @@ const STAGE_STYLE = {
     draw(first, 1);
     stage.classList.add('intro-done');
     introDone = true;
+    applyQueuedRefresh(first);
     startBoxes(first, reduceMotion() ? 'instant' : 'drop'); // 첫 입장 때의 떨어지는 연출
     let resizeTimer = 0;
     window.addEventListener('resize', () => { // 폭·높이가 바뀌면 보이는 주의 선과 박스를 새 크기로 다시 놓는다(연출 없이). 창을 끄는 동안은 기다렸다가 멈추면 한 번만
