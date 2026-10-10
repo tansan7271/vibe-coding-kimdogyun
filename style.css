@@ -1010,6 +1010,11 @@ html.carpet-next-on #carpet-next { display: block; min-height: 60vh; color: #999
 
 .page-book { transform-style: preserve-3d; transform-origin: 50% 0; } /* 위쪽 가장자리가 축 */
 
+/* 넘어가는 종이에 딸린 견출지(복제본): 종이와 함께 3D로 움직인다. 모양은 진짜 탭과 같은 .index-tabs button 규칙을 따른다 */
+.pc-tab-bar { transform-style: preserve-3d; }
+.pc-tab-bar button { z-index: auto; transition: none; backface-visibility: hidden; } /* 진짜 탭의 z-index(-1·1)는 3D 안에서 쓰지 않는다 */
+.pc-tab-bar .pc-tab-back { transform: rotateX(180deg); } /* 젖혀졌을 때 보이는 탭 뒷면(글자 없음) */
+
 #modal-goals .page-curl, #modal-goals .page-book { --turn-paper: var(--note-paper); --turn-shadow-rgb: 150, 118, 40; }     /* 메모지(노랑)를 진하게 */
 #modal-settings .page-curl, #modal-settings .page-book { --turn-paper: var(--cal-paper); --turn-shadow-rgb: 140, 112, 84; } /* 달력 종이(크림)를 진하게 */
 

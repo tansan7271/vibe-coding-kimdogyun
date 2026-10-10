@@ -294,9 +294,34 @@
     };
     const div = cls => { const d = document.createElement('div'); d.className = cls; return d; };
 
+    // 넘어가는 페이지의 견출지는 그 페이지에 딸려 올라가고 내려간다. 탭 상태는 클릭 즉시 바뀌므로, 올라타는 탭은 복제본으로 따로 만들고 그 동안 진짜 탭은 숨긴다
+    const tabBar = modal.querySelector('.index-tabs');
+    const tabClone = btn => { // 진짜 탭 자리(팝업 기준)에 복제본을 놓는다. 앞면과 뒷면(글자 없음) 한 쌍
+      const make = (isBack) => {
+        const bar = div('index-tabs pc-tab-bar'); // 같은 CSS를 쓰려고 index-tabs 안에 둔다
+        bar.style.top = `${tabBar.offsetTop + btn.offsetTop}px`;
+        const b = btn.cloneNode(true);
+        b.classList.add(isBack ? 'pc-tab-back' : 'pc-tab-front');
+        if (isBack) b.textContent = '';
+        bar.append(b);
+        return b;
+      };
+      return { front: make(false), back: make(true) };
+    };
+    let tab = null, hiddenTab = null;
+    if (dir === 'next') { // 지금 페이지의 탭(지금 선택된 탭)이 지금 페이지와 함께 올라간다
+      const from = tabBar.querySelector('button.active');
+      if (from) { tab = tabClone(from); hiddenTab = from; }
+    }
+
     const oldPage = cloneOf(); // 바꾸기 전 모습
     change();                  // 진짜 내용을 새 페이지로
     const mover = dir === 'prev' ? cloneOf() : oldPage; // 넘어가는 쪽: next면 옛 페이지, prev면 새 페이지
+    if (dir === 'prev') { // 새 페이지의 탭(새로 선택된 탭)이 새 페이지와 함께 뒤에서 올라와 앞에 안착한다
+      const to = tabBar.querySelector('button.active');
+      if (to) { tab = tabClone(to); hiddenTab = to; }
+    }
+    if (hiddenTab) hiddenTab.style.visibility = 'hidden';
 
     // curl: 팝업 내용 위에 깔리는 층(덮이기 전의 옛 페이지, 그림자). book: 위로 젖혀지는 페이지. 젖힌 뒤 book만 팝업 뒤로 보낸다
     const curl = div('page-curl');
@@ -310,6 +335,7 @@
     book.append(mover);
     if (hasBand) book.append(div('pc-band'));
     book.append(lit, back);
+    if (tab) for (const b of [tab.back, tab.front]) book.append(b.parentNode); // 탭은 페이지 오른쪽 바깥으로 튀어나와 있다
     panel.append(curl, book); // 진짜 요소보다 뒤에 둬야 getElementById가 진짜를 먼저 찾는다
     mover.scrollTop = scroll.scrollTop;
     oldPage.scrollTop = scroll.scrollTop;
@@ -327,6 +353,8 @@
       // 위로 젖히기: 위쪽 가장자리를 축으로 한 회전. 젖혀진 뒤에는 팝업 뒤로 층을 바꿔 뒤에서 내려가게 한다
       book.style.transform = `perspective(${persp}) rotateX(${phi}deg)`;
       book.style.zIndex = phi > 180 ? -1 : 3;
+      // 견출지: 페이지 앞면일 때(0~180도)는 선택된 탭 모양, 뒤로 내려간 뒤(180~360도)는 팝업 뒤에 끼워진 탭 모양. 바뀌는 순간 페이지는 화면 위쪽 밖에 있어 보이지 않는다
+      if (tab) for (const b of [tab.front, tab.back]) b.classList.toggle('active', phi < 180);
       lit.style.backgroundColor = col(litA * face); // 기울어질수록 앞면이 어두워진다
       // 종이 자체의 그림자: 평평할 때(0도)는 팝업의 그림자와 겹쳐 튀지 않게 0이고, 들리기 시작하면 빠르게 나타나 젖혀진 뒤에도 윤곽을 보여 준다
       book.style.setProperty('--sa', (pageShadowA * smooth(Math.min(phi, 360 - phi) / 30)).toFixed(3));
@@ -339,7 +367,7 @@
     // 진행도 u는 시간에 선형으로 간다(구간마다 곡선은 phiAt이 준다)
     const clock = curl.animate([{ opacity: 1 }, { opacity: 1 }], { duration: cssMs('--turn-ms'), easing: 'linear', fill: 'both' });
     let alive = true;
-    const cleanup = () => { alive = false; curl.remove(); book.remove(); };
+    const cleanup = () => { alive = false; curl.remove(); book.remove(); if (hiddenTab) hiddenTab.style.visibility = ''; };
     const frame = () => {
       if (!alive || !curl.isConnected) return;
       const p = clock.effect.getComputedTiming().progress ?? 1;
