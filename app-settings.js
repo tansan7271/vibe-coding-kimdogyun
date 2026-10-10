@@ -16,19 +16,19 @@
 
   // 반복 일정은 시작 날짜부터 생긴다 (그 이전에는 없다). 매주의 시작 날짜는 옛 데이터에는 없을 수 있다
   function eventRepeatFieldsHtml(ev) {
-    const dateInput = `<input type="date" data-field="date" data-event-id="${ev.id}" value="${ev.date || ''}">`;
-    const until = `종료 <input type="date" data-field="repeatUntil" data-event-id="${ev.id}" value="${ev.repeatUntil || ''}">`;
+    const dateInput = chipField(`<input type="date" data-field="date" data-event-id="${ev.id}" value="${ev.date || ''}" required>`);
+    const until = `<span class="ev-label">종료</span> ${chipField(`<input type="date" data-field="repeatUntil" data-event-id="${ev.id}" value="${ev.repeatUntil || ''}" required>`)}`;
     if (ev.repeat === 'weekly') {
       const options = WEEKDAY_LABELS.map((label, i) => `<option value="${i}"${Number(ev.weekday) === i ? ' selected' : ''}>${label}</option>`).join('');
-      return `<select data-field="weekday" data-event-id="${ev.id}">${options}</select> 시작 ${dateInput} ${until}`;
+      return `${chipField(`<select data-field="weekday" data-event-id="${ev.id}">${options}</select>`)} <span class="ev-label">시작</span> ${dateInput} ${until}`;
     }
     if (ev.repeat === 'biweekly') {
       const day = ev.date ? WEEKDAY_LABELS[Placement.weekdayOf(ev.date)] : '';
-      return `시작 ${dateInput} <span class="repeat-note">격주 ${day}요일</span> ${until}`;
+      return `<span class="ev-label">시작</span> ${dateInput} <span class="repeat-note">격주 ${day}요일</span> ${until}`;
     }
     if (ev.repeat === 'monthly') {
       const dom = ev.date ? Number(ev.date.slice(8)) : '';
-      return `시작 ${dateInput} <span class="repeat-note">매월 ${dom}일${dom > 28 ? ' (없는 달은 말일)' : ''}</span> ${until}`;
+      return `<span class="ev-label">시작</span> ${dateInput} <span class="repeat-note">매월 ${dom}일${dom > 28 ? ' (없는 달은 말일)' : ''}</span> ${until}`;
     }
     return dateInput;
   }
@@ -36,31 +36,69 @@
   // 뺀 날 목록과 되돌리기 (SPEC에는 없는 실수 복구용)
   function skippedDatesHtml(ev) {
     if (!ev.skipDates || ev.skipDates.length === 0) return '';
-    const items = ev.skipDates.map(d => `${d.slice(5).replace('-', '/')} <button type="button" class="skip-btn" data-action="unskip-event-day" data-event-id="${ev.id}" data-date="${d}">되돌리기</button>`).join(' · ');
-    return `<div class="skipped-dates">뺀 날: ${items}</div>`;
+    const items = ev.skipDates.map(d => `<span class="skip-item">${d.slice(5).replace('-', '/')} <button type="button" class="sbtn sbtn-sm" data-action="unskip-event-day" data-event-id="${ev.id}" data-date="${d}">되돌리기</button></span>`).join('');
+    return `<div class="skipped-dates"><span class="ev-label">뺀 날</span>${items}</div>`;
   }
 
-  function eventRowHtml(ev) {
+  // 카드 머리에 보이는 요약: 언제 · 몇 시 · 부하
+  function eventSummary(ev) {
+    let when;
+    if (ev.repeat === 'weekly') when = `매주 ${WEEKDAY_LABELS[Number(ev.weekday)] || ''}`;
+    else if (ev.repeat === 'biweekly') when = `격주 ${ev.date ? WEEKDAY_LABELS[Placement.weekdayOf(ev.date)] : ''}`;
+    else if (ev.repeat === 'monthly') when = `매월 ${ev.date ? Number(ev.date.slice(8)) : ''}일`;
+    else when = ev.date || '';
+    return `${when} · ${ev.start}~${ev.end} · 부하 ${ev.load}`;
+  }
+
+  // 일정 카드: 할 일 카드와 같은 구조와 서식(머리 전체를 누르면 아코디언으로 펼침). 펼친 카드만 본문을 그린다
+  function eventBodyHtml(ev) {
+    const repeatSelect = `<select data-field="repeat" data-event-id="${ev.id}">
+      <option value="none"${ev.repeat === 'none' ? ' selected' : ''}>반복 없음</option>
+      ${['weekly', 'biweekly', 'monthly'].map(r => `<option value="${r}"${ev.repeat === r ? ' selected' : ''}>${REPEAT_LABELS[r]}</option>`).join('')}
+    </select>`;
     return `
-      <div class="event-row" data-event-id="${ev.id}">
-        <input type="text" class="event-title-input" data-field="title" data-event-id="${ev.id}" value="${escapeAttr(ev.title)}">
-        <select data-field="repeat" data-event-id="${ev.id}">
-          <option value="none"${ev.repeat === 'none' ? ' selected' : ''}>반복 없음</option>
-          ${['weekly', 'biweekly', 'monthly'].map(r => `<option value="${r}"${ev.repeat === r ? ' selected' : ''}>${REPEAT_LABELS[r]}</option>`).join('')}
-        </select>
-        ${eventRepeatFieldsHtml(ev)}
-        <input type="time" data-field="start" data-event-id="${ev.id}" value="${ev.start}">
-        <span>~</span>
-        <input type="time" data-field="end" data-event-id="${ev.id}" value="${ev.end}">
+      <div class="goal-edit-row">
+        ${textField(`data-field="title" data-event-id="${ev.id}" value="${escapeAttr(ev.title)}" placeholder="일정 제목"`, 'goal-title-field')}
+        ${chipField(repeatSelect)}
+      </div>
+      <div class="ev-fields">${eventRepeatFieldsHtml(ev)}</div>
+      <div class="ev-fields">
+        ${chipField(`<input type="time" data-field="start" data-event-id="${ev.id}" value="${ev.start}">`)}
+        <span class="ev-label">~</span>
+        ${chipField(`<input type="time" data-field="end" data-event-id="${ev.id}" value="${ev.end}">`)}
         ${loadPickerHtml(ev.id, ev.load)}
-        <button type="button" class="btn btn-danger" data-action="delete-event" data-event-id="${ev.id}">삭제</button>
-        ${skippedDatesHtml(ev)}
+      </div>
+      ${skippedDatesHtml(ev)}`;
+  }
+
+  const expandedEvents = new Set();
+
+  function eventRowHtml(ev) {
+    const expanded = expandedEvents.has(ev.id);
+    return `
+      <div class="goal-item">
+      <div class="goal-card${expanded ? ' expanded' : ''}" data-event-id="${ev.id}">
+        <div class="goal-header" data-action="toggle-event" data-event-id="${ev.id}" aria-expanded="${expanded}">
+          <div class="goal-header-info">
+            <span class="goal-title">${escapeHtml(ev.title)}</span>
+            <span class="goal-deadline">${eventSummary(ev)}</span>
+            ${CHEV_DOWN.replace('class="chev"', 'class="chev goal-chev"')}
+          </div>
+          <div class="goal-actions">
+            <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-event" data-event-id="${ev.id}">삭제</button>
+          </div>
+        </div>
+        <div class="goal-acc">
+          <div class="goal-body"><div class="goal-body-inner">${expanded ? eventBodyHtml(ev) : ''}</div></div>
+        </div>
+      </div>
       </div>`;
   }
 
   // 팝업 왼쪽 견출지 탭: 'current'(현재 일정) | 'over'(지난 일정) | 'prefs'(전체 설정)
   let settingsTab = 'current';
   const settingsPanes = { events: document.getElementById('settings-pane-events'), prefs: document.getElementById('settings-pane-prefs') };
+  const eventAddWrap = document.getElementById('event-add-wrap'); // 일정 입력줄(고정 머리 안). 전체 설정 탭에서는 숨긴다
 
   function renderEvents() {
     const sorted = [...state.events].sort((a, b) => eventSortKey(a).localeCompare(eventSortKey(b)));
@@ -84,6 +122,7 @@
   function showSettingsTab(key) {
     settingsTab = key;
     settingsPanes.events.hidden = key === 'prefs';
+    eventAddWrap.hidden = key === 'prefs';
     settingsPanes.prefs.hidden = key !== 'prefs';
     renderEvents(); // 탭 글자·선택 표시와 일정 목록을 다시 그린다
   }
@@ -155,6 +194,21 @@
   eventList.addEventListener('click', (e) => {
     const target = e.target.closest('[data-action]');
     if (!target) return;
+
+    if (target.dataset.action === 'toggle-event') { // 머리 전체를 누르면 펼침/접힘. 한 번에 하나만 펼치고, 펼칠 때 본문을 그린다
+      const id = target.dataset.eventId;
+      const card = target.closest('.goal-card');
+      if (expandedEvents.has(id)) {
+        expandedEvents.delete(id);
+        collapseGoalCard(card);
+      } else {
+        eventList.querySelectorAll('.goal-card.expanded').forEach(collapseGoalCard);
+        expandedEvents.clear();
+        expandedEvents.add(id);
+        expandGoalCard(card, eventBodyHtml(state.events.find(x => x.id === id)));
+      }
+      return;
+    }
 
     if (target.dataset.action === 'delete-event') {
       if (!confirm('이 일정을 삭제할까요?')) return;
@@ -264,7 +318,7 @@
 
   function setDataMessage(text, isError) {
     dataMessage.textContent = text;
-    dataMessage.style.color = isError ? '#b8203a' : '#555';
+    dataMessage.style.color = isError ? '#b8203a' : ''; // 평소 색은 CSS(.pref-status)
   }
 
   document.getElementById('export-btn').addEventListener('click', () => {

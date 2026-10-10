@@ -588,7 +588,7 @@ button.btn-plain {
 
 /* 목록 카드: 스티치 버튼과 같은 모서리·그림자 서식(점선만 뺀다). 바탕은 흰색 */
 .goal-card, #ai-draft {
-  background: #fff;
+  background: var(--card-bg, #fff);
   border-radius: var(--wbtn-radius);
   padding: 14px 18px;
   box-shadow: var(--cardbox-shadow);
@@ -704,7 +704,7 @@ button.btn-plain {
 .step-row.dragging { /* 끌고 있는 줄: 위로 뜨고 흰 바탕에 그림자 */
   position: relative;
   z-index: 2;
-  background: #fff;
+  background: var(--card-bg, #fff);
   border-radius: var(--wbtn-radius);
   box-shadow: var(--cardbox-shadow);
   cursor: grabbing;
@@ -722,7 +722,7 @@ button.btn-plain {
   height: 28px;
   border-radius: 50%;
   border: 0;
-  background: var(--note-paper);
+  background: var(--btn-bg, var(--note-paper));
   box-shadow: var(--card-shadow);
   cursor: pointer;
   font-size: 12px;
@@ -754,49 +754,29 @@ button.btn-plain {
   margin-top: 28px;
 }
 
-.event-add-form {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
+/* 일정 입력줄(고정 머리 안): 제목 줄 / 반복·날짜·시각 줄 / 부하와 추가 버튼 줄 */
+.event-add-form { display: flex; flex-direction: column; gap: 12px; }
+.ev-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ev-row .ev-title { flex: 1; min-width: 180px; }
+.ev-add { margin-left: auto; }
+.ev-group { display: inline-flex; align-items: center; gap: 8px; }
+.ev-label { font-size: 13px; color: var(--hint-color); } /* 칸 앞의 짧은 이름(날짜·종료·시작·~) */
+.sbtn-field input[type="time"] { width: auto; }
+.ev-fields { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; }
+.repeat-note { font-size: 12px; color: var(--hint-color); }
+.skipped-dates { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; font-size: 13px; }
+.skip-item { display: inline-flex; align-items: center; gap: 6px; }
 
-.event-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px 14px;
-  margin-bottom: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  flex-wrap: wrap;
-}
-
-.event-row .skipped-dates { flex-basis: 100%; font-size: 12px; color: #555; }
-.event-row .event-title-input {
-  flex: 1;
-  min-width: 120px;
-}
-
-.settings-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 260px;
-}
-
-.settings-form label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 14px;
-}
-
-.settings-form input {
-  width: 90px;
-}
+/* 전체 설정: 카드를 가로로 나란히(팝업 폭에서 두 열) */
+.prefs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.prefs-col { display: flex; flex-direction: column; gap: 16px; } /* 열마다 카드를 쌓아 빈틈 없이 */
+.pref-card h3 { margin: 0 0 12px; font-size: 15px; color: #444; }
+.pref-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; }
+.pref-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; }
+.pref-label { color: #444; }
+.pref-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.pref-card .line-field { margin-top: 8px; }
+.pref-status { margin-top: 10px; font-size: 13px; color: rgba(var(--paper-shadow-rgb), 0.95); }
 
 .week-patch {
   position: fixed;
@@ -886,14 +866,16 @@ button.btn-plain {
 .week-patch .week-label { color: #fff; }
 
 /* 팝업의 스티치 버튼: 바탕이 팝업 종이와 같은 색이라 그림자로 떠 보이게 하고, 그림자 색은 팝업 종이를 진하게 한 색으로 은은하게 */
-#modal-goals { --paper-shadow-rgb: 150, 118, 40; }
-#modal-settings { --paper-shadow-rgb: 140, 112, 84; }
+#modal-goals { --paper-shadow-rgb: 150, 118, 40; --paper: var(--note-paper); --card-bg: #fff; --btn-bg: var(--note-paper); }
+/* 일정과 설정은 팝업 종이가 거의 흰색이라, 카드는 살짝 짙은 베이지로 두고 버튼·칸·부하 동그라미는 흰색으로 올려 구분한다 */
+#modal-settings { --paper-shadow-rgb: 140, 112, 84; --paper: var(--cal-paper); --card-bg: #f6efe1; --btn-bg: #fff; }
 .modal-scroll {
   --card-shadow: 0 2px 7px rgba(var(--paper-shadow-rgb), 0.34);     /* 팝업 안 버튼·부하 동그라미 그림자(팝업 종이를 진하게 한 색) */
   --cardbox-shadow: 0 4px 22px rgba(var(--paper-shadow-rgb), 0.15); /* 흰 카드 그림자: 버튼보다 옅고 넓게 퍼진다 */
 }
 .modal-scroll .sbtn { --wbtn-shadow: var(--card-shadow); --wbtn-font: 14px; --wbtn-pad: 12px 24px; } /* 안쪽 여백(위아래 / 좌우). 점선과 글자 사이가 답답하지 않게 */
 .sbtn:disabled { opacity: 0.5; cursor: default; }
+.modal-scroll .sbtn:not(.sbtn-accent):not(.sbtn-danger):not(:active) { background: var(--btn-bg); } /* 팝업마다 버튼·칸 바탕(--btn-bg) */
 .sbtn-accent { /* 강조 버튼: 붉은 바탕에 같은 털실 점선 */
   background: #b8203a;
   color: #fff;
@@ -977,12 +959,12 @@ button.btn-plain {
   z-index: -1;
   top: calc(var(--modal-top, 0px) * -1);
   bottom: 0;
-  background: var(--note-paper);
+  background: var(--paper, var(--note-paper));
 }
 .goal-head::after { /* 아래쪽 은은한 페이드 */
   top: 100%;
   height: 16px;
-  background: linear-gradient(var(--note-paper), transparent);
+  background: linear-gradient(var(--paper, var(--note-paper)), transparent);
 }
 .goal-head .modal-close { top: 0; right: 0; } /* 머리 안에서 제목 줄과 높이를 맞춘다 */
 .goal-compose { margin-bottom: 0; }

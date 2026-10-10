@@ -95,9 +95,9 @@
     }, cssMs('--acc-ms') + 80);
   }
 
-  function expandGoalCard(card, goal) {
+  function expandGoalCard(card, bodyHtml) { // 일정 카드(app-settings.js)도 같이 쓴다
     clearTimeout(card._clearTimer);
-    card.querySelector('.goal-body-inner').innerHTML = goalBodyHtml(goal);
+    card.querySelector('.goal-body-inner').innerHTML = bodyHtml;
     void card.offsetHeight; // 접힌 상태를 한 번 계산시켜 둬야 0에서 펼쳐지는 애니메이션이 돈다
     card.classList.add('expanded');
     card.querySelector('.goal-header').setAttribute('aria-expanded', 'true');
@@ -210,7 +210,7 @@
         goalList.querySelectorAll('.goal-card.expanded').forEach(collapseGoalCard); // 한 번에 하나만 펼친다
         expandedGoals.clear();
         expandedGoals.add(goalId);
-        expandGoalCard(card, state.goals.find(g => g.id === goalId));
+        expandGoalCard(card, goalBodyHtml(state.goals.find(g => g.id === goalId)));
       }
       return;
     }

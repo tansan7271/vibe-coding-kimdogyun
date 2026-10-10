@@ -94,80 +94,76 @@
     <button type="button" data-tab="prefs">전체 설정</button>
   </div>
   <div class="modal-scroll">
-  <button class="modal-close" type="button" aria-label="닫기">×</button>
   <section id="screen-settings" class="screen">
+    <div class="goal-head">
+    <button class="modal-close" type="button" aria-label="닫기">×</button>
     <h1>일정과 설정</h1>
+    <div id="event-add-wrap" class="goal-compose">
+      <div class="event-add-form">
+        <div class="ev-row">
+          <span class="line-field ev-title"><input type="text" class="line-input" id="new-event-title" placeholder="일정 제목"></span>
+          <label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><select id="new-event-repeat"><option value="none">반복 없음</option><option value="weekly">매주</option><option value="biweekly">격주</option><option value="monthly">매월</option></select></label>
+          <span id="new-event-date-wrap" class="ev-group"><span id="new-event-date-label" class="ev-label">날짜</span><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="date" id="new-event-date" required></label></span>
+          <span id="new-event-weekday-wrap" class="ev-group" style="display:none"><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><select id="new-event-weekday"><option value="0">월</option><option value="1">화</option><option value="2">수</option><option value="3">목</option><option value="4">금</option><option value="5">토</option><option value="6">일</option></select></label></span>
+          <span id="new-event-repeat-until-wrap" class="ev-group" style="display:none"><span class="ev-label">종료</span><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="date" id="new-event-repeat-until" required></label></span>
+        </div>
+        <div class="ev-row">
+          <span class="ev-group"><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="time" id="new-event-start" value="09:00"></label><span class="ev-label">~</span><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="time" id="new-event-end" value="10:00"></label></span>
+          <span id="new-event-load-picker"></span>
+          <button class="sbtn sbtn-accent ev-add" id="add-event-btn" type="button"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><span>일정 추가</span></button>
+        </div>
+      </div>
+    </div>
+    </div>
 
     <div id="settings-pane-events">
-    <h2>일정</h2>
-    <div class="event-add-form">
-      <input type="text" id="new-event-title" placeholder="일정 제목">
-      <select id="new-event-repeat">
-        <option value="none">반복 없음</option>
-        <option value="weekly">매주</option>
-        <option value="biweekly">격주</option>
-        <option value="monthly">매월</option>
-      </select>
-      <span id="new-event-date-wrap"><span id="new-event-date-label">날짜</span> <input type="date" id="new-event-date"></span>
-      <span id="new-event-weekday-wrap" style="display:none">
-        <select id="new-event-weekday">
-          <option value="0">월</option>
-          <option value="1">화</option>
-          <option value="2">수</option>
-          <option value="3">목</option>
-          <option value="4">금</option>
-          <option value="5">토</option>
-          <option value="6">일</option>
-        </select>
-      </span>
-      <span id="new-event-repeat-until-wrap" style="display:none">
-        종료 <input type="date" id="new-event-repeat-until">
-      </span>
-      <input type="time" id="new-event-start" value="09:00">
-      <span>~</span>
-      <input type="time" id="new-event-end" value="10:00">
-      <span id="new-event-load-picker"></span>
-      <button class="btn" id="add-event-btn" type="button">일정 추가</button>
-    </div>
     <div id="event-list"></div>
     </div>
 
     <div id="settings-pane-prefs" hidden>
-    <h2>기본값</h2>
-    <div class="settings-form">
-      <label>하루 예산 <input type="number" id="setting-capacity" min="1"></label>
-      <label>안전선(%) <input type="number" id="setting-safe-ratio" min="1" max="100"></label>
-      <label>수면 시간(시간) <input type="number" id="setting-sleep-hours" min="0" max="24"></label>
-      <label>생활 시간(시간) <input type="number" id="setting-life-hours" min="0" max="24"></label>
+    <div class="prefs-grid">
+    <div class="prefs-col">
+      <section class="goal-card pref-card">
+        <h3>기본값</h3>
+        <div class="pref-grid">
+          <label class="pref-row"><span class="pref-label">하루 예산</span><span class="sbtn sbtn-sm sbtn-field"><input type="number" id="setting-capacity" min="1"></span></label>
+          <label class="pref-row"><span class="pref-label">안전선(%)</span><span class="sbtn sbtn-sm sbtn-field"><input type="number" id="setting-safe-ratio" min="1" max="100"></span></label>
+          <label class="pref-row"><span class="pref-label">수면(시간)</span><span class="sbtn sbtn-sm sbtn-field"><input type="number" id="setting-sleep-hours" min="0" max="24"></span></label>
+          <label class="pref-row"><span class="pref-label">생활(시간)</span><span class="sbtn sbtn-sm sbtn-field"><input type="number" id="setting-life-hours" min="0" max="24"></span></label>
+        </div>
+      </section>
+
+      <section class="goal-card pref-card">
+        <h3>데이터</h3>
+        <div class="pref-actions">
+          <button class="sbtn sbtn-sm" id="export-btn" type="button">내보내기 (JSON 파일)</button>
+          <button class="sbtn sbtn-sm" id="import-btn" type="button">가져오기 (JSON 파일)</button>
+          <input type="file" id="import-file" accept="application/json,.json" style="display:none">
+        </div>
+        <div id="data-message" class="pref-status"></div>
+      </section>
     </div>
 
-    <h2>AI 분해</h2>
-    <div class="settings-form">
-      <div class="ai-note">Anthropic API 키를 넣으면 할 일 화면에 "텍스트로 만들기"가 나타납니다. 키는 저장하지 않고 이 화면을 열어 둔 동안 메모리에만 있습니다. 새로고침하면 다시 넣어야 합니다. 키 없이도 앱은 모두 동작합니다.</div>
-      <div>
-        <input type="password" id="ai-key-input" placeholder="API 키" autocomplete="off" style="min-width:240px">
-        <button class="btn" id="ai-key-save" type="button">저장</button>
-        <button class="btn btn-plain" id="ai-key-delete" type="button">삭제</button>
-      </div>
-      <div id="ai-key-status" style="font-size:13px;color:#555"></div>
-    </div>
+    <div class="prefs-col">
+      <section class="goal-card pref-card">
+        <h3>AI 분해</h3>
+        <div class="ai-note">Anthropic API 키를 넣으면 할 일 화면에 AI 입력기가 나타납니다. 키는 저장하지 않고 이 화면을 열어 둔 동안 메모리에만 있습니다. 새로고침하면 다시 넣어야 합니다. 키 없이도 앱은 모두 동작합니다.</div>
+        <span class="line-field"><input type="password" class="line-input" id="ai-key-input" placeholder="API 키" autocomplete="off"></span>
+        <div class="pref-actions">
+          <button class="sbtn sbtn-sm sbtn-accent" id="ai-key-save" type="button">저장</button>
+          <button class="sbtn sbtn-sm sbtn-danger" id="ai-key-delete" type="button">삭제</button>
+        </div>
+        <div id="ai-key-status" class="pref-status"></div>
+      </section>
 
-    <h2>데이터</h2>
-    <div class="settings-form">
-      <div>
-        <button class="btn" id="export-btn" type="button">내보내기 (JSON 파일)</button>
-        <button class="btn" id="import-btn" type="button">가져오기 (JSON 파일)</button>
-        <input type="file" id="import-file" accept="application/json,.json" style="display:none">
-      </div>
-      <div id="data-message" style="font-size:13px;color:#555"></div>
+      <section class="goal-card pref-card">
+        <h3>테스트 데모</h3>
+        <div class="ai-note">올해 9~11월의 학부생 일정과 과제가 들어찬 예시 데이터를 봅니다. 내 데이터는 그대로 보관되고, 데모를 끄면 돌아옵니다. 데모를 보는 동안 고친 내용은 데모를 끄면 사라집니다.</div>
+        <div class="pref-actions">
+          <button class="sbtn sbtn-sm" id="demo-toggle-btn" type="button">데모 모드 켜기</button>
+        </div>
+      </section>
     </div>
-
-    <h2>테스트 데모</h2>
-    <div class="settings-form">
-      <div class="ai-note">올해 9~11월의 학부생 일정과 과제가 들어찬 예시 데이터를 봅니다. 내 데이터는 그대로 보관되고, 데모를 끄면 돌아옵니다. 데모를 보는 동안 고친 내용은 데모를 끄면 사라집니다.</div>
-      <div>
-        <button class="btn" id="demo-toggle-btn" type="button">데모 모드 켜기</button>
-      </div>
     </div>
     </div>
   </section>
