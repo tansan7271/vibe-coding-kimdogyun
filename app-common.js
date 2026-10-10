@@ -263,7 +263,7 @@
     if (target === 'settings') showSettingsTab('current'); // 열 때는 항상 현재 일정부터
     document.body.style.overflow = 'hidden';
     modals[target].classList.add('open');
-    playModal(modals[target], btn, false, () => {});
+    playModal(modals[target], btn, false, () => modals[target].classList.add('settled')); // 그림자는 자리 잡은 뒤에 나타난다
     btn.classList.add('dock-away'); // 버튼은 팝업이 됐으니 그 자리에서 빠진다
     btn.blur(); // 닫을 때 키보드 포커스 테두리가 버튼에 남지 않게
   }
@@ -273,6 +273,7 @@
     const key = Object.keys(modals).find(k => modals[k].classList.contains('open'));
     if (!key) { document.body.style.overflow = ''; return; }
     const btn = document.querySelector(`[data-screen="${key}"]`);
+    modals[key].classList.remove('settled'); // 움직임이 시작되자마자 그림자가 서서히 사라진다
     playModal(modals[key], btn, true, () => {
       modals[key].classList.remove('open');
       btn.classList.remove('dock-away'); // 제자리에 챡 맞춰 들어간 뒤 진짜 버튼이 돌아온다

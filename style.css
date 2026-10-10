@@ -123,6 +123,7 @@
   --dock-hover-lift: 14px;             /* 마우스를 올리면 위로 올라오는 거리 */
   --dock-hover-ms: 160ms;              /* 올라오고 내려가는 시간 */
   --modal-anim-ms: 560ms;              /* 버튼이 커지며 뒤집혀 팝업이 되는 시간(여는 쪽). 닫는 쪽은 아래 --modal-*-close 값 */
+  --modal-shadow-ms: 220ms;            /* 팝업 그림자가 나타나고 사라지는 시간 */
   --modal-swap-start-close: 0.02;     /* 닫을 때의 --modal-swap-start. 닫을 때 도착한 뒤 가만히 있는 시간을 줄이려고 따로 둔다 */
   --modal-swap-close: 0.05;           /* 닫을 때의 --modal-swap */
   --modal-anim-close-ms: 620ms;        /* 닫는 시간. 바운드가 느긋하게 올라올 시간만큼 열 때(560ms)보다 조금 길다 */
@@ -350,8 +351,27 @@ main {
   max-width: var(--modal-max-width);
   height: 100%; /* 내용이 적어도 화면 위아래 여백(--modal-gap)만 남기고 꽉 채운다. 탭을 바꿔도 팝업 크기가 변하지 않는다 */
   border-radius: var(--modal-radius);
-  box-shadow: 0 3px 0 #eadfce, 0 6px 0 #dccfba, 0 10px 40px rgba(0, 0, 0, 0.35); /* 아래로 겹친 종이 두 장(뒷 페이지가 있는 느낌) + 그림자. 아래쪽 '일정과 설정' 버튼과 같다 */
 }
+
+/* 팝업 그림자: 아래로 겹친 종이 두 장(뒷 페이지가 있는 느낌) + 부드러운 그림자. 아래쪽 '일정과 설정' 버튼과 같다.
+   날아다니며 뒤집히는 팝업에 붙여 두면 연출이 끝나는 순간 갑자기 나타나므로, 움직이지 않는 별도 층으로 두고
+   팝업이 자리 잡은 뒤(.settled)에 서서히 나타나게 한다. 닫을 때는 움직임이 시작되자마자 서서히 사라진다 */
+.modal-backdrop::before {
+  content: '';
+  position: absolute;
+  top: var(--modal-gap);
+  bottom: var(--modal-gap);
+  left: 50%;
+  width: min(calc(100% - var(--modal-gap) * 2), var(--modal-max-width)); /* 팝업의 최종 자리와 같다 */
+  transform: translateX(-50%);
+  border-radius: var(--modal-radius);
+  box-shadow: 0 3px 0 #eadfce, 0 6px 0 #dccfba, 0 10px 40px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--modal-shadow-ms) ease;
+}
+
+.modal-backdrop.settled::before { opacity: 1; }
 
 
 /* 스크롤은 안쪽 영역이 맡고, 바깥 패널은 스프링·접합부처럼 튀어나오는 장식을 맡는다 */
@@ -461,7 +481,7 @@ main {
   letter-spacing: 0.04em;
   white-space: nowrap;
   cursor: pointer;
-  transition: width var(--tab-ms) ease-out, background var(--tab-ms), color var(--tab-ms);
+  transition: width var(--tab-ms) ease-out, margin-left var(--tab-ms) ease-out, padding-left var(--tab-ms) ease-out, background var(--tab-ms), color var(--tab-ms); /* 폭과 여백을 같이 바꿔야 클릭할 때 오른쪽 끝이 튀지 않는다 */
 }
 
 .index-tabs button:hover { width: calc(var(--tab-w) + var(--tab-tuck) + 4px); }
