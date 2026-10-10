@@ -92,6 +92,7 @@
       for (const f of ['doneDate', 'pinnedDate', 'earliestDate', 'placedDate']) {
         if (s[f] !== undefined && !isDateStr(s[f])) return fail(`${at}의 ${f}가 YYYY-MM-DD 형식이 아닙니다: ${JSON.stringify(s[f])}`);
       }
+      // pushCount(밀린 횟수)는 더 이상 쓰지 않는다. 옛 내보내기 파일을 그대로 가져올 수 있게 값 검사만 남긴다
       if (s.pushCount !== undefined && !(Number.isInteger(s.pushCount) && s.pushCount >= 0)) return fail(`${at}의 pushCount는 0 이상 정수여야 합니다.`);
     }
 

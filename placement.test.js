@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { autoPush, placeSteps, dayStats, weekStart, pushEarliestDate, canPush, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange, weekSummary, canDropPin, isGoalDone, isEventOver } = require('./placement.js');
+const { autoPush, placeSteps, dayStats, weekStart, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange, canDropPin, isGoalDone, isEventOver } = require('./placement.js');
 
 const defaultSettings = {
   capacity: 10,
@@ -367,32 +367,9 @@ test('고정된 단계는 그 날짜에 남고 다른 단계 배치에 부하로
   assert.equal(r[1].date, '2026-10-02'); // 5+4=9 > 8
 });
 
-test('pushEarliestDate: 깔린 날의 다음 날 (월말·연말 경계 포함)', () => {
-  assert.equal(pushEarliestDate('2026-10-01'), '2026-10-02');
-  assert.equal(pushEarliestDate('2026-09-30'), '2026-10-01');
-  assert.equal(pushEarliestDate('2026-12-31'), '2027-01-01');
-});
-
-test('canPush: 마감 전 날에 깔렸으면 가능, 마감일이면 이유와 함께 불가', () => {
-  assert.deepEqual(canPush({ placedDate: '2026-10-01', deadline: '2026-10-02' }), { ok: true, reason: null });
-  const r = canPush({ placedDate: '2026-10-02', deadline: '2026-10-02' });
-  assert.equal(r.ok, false);
-  assert.ok(r.reason.includes('마감일'));
-});
-
-test('이 날 안 함: 미래 날에 깔린 단계를 밀면 그 날 다음 날부터 다시 깔린다', () => {
-  const goals = [goal('g1', '2026-10-10')];
-  // 오늘(10/1)이 가득 차서 10/2에 깔린 단계 -> 10/2 기준으로 밀면 10/3
-  const done = [{ load: 8, minutes: 60, doneDate: '2026-10-01' }];
-  const before = placeSteps({ steps: [step({})], doneSteps: done, goals, events: [], today: '2026-10-01', ...defaultSettings });
-  assert.equal(before[0].date, '2026-10-02');
-  const after = placeSteps({ steps: [step({ earliestDate: pushEarliestDate(before[0].date) })], doneSteps: done, goals, events: [], today: '2026-10-01', ...defaultSettings });
-  assert.equal(after[0].date, '2026-10-03');
-});
-
-test('autoPush: 깔린 날이 어제 이전인 미완료 단계만 오늘부터로 밀고 밀림 +1', () => {
+test('autoPush: 깔린 날이 어제 이전인 미완료 단계만 오늘부터로 민다', () => {
   const steps = [
-    step({ id: 'y', placedDate: '2026-09-30', pushCount: 1 }),
+    step({ id: 'y', placedDate: '2026-09-30' }),
     step({ id: 't', placedDate: '2026-10-01' }),
     step({ id: 'f', placedDate: '2026-10-02' }),
     step({ id: 'n' }),
@@ -401,18 +378,16 @@ test('autoPush: 깔린 날이 어제 이전인 미완료 단계만 오늘부터�
   const r = autoPush({ steps, today: '2026-10-01' });
   assert.deepEqual(r.pushedIds, ['y']);
   assert.equal(r.steps[0].earliestDate, '2026-10-01');
-  assert.equal(r.steps[0].pushCount, 2);
   assert.equal(r.steps[0].placedDate, undefined);
   assert.equal(r.steps[1], steps[1]);
   assert.equal(r.steps[3], steps[3]);
   assert.equal(r.steps[4], steps[4]);
-  assert.equal(steps[0].pushCount, 1); // 원본 그대로
+  assert.equal(steps[0].placedDate, '2026-09-30'); // 원본 그대로
 });
 
 test('autoPush: 연말 경계, 이미 있던 earliestDate가 오늘보다 이르면 오늘로, 고정은 풀린다', () => {
   const r = autoPush({ steps: [step({ placedDate: '2026-12-31', earliestDate: '2026-12-31', pinnedDate: '2026-12-31' })], today: '2027-01-01' });
   assert.equal(r.steps[0].earliestDate, '2027-01-01');
-  assert.equal(r.steps[0].pushCount, 1);
   assert.equal('pinnedDate' in r.steps[0], false);
   assert.deepEqual(autoPush({ steps: [], today: '2026-10-01' }), { steps: [], pushedIds: [] });
 });
@@ -467,49 +442,6 @@ test('일정 부하는 반복 종류와 상관없이 그날 부하에 들어간�
 });
 
 const settings = { capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 4 };
-const weekOf = (events, doneSteps) => dateRange('2026-09-21', '2026-09-27').map(date => dayStats({ date, steps: [], placements: [], events, doneSteps, ...settings }));
-const ev1 = (id, date, load, start = '09:00', end = '10:00') => ({ id, title: id, load, start, end, repeat: 'none', date });
-const done1 = (date, load, pushCount, minutes = 60) => ({ id: `d${date}${load}`, load, minutes, doneDate: date, pushCount });
-
-test('weekSummary: 기록이 없는 주는 empty (첫 사용·빈 주)', () => {
-  const r = weekSummary(weekOf([], []));
-  assert.equal(r.empty, true);
-  assert.equal(r.totalLoad, 0);
-  assert.equal(r.pushCount, 0);
-});
-
-test('weekSummary: 일정만 있는 주도 기록이 있다. 총 부하는 일정 부하 합', () => {
-  const r = weekSummary(weekOf([ev1('a', '2026-09-22', 3), ev1('b', '2026-09-24', 2)], []));
-  assert.equal(r.empty, false);
-  assert.equal(r.totalLoad, 5);
-  assert.equal(r.pushCount, 0);
-});
-
-test('weekSummary: 예산 정확히는 초과가 아니고, 안전선과 같으면 안전선도 아니다', () => {
-  const r = weekSummary(weekOf([ev1('a', '2026-09-21', 5), ev1('b', '2026-09-21', 5), ev1('c', '2026-09-22', 5), ev1('d', '2026-09-22', 3)], []));
-  // 월: 10 (예산과 같음 -> 안전선만 초과), 화: 8 (안전선과 같음 -> 초과 아님)
-  assert.equal(r.overBudgetDays, 0);
-  assert.equal(r.overSafeOnlyDays, 1);
-  assert.equal(r.totalLoad, 18);
-});
-
-test('weekSummary: 예산·안전선·시간 초과를 따로 세고 완료 단계의 밀림 횟수를 합한다', () => {
-  const events = [ev1('a', '2026-09-21', 5), ev1('b', '2026-09-21', 5), ev1('c', '2026-09-21', 1), ev1('long', '2026-09-23', 1, '08:00', '21:00')];
-  const done = [done1('2026-09-22', 5, 2), done1('2026-09-22', 4, 0), done1('2026-09-25', 1, 3), done1('2026-09-26', 1, undefined)];
-  const r = weekSummary(weekOf(events, done));
-  assert.equal(r.overBudgetDays, 1); // 월 11
-  assert.equal(r.overSafeOnlyDays, 1); // 화 9
-  assert.equal(r.overTimeDays, 1); // 수 13시간 일정 > 가용 12시간
-  assert.equal(r.pushCount, 5);
-  assert.equal(r.totalLoad, 11 + 9 + 1 + 1 + 1);
-  assert.equal(r.empty, false);
-});
-
-test('weekSummary: 완료한 단계만 있는 주도 기록이 있다', () => {
-  const r = weekSummary(weekOf([], [done1('2026-09-27', 2, 1)]));
-  assert.deepEqual(r, { empty: false, totalLoad: 2, overBudgetDays: 0, overSafeOnlyDays: 0, overTimeDays: 0, pushCount: 1 });
-});
-
 test('반복 예외: skipDates의 날만 빠지고 다음 회차는 남는다 (매주·격주·매월)', () => {
   const weekly = rep({ repeat: 'weekly', weekday: 0, date: '2026-10-05', skipDates: ['2026-10-12'] });
   assert.deepEqual(evOn(weekly, '2026-10-01', '2026-10-26'), ['2026-10-05', '2026-10-19', '2026-10-26']);

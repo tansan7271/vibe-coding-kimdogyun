@@ -245,12 +245,6 @@
     return addDays(dateStr, -weekdayOf(dateStr));
   }
 
-  // 밀림 (SPEC 5장): "이 날 안 함"이면 시작 가능일이 깔린 날의 다음 날이 된다
-  function pushEarliestDate(placedDate) {
-    return addDays(placedDate, 1);
-  }
-
-  // 마감일에 깔려 있으면 더 미룰 수 없다
   /**
    * 카펫에서 단계를 끌어 놓았을 때 고정할 수 있는가 (SPEC 10장 드래그로 옮기기).
    * 같은 날은 아무 일도 없다(reason 없음). 지난 날짜에는 고정할 수 없다. 마감 이후 날은 기존 고정 규칙처럼 막지 않는다.
@@ -259,13 +253,6 @@
   function canDropPin({ fromDate, toDate, today }) {
     if (toDate === fromDate) return { ok: false, reason: null };
     if (toDate < today) return { ok: false, reason: '지난 날짜에는 고정할 수 없습니다.' };
-    return { ok: true, reason: null };
-  }
-
-  function canPush({ placedDate, deadline }) {
-    if (placedDate >= deadline) {
-      return { ok: false, reason: '마감일에 깔려 있어 더 미룰 수 없습니다' };
-    }
     return { ok: true, reason: null };
   }
 
@@ -313,29 +300,8 @@
   }
 
   /**
-   * 지난 주 요약 (SPEC 10장). 기록에서 계산하고 새로 저장하는 값은 없다.
-   * - totalLoad: 7일 하루 부하(일정 + 완료한 단계)의 합
-   * - overBudgetDays / overSafeOnlyDays / overTimeDays: 예산 초과 / 안전선만 초과(예산 이내) / 시간 초과인 날 수
-   * - pushCount: 그 주에 완료한 단계들의 밀린 횟수 합. 밀린 날짜는 저장하지 않으므로 완료한 단계 기준의 근사다
-   * - empty: 일정도 완료한 단계도 없는 주
-   * @param {Array} weekStats 그 주 날짜별 dayStats 결과
-   */
-  function weekSummary(weekStats) {
-    let totalLoad = 0, overBudgetDays = 0, overSafeOnlyDays = 0, overTimeDays = 0, pushCount = 0, records = 0;
-    weekStats.forEach(st => {
-      totalLoad += st.load;
-      if (st.overBudget) overBudgetDays++;
-      else if (st.overSafe) overSafeOnlyDays++;
-      if (st.overTime) overTimeDays++;
-      pushCount += st.doneSteps.reduce((sum, d) => sum + (d.pushCount || 0), 0);
-      records += st.events.length + st.doneSteps.length;
-    });
-    return { empty: records === 0, totalLoad, overBudgetDays, overSafeOnlyDays, overTimeDays, pushCount };
-  }
-
-  /**
    * 앱을 열었을 때: 깔린 날이 오늘보다 이전인데 미완료인 단계는 밀린 것으로 처리한다 (SPEC 5장 밀림).
-   * 시작 가능일 = 오늘, 밀린 횟수 +1. 고정된 단계는 고정을 풀고 같이 처리한다.
+   * 시작 가능일 = 오늘. 고정된 단계는 고정을 풀고 같이 처리한다.
    * 깔린 날을 모르는 단계(placedDate 없음)와 완료된 단계는 건드리지 않는다.
    * @returns {{steps: object[], pushedIds: string[]}} 원본은 바꾸지 않는다
    */
@@ -345,7 +311,7 @@
       if (step.done || !step.placedDate || step.placedDate >= today) return step;
       pushedIds.push(step.id);
       const { pinnedDate, ...rest } = step;
-      return { ...rest, earliestDate: maxDateStr(today, step.earliestDate), pushCount: (step.pushCount || 0) + 1, placedDate: undefined };
+      return { ...rest, earliestDate: maxDateStr(today, step.earliestDate), placedDate: undefined };
     });
     return { steps: next, pushedIds };
   }
@@ -372,11 +338,8 @@
     isEventOver,
     placeSteps,
     autoPush,
-    weekSummary,
     dayStats,
     weekStart,
-    pushEarliestDate,
-    canPush,
     canDropPin,
     addDays,
     weekdayOf,

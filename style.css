@@ -977,17 +977,6 @@ button.btn-plain {
 
 .week-patch > :not(.patch-stitch) { position: relative; } /* 점선 위에 버튼이 오게 */
 
-.week-summary {
-  font-size: 13px;
-  color: #444;
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-}
-.week-summary .note { color: #888; font-size: 12px; }
-
 .week-label {
   font-size: 14px;
   color: #444;
@@ -995,145 +984,13 @@ button.btn-plain {
   text-align: center;
 }
 
-.week-scroll { overflow-x: auto; }
-
-.week-strip {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(120px, 1fr));
-  gap: 8px;
-  min-width: 888px;
-}
-
-#carpet-svg { display: block; min-width: 888px; }
-
-.day-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  font-size: 12px;
-  border: 2px solid transparent;
-}
-
-.day-card.today { border-color: #b8203a; }
-.day-card.past { background: #f0eeeb; }
-
-.day-head {
-  font-weight: bold;
-  font-size: 13px;
-  margin-bottom: 8px;
-  display: flex;
-  justify-content: space-between;
-}
-
-.today-badge {
-  font-size: 11px;
-  background: #b8203a;
-  color: #fff;
-  border-radius: 8px;
-  padding: 1px 6px;
-}
-
-.day-item {
-  padding: 3px 6px;
-  margin-bottom: 3px;
-  border-radius: 4px;
-  background: #f5f2ee;
-  overflow-wrap: anywhere;
-}
-
-.day-item.event { background: #e4e9f2; }
-/* 끌어서 옮기기 */
-.week-strip .day-item.step.clickable { cursor: grab; }
-body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-select: none; cursor: grabbing !important; }
-.drag-ghost { position: fixed; z-index: 1000; pointer-events: none; opacity: 0.85; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 220px; }
-.day-card.drop-ok { outline: 2px solid #b8203a; outline-offset: -2px; }
-.day-card.drop-bad { opacity: 0.5; }
-.day-item.step.drag-source { opacity: 0.4; }
-.drag-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 1001; }
-.skip-btn {
-  font-size: 11px;
-  padding: 1px 6px;
-  margin-left: 4px;
-  border: 1px solid #aab4c8;
-  border-radius: 4px;
-  background: #fff;
-  color: #445;
-  cursor: pointer;
-}
-.day-item.step { background: #f8e3e7; }
-.day-item.exceeded { border: 1px solid #b8203a; }
-
-.day-item .tag {
-  font-size: 10px;
-  color: #b8203a;
-  font-weight: bold;
-}
-
-.day-items { margin-bottom: 8px; min-height: 24px; }
-
-.bar-row { margin-top: 6px; }
-
-.bar-label {
-  display: flex;
-  justify-content: space-between;
-  color: #555;
-  margin-bottom: 2px;
-}
-
-.bar-label .warn { color: #b8203a; font-weight: bold; }
-
-.bar {
-  position: relative;
-  height: 10px;
-  background: #e6e2dc;
-  border-radius: 5px;
-  overflow: hidden;
-}
-
-.bar-fill { height: 100%; background: #6b8fc7; }
-.bar-fill.over-safe { background: #e0a030; }
-.bar-fill.over-budget { background: #b8203a; }
-.bar-fill.time { background: #7aa88a; }
-.bar-fill.over-time { background: #b8203a; }
-
-.bar-safe-line {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: #333;
-}
-
-.overdue-box { margin-top: 20px; }
-
-.day-item.clickable { cursor: pointer; }
-.day-item.clickable:hover { background: #f1cfd6; }
-.day-item.done { background: #dfeede; text-decoration: none; }
-.day-item.pinned .tag-pin { color: #333; }
-
-.step-menu {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 6px;
-  margin-bottom: 6px;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.step-menu button { text-align: left; }
-.step-menu input[type="date"] { width: 100%; font-size: 12px; }
-.step-menu .menu-hint { color: #777; font-size: 11px; }
-
-/* 헤더의 월 표시: "Red Carpet ∙ 12월". 새 카펫(?carpet=next)일 때만 켜진다 */
+/* 헤더의 월 표시: "Red Carpet ∙ 12월" */
 .header-month { display: flex; align-items: baseline; gap: 6px; color: var(--header-month-color); }
 .header-month .dot { width: var(--header-month-dot-size); height: var(--header-month-dot-size); border-radius: 50%; background: currentColor; align-self: center; } /* 가운데 점: 글자 대신 동그라미로 그려 숫자 높이의 가운데에 놓는다 */
-.header-month .num { display: flex; line-height: 0; } /* 월 숫자는 윤곽선 그림(app-carpet-next.js). 크기는 --header-month-num-size */
+.header-month .num { display: flex; line-height: 0; } /* 월 숫자는 윤곽선 그림(app-carpet.js). 크기는 --header-month-num-size */
 .header-month .unit { font-size: var(--header-month-unit-size); }
 
-/* 새 카펫의 층(app-carpet-next.js). 모든 층은 .cn-world 안에서 왼쪽 위가 (0,0)인 같은 좌표를 쓴다.
+/* 카펫 화면의 층(app-carpet.js). 모든 층은 .cn-world 안에서 왼쪽 위가 (0,0)인 같은 좌표를 쓴다.
    움직이는 것(박스·가리개·깔린 카펫·롤)은 transform만 바꿔서 그래픽 카드가 위치만 옮기게 한다 */
 .cn-pages { position: relative; margin: 0 -16px; overflow-x: clip; touch-action: pan-y; } /* 화면 너비 끝까지: main의 좌우 여백 16px을 되돌린다. 옆으로 밀려 나가는 페이지는 화면 가장자리에서 잘린다(가로 스크롤 없음). 세로 스크롤은 브라우저에, 가로 스와이프는 JS에. 높이와 위쪽 당김은 JS가 정한다 */
 .cn-world { position: absolute; left: 0; top: 0; width: 100%; will-change: transform; } /* 한 주 = 한 페이지. 주를 넘길 때 통째로 옆으로 밀린다 */
@@ -1143,7 +1000,7 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .cn-cover, .cn-laid { transform-origin: 0 0; will-change: transform; }
 .cn-laid { border-radius: 0; }
 .cn-carpet { pointer-events: none; }
-.cn-shadow { opacity: 0; pointer-events: none; will-change: opacity; } /* 카펫 아래 그림자(app-carpet-next.js). 모양은 JS가 정착한 카펫으로 한 번만 만들고, 나타나고 사라지는 건 opacity 전환뿐이다. 카펫이 떨어도 영향이 없다 */
+.cn-shadow { opacity: 0; pointer-events: none; will-change: opacity; } /* 카펫 아래 그림자(app-carpet.js). 모양은 JS가 정착한 카펫으로 한 번만 만들고, 나타나고 사라지는 건 opacity 전환뿐이다. 카펫이 떨어도 영향이 없다 */
 .cn-shadow.on { opacity: 1; }
 .cn-roll { will-change: transform; pointer-events: none; }
 .cn-boxes { width: 100%; height: 100%; pointer-events: none; }
@@ -1187,7 +1044,7 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .cn-seal-wrap { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform, translate, rotate; }
 .cn-seal { position: absolute; overflow: visible; }
 
-/* 박스 누르기: 눌린 박스가 제자리에서 커진 모양(app-carpet-next.js). 다른 박스·도장 위의 층에 그린다. 층은 평소 클릭을 통과시키고, 열려 있는 동안만 바깥 클릭을 받아 닫는다 */
+/* 박스 누르기: 눌린 박스가 제자리에서 커진 모양(app-carpet.js). 다른 박스·도장 위의 층에 그린다. 층은 평소 클릭을 통과시키고, 열려 있는 동안만 바깥 클릭을 받아 닫는다 */
 .cn-boxes .cn-box { pointer-events: auto; cursor: pointer; }
 .cn-focus { width: 100%; height: 100%; pointer-events: none; }
 .cn-focus.open { pointer-events: auto; }
@@ -1207,7 +1064,7 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .fx-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; padding-top: 4px; } /* 버튼은 항상 박스 아래 오른쪽 끝. 나머지는 왼쪽 위부터 쌓인다 */
 .cn-fbox .sbtn { --wbtn-pad: 8px 16px; --wbtn-font: 14px; }
 
-/* 박스 끌기(app-carpet-next.js): 끄는 동안 화면 가장자리에 나타나는 안내 구역, 마우스를 따라오는 복사본, 놓을 날짜칸 강조. 색과 크기는 아래 변수 */
+/* 박스 끌기(app-carpet.js): 끄는 동안 화면 가장자리에 나타나는 안내 구역, 마우스를 따라오는 복사본, 놓을 날짜칸 강조. 색과 크기는 아래 변수 */
 :root {
   --dz-red: 184, 32, 58;     /* 날짜칸 강조와 주 이동 구역 아이콘의 붉은색(RGB) */
   --dz-light: 255, 250, 242; /* 주 이동 구역(왼쪽·오른쪽) 그라데이션의 흰색 계열(RGB) */
@@ -1260,19 +1117,17 @@ body.dragging-box, body.dragging-box * { user-select: none; -webkit-user-select:
 @media (prefers-reduced-motion: reduce) { .dz, .dz-ic, .cn-drop, .cn-boxes .cn-box { transition: none; } .dz.active .dz-ic svg { animation: none; } }
 
 /* 예산 초과인 날의 박스 떨림(홈 화면 수정 모드). 위치는 translate, 기울기는 transform, 떨림은 rotate 속성이 맡아 곱해진다. 박스마다 빠르기·시작점은 JS가 --jig-dur, --jig-delay로 준다.
-   슬라이드·끌기·팝업이 떠 있는 동안은 JS가 #carpet-next에 cn-paused를 붙여 멈춘다 */
+   슬라이드·끌기·팝업이 떠 있는 동안은 JS가 #carpet에 cn-paused를 붙여 멈춘다 */
 @keyframes cn-jig { from { rotate: calc(var(--jig-deg) * -1); } to { rotate: var(--jig-deg); } }
 .cn-box.jig, .cn-seal-wrap.jig { animation: cn-jig var(--jig-dur) cubic-bezier(0.37, 0, 0.63, 1) var(--jig-delay) infinite alternate; }
-#carpet-next.cn-paused .jig { animation-play-state: paused; }
+#carpet.cn-paused .jig { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .cn-box.jig, .cn-seal-wrap.jig { animation: none; } }
 .cn-box.vanish, .cn-seal-wrap.vanish { opacity: 0; transition: opacity var(--vanish-ms, 280ms) ease-out; pointer-events: none; } /* 없어지는 박스: 제자리에서 투명해진다. 물리 세계에서는 이미 빠져 있다 */
 
-/* 새 카펫(작업 중). ?carpet=next 일 때만 켜진다(app-carpet-next.js). 교체가 끝나면 이 블록과 옛 카펫 규칙을 정리한다 */
-#carpet-next { display: none; }
-html.carpet-next-on #screen-carpet { display: none; }
-html.carpet-next-on main { padding-bottom: 0; } /* 새 카펫 화면은 아래 여백으로 스크롤이 생기지 않게 */
-html.carpet-next-on body { padding-bottom: 0; }
-html.carpet-next-on #carpet-next { display: block; min-height: 60vh; color: #999; font-size: 14px; }
+/* 카펫 화면: 아래 버튼에 가려지는 부분은 JS가 페이지 아래 여백으로 정한다(app-carpet.js applyContainer). 본문에 따로 아래 여백을 두지 않는다 */
+#carpet { display: block; min-height: 60vh; }
+main { padding-bottom: 0; }
+body { padding-bottom: 0; }
 
 /* 데모 모드 표시: 내 데이터가 아니라 예시 데이터를 보고 있다는 알림. 아래쪽 버튼 묶음 왼쪽 구석, 팝업(200)보다 아래 */
 .demo-badge {

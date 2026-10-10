@@ -36,16 +36,7 @@
 </nav>
 
 <main>
-  <section id="screen-carpet" class="screen active">
-    <div id="week-summary" class="week-summary" style="display:none"></div>
-    <div class="week-scroll">
-      <svg id="carpet-svg" height="170" aria-label="이번 주 카펫: 부하만큼 아래로 처집니다"></svg>
-      <div class="week-strip" id="week-strip"></div>
-    </div>
-    <div class="overdue-box" id="overdue-box"></div>
-  </section>
-
-  <section id="carpet-next" hidden aria-label="새 카펫(작업 중)"></section>
+  <section id="carpet" aria-label="이번 주 카펫"></section>
 
   <div class="modal-backdrop" id="modal-goals" role="dialog" aria-modal="true" aria-label="할 일">
   <div class="modal-panel">
@@ -190,7 +181,6 @@
 <script src="app-goals.js"></script>
 <script src="app-settings.js"></script>
 <script src="app-carpet.js"></script>
-<script src="app-carpet-next.js"></script>
 
 </body>
 </html>

@@ -1,6 +1,6 @@
 // 카펫 박스 목록이 바뀌었는지, 어느 박스를 다시 떨어뜨려야 하는지 가리는 계산. 순수 함수. DOM, localStorage, 현재 시각을 직접 읽지 않는다.
 //
-// 박스 하나는 { id, col, load, kind, title, goal, minutes, push } 모양이다(app-carpet-next.js의 boxItems).
+// 박스 하나는 { id, col, load, kind, title, goal, minutes, push } 모양이다(app-carpet.js의 boxItems).
 // 떨어뜨리는 박스: 새로 생겼거나, 다른 날(col)로 옮겨졌거나, 크기(load)가 바뀐 것. 그 밖의 글자·시간만 바뀐 박스는 제자리에서 내용만 바뀐다(edited).
 // 없어진 박스(removed)는 사라지는 연출을 받는다.
 (function (root, factory) {
