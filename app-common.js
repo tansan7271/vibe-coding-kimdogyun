@@ -221,8 +221,10 @@
     const persp = cssVar('--modal-perspective');
     const half = parseFloat(cssVar('--modal-flip-deg')) / 2; // 앞면이 이만큼 돌아 옆면이 되고, 거기서 뒷면이 이어받는다
     const delay = cssMs('--modal-content-delay');
-    // 원본 버튼과 복제본이 서로 바뀌는 구간(시간 비율 0~1). 닫을 때는 도착한 뒤 가만히 있는 시간이 길어 보이지 않게 따로 짧게 둔다
-    const swapStart = cssMs(reverse ? '--modal-swap-start-close' : '--modal-swap-start'), swap = cssMs(reverse ? '--modal-swap-close' : '--modal-swap');
+    // 원본 버튼과 복제본이 서로 바뀌는 구간(시간 비율 0~1). 닫을 때는 도착한 뒤 가만히 있는 시간이 길어 보이지 않게 따로 짧게 둔다.
+    // 헤더 아이콘의 복제본은 원래 아이콘과 같은 층 순서에 놓이므로(아래 hd-flip-layer) 원본과 똑같이 보인다: 천천히 교차시킬 필요 없이 바로 바꾼다
+    const isHd = btn.classList.contains('hd-btn');
+    const swapStart = isHd ? 0 : cssMs(reverse ? '--modal-swap-start-close' : '--modal-swap-start'), swap = isHd ? 0.001 : cssMs(reverse ? '--modal-swap-close' : '--modal-swap');
     const ms = cssMs(reverse ? '--modal-anim-close-ms' : '--modal-anim-ms');
     const timing = { duration: ms, easing: cssVar(reverse ? '--modal-ease-close' : '--modal-ease'), fill: 'both' };
     const landEase = cssVar('--modal-ease-land'), settleEase = cssVar('--modal-ease-settle');
@@ -247,13 +249,14 @@
     front.tabIndex = -1;
     front.classList.add('flip-front');
     front.style.cssText = `left:${b.left + b.width / 2 - bw / 2}px; top:${b.top + b.height / 2 - bh / 2}px; width:${bw}px; height:${bh}px;`;
-    modal.appendChild(front);
+    // 화면 아래 버튼의 복제본은 팝업 층(맨 위)에 둔다. 헤더 아이콘의 복제본은 원래 아이콘과 같은 층 순서에 둬서, 날아오거나 돌아갈 때도 다른 아이콘·날짜 컨트롤과의 앞뒤가 그대로다
+    (isHd ? document.getElementById('hd-flip-layer') : modal).appendChild(front);
     modal.classList.add('flipping');
 
     // 변환 모양: 이동 → 기울기 → 확대 → 세로축 회전. 모든 키프레임이 같은 순서라야 부드럽게 이어진다.
     // 중간(0.5) 값은 양 끝의 평균이라 앞뒤 구간이 한 줄로 이어진다
     // 헤더 아이콘(스프링이 아래)은 가로축으로, 화면 아래 버튼(스프링이 위)은 세로축으로 뒤집는다. 아이콘의 아래쪽 스프링이 팝업의 위쪽 스프링으로 이어지게 하려는 것이다
-    const axis = btn.classList.contains('hd-btn') ? 'rotateX' : 'rotateY';
+    const axis = isHd ? 'rotateX' : 'rotateY';
     const tf = (x, y, rot, sx, sy, ry) => `perspective(${persp}) translate(${x}px, ${y}px) rotate(${rot}deg) scale(${sx}, ${sy}) ${axis}(${ry}deg)`;
     const bg = getComputedStyle(modal).backgroundColor;
     const blur = cssVar('--modal-blur');

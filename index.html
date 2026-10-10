@@ -24,16 +24,17 @@
 
 <div class="week-patch">
   <svg class="patch-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="10"/></svg>
-  <button class="wbtn" id="week-prev" type="button"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5L8 12l7 7"/></svg><span>이전 주</span></button>
-  <span class="week-label" id="week-label"></span>
-  <button class="wbtn" id="week-next" type="button"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><span>다음 주</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+  <button class="wbtn" id="week-prev" type="button" aria-label="이전 주"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5L8 12l7 7"/></svg><span>이전 주</span></button>
+  <span class="week-label" id="week-label"><span class="week-no" id="week-no"></span><span class="week-range" id="week-range"></span></span>
+  <button class="wbtn" id="week-next" type="button" aria-label="다음 주"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><span>다음 주</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
   <button class="wbtn" id="week-today" type="button"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><span>이번 주</span></button>
 </div>
 
-<!-- 데스크톱: 헤더 날짜 컨트롤 왼쪽에 매달린 축소 아이콘. 마우스를 올리면 그 자리에서 현행 크기 버튼으로 펼쳐진다. 모바일 판에서는 숨고 아래 nav가 나온다 -->
+<!-- 데스크톱: 헤더 날짜 컨트롤 왼쪽에 매달린 버튼(아래 버튼을 줄여 위아래를 뒤집은 것). 모바일 판에서는 숨고 아래 nav가 나온다 -->
+<div id="hd-flip-layer" aria-hidden="true"></div>
 <div class="hd-icons" id="hd-icons">
-  <button data-screen="goals" class="hd-btn hd-note" type="button" aria-label="할 일"><span class="hd-glyph hd-plus" aria-hidden="true"></span><span class="hd-label">할 일</span></button>
-  <button data-screen="settings" class="hd-btn hd-cal" type="button" aria-label="일정과 설정"><svg class="hd-glyph hd-gear" viewBox="-12 -12 24 24" aria-hidden="true"><path fill-rule="evenodd"/></svg><span class="hd-label">일정과 설정</span></button>
+  <button data-screen="goals" class="hd-btn hd-note" type="button" aria-label="할 일"><span></span></button>
+  <button data-screen="settings" class="hd-btn hd-cal" type="button" aria-label="일정과 설정"><span><svg class="hd-gear" viewBox="-12 -12 24 24" aria-hidden="true"><path fill-rule="evenodd"/></svg></span></button>
 </div>
 
 <nav>

@@ -132,6 +132,10 @@ const STAGE_STYLE = {
   const G = STAGE_STYLE;
   stage.style.setProperty('--jig-deg', `${G.jiggleDeg}deg`); // 박스 떨림 각도를 CSS 애니메이션에 넘긴다
   const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 모바일 판: style.css의 --bp-mobile 이하. 한 주가 가로 스크롤 틀(stage) 안에 놓이고(칸 폭 고정), 옆으로 밀어 주 넘기기는 없다
+  const mobileMQ = window.matchMedia(`(max-width: ${parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bp-mobile')) || 1024}px)`);
+  const isMobile = () => mobileMQ.matches;
+  const slideWidth = () => (isMobile() ? stage.clientWidth : pagesEl.clientWidth); // 슬라이드로 밀려나는 거리: 모바일은 화면 폭(보이는 창)만큼
   const weekLabelEl = document.getElementById('week-label');
 
   let active = null;      // 지금 보이는 페이지
@@ -193,7 +197,11 @@ const STAGE_STYLE = {
     monthEl.setAttribute('aria-label', `${monthNum}월`);
     monthEl.querySelector('.num').innerHTML = monthNumberSvg(monthNum, monthSize);
     monthEl.hidden = false;
-    if (weekLabelEl) weekLabelEl.textContent = `${page.dates[0]} ~ ${page.dates[6]}`;
+    if (weekLabelEl) { // 두 줄: 위는 몇 주차(해·달 기준), 아래는 날짜 범위
+      const w = Placement.weekNumbers(page.dates[0]);
+      weekLabelEl.querySelector('.week-no').textContent = `${w.year}년 ${w.yearWeek}주차 · ${w.month}월 ${w.monthWeek}주차`;
+      weekLabelEl.querySelector('.week-range').textContent = `${page.dates[0]} ~ ${page.dates[6]}`;
+    }
   }
 
   // 아래쪽 '할 일' 메모지의 왼쪽 위 꼭짓점의 화면 높이. 메모지는 가운데를 기준으로 기울어 있어서 기울기(변환 행렬)를 반영해 계산한다
@@ -300,12 +308,13 @@ const STAGE_STYLE = {
     const radius0 = CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0, startMargin }).radius;
     const groundY = S.topMargin + 2 * radius0;     // 페이지 안에서 땅 높이: 롤 지름 + 위 여백
     const headerBottom = parseFloat(getComputedStyle(document.body).paddingTop) || 0; // 헤더 아랫단 높이(화면 위에서)
-    pagesEl.style.marginTop = '0px';
+    const liftHost = isMobile() ? stage : pagesEl; // 모바일에서는 pagesEl을 끌어올리면 스크롤 틀에 잘리므로 틀 자체를 올린다
+    pagesEl.style.marginTop = '0px'; stage.style.marginTop = '';
     const stageTop = pagesEl.getBoundingClientRect().top + window.scrollY;
     // 위 여백 줄이기: 그림은 그대로 두고 통째로 위로 끌어올려, 처음 롤 윗부분이 지름의 rollTuckRatio만큼 헤더 뒤로 들어가게 한다
     const diameter = groundY - S.topMargin;
     const lift = Math.max(0, stageTop + S.topMargin - headerBottom + G.rollTuckRatio * diameter);
-    pagesEl.style.marginTop = `${-lift}px`;
+    liftHost.style.marginTop = `${-lift}px`;
     const svgTop = stageTop - lift;
     const lineY = svgTop + groundY;                // 카펫 선의 화면 높이
     const topSpace = lineY - headerBottom;         // 위쪽 여백: 헤더 아랫단 ~ 카펫 선
@@ -1268,6 +1277,7 @@ const STAGE_STYLE = {
   let busy = false;     // 슬라이드 중
   let navTarget = 0;    // 가려는 주(연타하면 마지막 것만 이어서 간다)
   let queued = null;
+  let pendingScroll = null; // 모바일 판: 슬라이드가 끝나는 순간 옮길 가로 스크롤 위치
 
   // el을 가로로 fromX에서 toX로 옮긴다(WAAPI). 끝나면 최종 위치를 style로 박고 애니메이션을 걷는다
   function animateX(el, fromX, toX, ms) {
@@ -1282,6 +1292,9 @@ const STAGE_STYLE = {
     active = next;
     applyContainer(next.m);
     next.el.style.transform = '';
+    next.el.style.clipPath = '';
+    stage.style.overflowX = '';
+    if (pendingScroll !== null) { stage.scrollLeft = pendingScroll; pendingScroll = null; } // 비껴 놓은 것을 지운 것과 같은 순간에 옮겨 튀지 않는다
     busy = false;
     navTarget = next.offset;
     const stale = refreshQueued; // 슬라이드 중에 데이터가 바뀌었으면 미리 만든 것도 다시 놓는다
@@ -1301,18 +1314,35 @@ const STAGE_STYLE = {
     const dir = target > active.offset ? 1 : -1;       // 다음 주(+1)면 새 페이지가 오른쪽에서 들어온다
     const old = active;
     const next = buildPage(target);
-    const width = pagesEl.clientWidth;
+    const width = slideWidth();
+    // 모바일 판: 새 주는 지난 주면 오른쪽 끝(일요일)에서, 다음 주면 왼쪽 끝(월요일)에서, 이번 주면 오늘 칸에서 시작한다.
+    // 슬라이드 동안 스크롤 위치는 그대로 두고 새 페이지를 그만큼 비껴 놓았다가(shift), 도착하는 순간 비킨 것을 지우며 스크롤을 옮겨 튀지 않게 한다
+    let landing = null, shift = 0;
+    if (isMobile()) {
+      stage.style.overflowX = 'hidden'; // 밀려 들어오는 페이지 때문에 스크롤 폭이 늘지 않게
+      const maxLeft = Math.max(0, pagesEl.clientWidth - stage.clientWidth);
+      const todayIdx = target === 0 ? next.dates.indexOf(work.today) : -1;
+      landing = target === 0 && todayIdx >= 0 ? Math.min(maxLeft, todayIdx * (pagesEl.clientWidth / 7)) : dir > 0 ? 0 : maxLeft;
+      shift = stage.scrollLeft - landing;
+      pendingScroll = landing;
+      // 두 페이지는 화면보다 훨씬 넓다. 슬라이드 동안 각자 '지금 보이는 창'(옛 페이지는 지금 스크롤 위치, 새 페이지는 도착할 스크롤 위치)만 보이게 잘라서,
+      // 옆으로 밀릴 때 화면 밖에 있던 부분(이번 주 전반부 등)이 들어와 새 주와 겹쳐 보이지 않게 한다
+      const pw = pagesEl.clientWidth, vw = stage.clientWidth;
+      const windowClip = left => `inset(-400px ${Math.max(0, pw - left - vw)}px -400px ${left}px)`;
+      old.el.style.clipPath = windowClip(stage.scrollLeft);
+      next.el.style.clipPath = windowClip(landing);
+    }
     pagesEl.style.height = `${Math.max(old.m.height, next.m.height)}px`; // 슬라이드 동안은 둘 중 높은 쪽에 맞춘다
-    next.el.style.transform = `translate3d(${dir * width}px,0,0)`;
+    next.el.style.transform = `translate3d(${dir * width + shift}px,0,0)`;
     setHeader(next);
-    await Promise.all([animateX(old.el, 0, -dir * width, G.slideMs), animateX(next.el, dir * width, 0, G.slideMs)]);
+    await Promise.all([animateX(old.el, 0, -dir * width, G.slideMs), animateX(next.el, dir * width + shift, shift, G.slideMs)]);
     arrive(old, next);
   }
 
   // 터치 스와이프: 손가락을 따라 페이지가 움직이고, 놓을 때 충분히 밀었거나 빠르면 넘어가고 아니면 제자리로 돌아간다
   let drag = null;
   pagesEl.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'touch' || busy || !introDone || focus || boxDrag) return;
+    if (e.pointerType !== 'touch' || busy || !introDone || focus || boxDrag || isMobile()) return; // 모바일 판은 옆으로 밀면 날짜 스크롤이다
     drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, mode: 'wait', dir: 0, other: null, dx: 0, lastX: e.clientX, lastT: e.timeStamp, v: 0 };
   });
   pagesEl.addEventListener('pointermove', e => {
@@ -1367,7 +1397,18 @@ const STAGE_STYLE = {
   // 헤더 패치의 이전 주·다음 주·이번 주 버튼. 옛 카펫의 같은 버튼 처리(app-carpet.js)가 먼저 돌지만 옛 화면은 숨겨져 있어 상관없다
   document.getElementById('week-prev').addEventListener('click', () => goTo(navTarget - 1));
   document.getElementById('week-next').addEventListener('click', () => goTo(navTarget + 1));
-  document.getElementById('week-today').addEventListener('click', () => goTo(0));
+  document.getElementById('week-today').addEventListener('click', async () => {
+    await goTo(0);
+    if (isMobile()) scrollToToday(true);
+  });
+
+  // 모바일 판: 이번 주에 있으면 오늘 칸이 화면 왼쪽에 오게 가로 스크롤한다
+  function scrollToToday(smooth) {
+    if (!isMobile() || !active || active.offset !== 0) return;
+    const idx = active.dates.indexOf(work.today);
+    if (idx < 0) return;
+    stage.scrollTo({ left: idx * (active.el.clientWidth / 7), behavior: smooth && !reduceMotion() ? 'smooth' : 'instant' });
+  }
 
   // ---- 시작: 첫 입장 롤 펼침 ----
   const first = createPage(0, true);
@@ -1381,6 +1422,7 @@ const STAGE_STYLE = {
     stage.classList.add('intro-done');
     introDone = true;
     applyQueuedRefresh(first);
+    scrollToToday(false); // 모바일 판은 오늘 칸에서 시작한다
     startBoxes(first, reduceMotion() ? 'instant' : 'drop'); // 첫 입장 때의 떨어지는 연출
     let resizeTimer = 0;
     window.addEventListener('resize', () => { // 폭·높이가 바뀌면 보이는 주의 선과 박스를 새 크기로 다시 놓는다(연출 없이). 창을 끄는 동안은 기다렸다가 멈추면 한 번만
