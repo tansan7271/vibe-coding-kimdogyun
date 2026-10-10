@@ -61,6 +61,7 @@ app-carpet.js    카펫 화면, 단계 드래그 고정, CARPET_STYLE. 처음 �
 app-carpet-next.js 새 카펫 화면(작업 중). ?carpet=next 로 열 때만 켜진다. 이관 체크리스트가 맨 위에 있고, 다 채우면 옛 app-carpet.js를 지우고 이름을 되돌린다
 placement.js     배치 규칙 (순수 함수, 테스트 있음)
 carpet.js        카펫 모양 계산 (순수 함수, 테스트 있음)
+carpet-roll.js   첫 입장 롤 펼침 계산: 나선 롤의 굴림·크기, 진행도 (순수 함수, 테스트 있음)
 data.js          내보내기/가져오기 검사 (순수 함수, 테스트 있음)
 ai.js            AI 분해 요청·응답 검사 (순수 함수, 테스트 있음)
 *.test.js        node --test로 도는 테스트

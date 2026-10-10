@@ -960,3 +960,5 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 #carpet-next { display: none; }
 html.carpet-next-on #screen-carpet { display: none; }
 html.carpet-next-on #carpet-next { display: block; min-height: 60vh; color: #999; font-size: 14px; }
+.carpet-intro { display: block; width: calc(100% + 32px); margin: 0 -16px; overflow: visible; } /* 롤과 카펫은 화면 너비 끝까지. main의 좌우 여백 16px을 되돌린다 */
+.carpet-next-note { margin: 0; }
