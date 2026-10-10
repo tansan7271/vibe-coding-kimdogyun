@@ -131,13 +131,11 @@
   }
 
   const ALL_LOADS = [1, 2, 3, 4, 5];
-  const EXTRA_LOADS = [2, 4];
 
   function loadPickerHtml(key, selected) {
     const buttons = ALL_LOADS
       .map(l => {
-        const extraClass = EXTRA_LOADS.includes(l) ? ' load-extra' : '';
-        return `<button type="button" class="load-btn${extraClass}${l === selected ? ' selected' : ''}" data-action="select-load" data-load-key="${key}" data-load="${l}">${l}</button>`;
+        return `<button type="button" class="load-btn${l === selected ? ' selected' : ''}" data-action="select-load" data-load-key="${key}" data-load="${l}">${l}</button>`;
       })
       .join('');
     return `<div class="load-picker" data-load-key="${key}">${buttons}</div>`;
