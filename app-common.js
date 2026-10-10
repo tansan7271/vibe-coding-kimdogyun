@@ -166,19 +166,10 @@
     return all.find(b => b.getClientRects().length > 0) || all[0];
   }
 
-  // 헤더 아이콘은 날짜 컨트롤(.week-patch) 왼쪽 끝에 붙는다. 컨트롤 폭은 날짜 글자에 따라 변하므로 위치를 재서 --hd-right로 준다
-  (function placeHeaderIcons() {
-    const patch = document.querySelector('.week-patch');
-    const root = document.documentElement;
+  // 헤더 아이콘의 톱니 모양은 한 곳(box-icons.js)에서 만든다. 위치는 CSS(날짜 컨트롤 틀의 오른쪽 끝, 화면 오른쪽 기준)가 정한다
+  (function drawGear() {
     const gear = document.querySelector('.hd-gear path');
-    if (gear) gear.setAttribute('d', BoxIcons.gearPath()); // 톱니 모양은 한 곳(box-icons.js)에서 만든다
-    const set = () => {
-      const tuck = parseFloat(getComputedStyle(root).getPropertyValue('--hd-tuck')) || 0;
-      root.style.setProperty('--hd-right', `${Math.max(0, window.innerWidth - patch.getBoundingClientRect().left - tuck).toFixed(1)}px`);
-    };
-    if (window.ResizeObserver) new ResizeObserver(set).observe(patch);
-    window.addEventListener('resize', set);
-    set();
+    if (gear) gear.setAttribute('d', BoxIcons.gearPath());
   })();
 
   // 팝업은 헤더 위에 뜬다. 닫는 길: 바깥 배경, 왼쪽 위 x, Esc
