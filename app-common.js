@@ -269,11 +269,13 @@
     });
   }
 
-  // 견출지로 팝업 안의 페이지를 바꿀 때: 오른쪽 아래 모서리에서 들춰 왼쪽 위로 넘기는 페이지 넘김.
-  //  - 'next'(지금보다 아래쪽 탭): 지금 페이지가 모서리부터 접혀 올라가며 넘어가고 그 밑에서 새 페이지가 드러난다
-  //  - 'prev'(지금보다 위쪽 탭): 같은 동작을 거꾸로. 새 페이지가 위쪽 왼쪽에서부터 펴지며 지금 페이지를 덮는다
-  // 접히는 선(꺾임선)이 대각선으로 지나가므로 요소 하나에 애니메이션을 걸 수 없어, 매 프레임 꺾임선 위치로 도형(clip-path)을 계산해 그린다.
-  // 3D 변환은 쓰지 않는다(날아다니는 팝업의 그림자가 연출 중 사라지던 문제를 피하려고). 모양 값은 --turn-* (style.css)
+  // 견출지로 팝업 안의 페이지를 바꿀 때: 위쪽이 스프링으로 묶인 메모장의 페이지를 넘기는 효과.
+  //  1) 오른쪽 아래 모서리가 대각선으로 접히며 들리고
+  //  2) 중간쯤부터 접힌 모서리가 펴지면서 페이지 전체가 위쪽 가장자리를 축으로 위로 젖혀진다 (90도를 넘으면 종이 뒷면이 보인다)
+  //  3) 다 젖혀지면 팝업 뒤로 층이 바뀌고, 뒤에서 아래로 내려가며 팝업에 가려진다
+  // 'next'(지금보다 아래쪽 탭): 지금 페이지가 이 순서대로 넘어간다. 'prev'(위쪽 탭): 새 페이지가 이 순서를 거꾸로 해서 덮는다.
+  // 접히는 선은 대각선이라 매 프레임 도형(clip-path)을 계산하고, 젖히는 건 3D 회전(rotateX)이다. 모양 값은 --turn-* (style.css).
+  // 그림자는 filter·box-shadow 없이 그라디언트로만 그린다(날아다니는 팝업의 그림자가 연출 중 사라지던 문제를 피하려고)
   function clipPolygon(poly, keep) { // 볼록 다각형을 반평면 keep(p) >= 0 으로 자른다
     const out = [];
     for (let i = 0; i < poly.length; i++) {
@@ -284,9 +286,11 @@
     return out;
   }
   const polyCss = poly => (poly.length < 3 ? 'polygon(0 0, 0 0, 0 0)' : `polygon(${poly.map(p => `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px`).join(',')})`);
+  const smooth = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+  const easeOut = x => { x = Math.min(1, Math.max(0, x)); return 1 - (1 - x) ** 3; };
 
   function pageTurn(modal, change, dir) {
-    modal.querySelectorAll('.page-curl').forEach(el => el.remove()); // 진행 중이던 것은 즉시 끝낸다
+    modal.querySelectorAll('.page-curl, .page-book').forEach(el => el.remove()); // 진행 중이던 것은 즉시 끝낸다
     if (reduceMotion.matches || modalBusy || !modal.classList.contains('open')) { change(); return; }
     const panel = modal.querySelector('.modal-panel');
     const scroll = modal.querySelector('.modal-scroll');
@@ -299,74 +303,93 @@
       c.scrollTop = scroll.scrollTop;
       return c;
     };
+    const div = cls => { const d = document.createElement('div'); d.className = cls; return d; };
 
-    const curl = document.createElement('div');
-    curl.className = 'page-curl';
     const oldPage = cloneOf(); // 바꾸기 전 모습
     change();                  // 진짜 내용을 새 페이지로
-    const mover = dir === 'prev' ? cloneOf() : oldPage; // 넘어가는(접히는) 쪽: next면 옛 페이지, prev면 새 페이지
-    const shade = document.createElement('div'); shade.className = 'pc-shade'; // 드러난 쪽에 드리우는 그림자
-    const flapWrap = document.createElement('div'); flapWrap.className = 'pc-flap-wrap'; // 바깥으로 그림자를 드리우는 층(clip-path와 drop-shadow는 한 요소에 같이 못 쓴다)
-    const flap = document.createElement('div'); flap.className = 'pc-flap';              // 접혀 넘어온 뒷면
-    const ghost = mover.cloneNode(true); // 뒷면에 거울상으로 비치는 앞면 내용
-    ghost.classList.add('pc-ghost'); ghost.classList.remove('pc-page');
-    ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-    flap.appendChild(ghost); flapWrap.appendChild(flap);
-    if (dir === 'prev') curl.append(oldPage, shade, mover, flapWrap); // 아래에 옛 페이지가 깔려 있고 그 위를 새 페이지가 덮는다
-    else curl.append(shade, mover, flapWrap);                         // 아래는 진짜 새 페이지
-    panel.appendChild(curl); // 진짜 요소보다 뒤에 둬야 getElementById가 진짜를 먼저 찾는다
+    const mover = dir === 'prev' ? cloneOf() : oldPage; // 넘어가는 쪽: next면 옛 페이지, prev면 새 페이지
+
+    // curl: 팝업 내용 위에 깔리는 층(아래 페이지·그림자). book: 위로 젖혀지는 페이지. 젖힌 뒤 book만 팝업 뒤로 보낸다
+    const curl = div('page-curl');
+    const shade = div('pc-shade'); // 모서리가 들린 자리에 드러난 쪽에 드리우는 그림자(대각선)
+    const cast = div('pc-cast');   // 페이지가 젖혀 올라가며 아래쪽에 드리우는 그림자(수평)
+    if (dir === 'prev') curl.append(oldPage); // 덮이기 전의 옛 페이지가 아래에 깔려 있다
+    curl.append(shade, cast);
+    const book = div('page-book');
+    const lit = div('pc-lit');     // 기울어질수록 어두워지는 앞면
+    const flap = div('pc-flap');   // 접혀 넘어온 모서리의 뒷면
+    const back = div('pc-back');   // 젖혀졌을 때 보이는 종이 뒷면
+    book.append(mover, lit, flap, back);
+    panel.append(curl, book); // 진짜 요소보다 뒤에 둬야 getElementById가 진짜를 먼저 찾는다
     mover.scrollTop = scroll.scrollTop;
     oldPage.scrollTop = scroll.scrollTop;
 
-    // 꺾임선: 오른쪽 아래 모서리(BR)에서 왼쪽 위(TL)로 대각선 방향 d를 따라 s만큼 지난 곳, d에 수직
+    // 모서리 접힘: 오른쪽 아래 모서리(BR)에서 왼쪽 위(TL)로 대각선 방향 d를 따라 s만큼 지난 곳이 꺾임선(d에 수직)
     const L = Math.hypot(W, H), dx = -W / L, dy = -H / L;
     const rect = [[0, 0], [W, 0], [W, H], [0, H]];
     const t = p => (p[0] - W) * dx + (p[1] - H) * dy; // BR에서 d 방향으로 잰 거리
-    const rgb = cssVar('--turn-shadow-rgb'), liftScale = cssMs('--turn-flap-scale');
+    const rgb = cssVar('--turn-shadow-rgb'), persp = cssVar('--turn-perspective');
     const shadeW = cssMs('--turn-shadow-w'), shadeA = cssMs('--turn-shadow-a'), flapW = cssMs('--turn-flap-shade-w'), flapA = cssMs('--turn-flap-shade-a');
+    const castW = cssMs('--turn-cast-w'), castA = cssMs('--turn-cast-a'), litA = cssMs('--turn-lit-a');
+    const cornerMax = cssMs('--turn-corner') * L, endA = cssMs('--turn-a'), endB = cssMs('--turn-b');
     const gradAngle = Math.atan2(W, -H) * 180 / Math.PI; // BR 쪽을 향하는 그라디언트(시작점이 TL이라 위치 q = L − t)
-    // 그림자는 선형이 아니라 부드럽게 줄어든다(바깥으로 갈수록 천천히). stops: [꺾임선에서의 거리 비율, 진하기 비율]
-    const FALL = [[0, 1], [0.12, 0.72], [0.3, 0.4], [0.55, 0.16], [0.8, 0.05], [1, 0]];
-    const drgb = a => `rgba(${rgb}, ${(a).toFixed(3)})`;
+    const FALL = [[0, 1], [0.12, 0.72], [0.3, 0.4], [0.55, 0.16], [0.8, 0.05], [1, 0]]; // 그림자는 바깥으로 갈수록 천천히 사라진다: [거리 비율, 진하기 비율]
+    const col = a => `rgba(${rgb}, ${a.toFixed(3)})`;
 
-    function draw(s) { // s: 0이면 전부 붙어 있고 L이면 전부 넘어갔다 (넘어가는 쪽 기준)
-      const kept = clipPolygon(rect, p => t(p) - s);          // 아직 붙어 있는 쪽
-      const removed = clipPolygon(rect, p => s - t(p));       // 넘어간 쪽
-      const folded = removed.map(p => { const k = 2 * (s - t(p)); return [p[0] + k * dx, p[1] + k * dy]; }).reverse(); // 꺾임선 너머로 접혀 온 모양(반사하면 순서가 뒤집힌다)
-      mover.style.clipPath = polyCss(kept);
-      flap.style.clipPath = polyCss(folded); // 팝업 틀 밖으로 나가도 자르지 않는다
-      // 접힌 부분이 눈앞으로 들려 올라온 듯 꺾임선 중심으로 살짝 키운다. 그래서 팝업 틀 밖으로 넘쳐 나오고 그림자도 틀 밖에 드리운다
-      const k = t([W / 2, H / 2]) - s, cx = W / 2 - k * dx, cy = H / 2 - k * dy; // 꺾임선 위에서 팝업 중심과 가장 가까운 점
-      flapWrap.style.transformOrigin = `${cx}px ${cy}px`;
-      flapWrap.style.transform = `scale(${liftScale})`;
-      shade.style.clipPath = polyCss(removed);
-      const q = L - s; // 꺾임선의 그라디언트 위치
-
-      // 드러난 쪽 그림자: 꺾임선에서 멀어질수록 은은하게 사라진다
-      shade.style.background = `linear-gradient(${gradAngle}deg, transparent ${q}px, ${FALL.map(([d, a]) => `${drgb(shadeA * a)} ${q + shadeW * d}px`).join(',')})`;
-
-      // 접혀 넘어온 뒷면: 꺾임선 가장자리는 어둡고, 바로 안쪽에 둥글게 말린 듯한 밝은 줄, 안쪽으로 갈수록 은은하게 사라진다
-      const stops = [[flapW, 0], [flapW * 0.6, 0.05], [flapW * 0.3, 0.12], [14, 0.04], [9, -0.22], [3, 0.2], [0, 0.42]]; // [꺾임선에서의 거리px, 진하기(음수는 밝은 줄)]
-      flap.style.setProperty('--flap-shade', `linear-gradient(${gradAngle}deg, ${stops.map(([d, a]) => `${a < 0 ? `rgba(255,255,255,${(-a).toFixed(3)})` : drgb(flapA * a / 0.42)} ${q - d}px`).join(',')}, transparent ${q + 0.5}px)`);
-
-      // 뒷면에 비치는 앞면: 꺾임선을 기준으로 거울상(R = I − 2ddᵀ). 은은하게만 보인다
-      const bd = dx * W + dy * H;
-      ghost.style.transform = `matrix(${1 - 2 * dx * dx}, ${-2 * dx * dy}, ${-2 * dx * dy}, ${1 - 2 * dy * dy}, ${2 * dx * (bd + s)}, ${2 * dy * (bd + s)})`;
+    // 진행도 u(0~1)에서 모서리 접힘 s와 젖힌 각도 phi. 구간마다 부드럽게 이어 붙인다
+    function stateAt(u) {
+      if (u < endA) return { s: cornerMax * smooth(u / endA), phi: 0 }; // 1) 모서리가 접히며 들린다
+      if (u < endB) { // 2) 접힌 모서리가 펴지며 페이지 전체가 위로 젖혀진다
+        const x = (u - endA) / (endB - endA);
+        return { s: cornerMax * (1 - easeOut(x * 1.7)), phi: 180 * smooth(x) };
+      }
+      return { s: 0, phi: 180 + 180 * smooth((u - endB) / (1 - endB)) }; // 3) 뒤에서 아래로 내려간다
     }
 
-    const timing = { duration: cssMs('--turn-ms'), easing: cssVar('--turn-ease'), fill: 'both' };
-    const clock = curl.animate([{ opacity: 1 }, { opacity: 1 }], timing); // 곡선이 적용된 진행도를 얻는 시계
+    function draw(u) {
+      const { s, phi } = stateAt(u);
+      const rad = phi * Math.PI / 180, face = Math.sin(Math.min(rad, Math.PI)); // 0(정면)→1(옆면)→0(젖혀짐)
+
+      // 모서리 접힘 도형
+      const kept = clipPolygon(rect, p => t(p) - s);
+      const removed = clipPolygon(rect, p => s - t(p));
+      const folded = removed.map(p => { const k = 2 * (s - t(p)); return [p[0] + k * dx, p[1] + k * dy]; }).reverse(); // 반사하면 순서가 뒤집힌다
+      mover.style.clipPath = polyCss(kept);
+      lit.style.clipPath = polyCss(kept);
+      flap.style.clipPath = polyCss(folded);
+      shade.style.clipPath = polyCss(removed);
+      const q = L - s; // 꺾임선의 그라디언트 위치
+      const cornerOn = Math.min(1, s / (cornerMax * 0.25 + 0.001)); // 접힘이 막 시작될 때는 그림자도 서서히
+      shade.style.background = `linear-gradient(${gradAngle}deg, transparent ${q}px, ${FALL.map(([d, a]) => `${col(shadeA * a * cornerOn)} ${q + shadeW * d}px`).join(',')})`;
+      // 접혀 넘어온 뒷면: 꺾임선 가장자리는 짙고, 바로 안쪽에 둥글게 말린 듯한 밝은 줄, 안쪽으로 갈수록 은은하게 사라진다
+      const stops = [[flapW, 0], [flapW * 0.6, 0.05], [flapW * 0.3, 0.12], [14, 0.04], [9, -0.22], [3, 0.2], [0, 0.42]]; // [꺾임선에서의 거리px, 진하기(음수는 밝은 줄)]
+      flap.style.setProperty('--flap-shade', `linear-gradient(${gradAngle}deg, ${stops.map(([d, a]) => `${a < 0 ? `rgba(255,255,255,${(-a).toFixed(3)})` : col(flapA * a / 0.42)} ${q - d}px`).join(',')}, transparent ${q + 0.5}px)`);
+
+      // 위로 젖히기: 위쪽 가장자리를 축으로 한 3D 회전. 젖혀진 뒤에는 팝업 뒤로 층을 바꿔 뒤에서 내려가게 한다
+      book.style.transform = `perspective(${persp}) rotateX(${phi}deg)`;
+      book.style.zIndex = phi > 180 ? -1 : 3;
+      lit.style.backgroundColor = col(litA * face); // 기울어질수록 앞면이 어두워진다
+      // 젖혀 올라가는 페이지가 드러난 페이지 위쪽에 드리우는 그림자: 페이지 아래 가장자리(투영) 바로 아래
+      const edgeY = Math.max(0, H * Math.cos(rad));
+      const a = castA * face * (phi < 90 ? 1 : Math.max(0, 1 - (phi - 90) / 60));
+      cast.style.background = `linear-gradient(to bottom, transparent ${edgeY}px, ${FALL.map(([d, f]) => `${col(a * f)} ${edgeY + castW * d}px`).join(',')})`;
+    }
+
+    // 진행도 u는 시간에 선형으로 간다(구간마다 곡선은 stateAt이 준다)
+    const clock = curl.animate([{ opacity: 1 }, { opacity: 1 }], { duration: cssMs('--turn-ms'), easing: 'linear', fill: 'both' });
+    const u0 = dir === 'prev' ? 1 : 0; // prev는 같은 동작을 거꾸로
     let alive = true;
+    const cleanup = () => { alive = false; curl.remove(); book.remove(); };
     const frame = () => {
       if (!alive || !curl.isConnected) return;
       const p = clock.effect.getComputedTiming().progress ?? 1;
-      draw((dir === 'prev' ? 1 - p : p) * L);
-      if (clock.playState === 'finished') { curl.remove(); return; }
+      draw(dir === 'prev' ? 1 - p : p);
+      if (clock.playState === 'finished') { cleanup(); return; }
       requestAnimationFrame(frame);
     };
-    draw(dir === 'prev' ? L : 0);
+    draw(u0);
     requestAnimationFrame(frame);
-    clock.finished.then(() => { alive = false; curl.remove(); }).catch(() => { alive = false; });
+    clock.finished.then(cleanup).catch(() => { alive = false; });
   }
 
   function openModal(target, btn) {

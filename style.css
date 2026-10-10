@@ -127,16 +127,18 @@
   --dock-hover-lift: 14px;             /* 마우스를 올리면 위로 올라오는 거리 */
   --dock-hover-ms: 160ms;              /* 올라오고 내려가는 시간 */
   --modal-anim-ms: 560ms;              /* 버튼이 커지며 뒤집혀 팝업이 되는 시간(여는 쪽). 닫는 쪽은 아래 --modal-*-close 값 */
-  --turn-ms: 520ms;                    /* 견출지로 페이지를 바꿀 때 페이지가 말려 올라가는 시간 */
-  --turn-ease: cubic-bezier(0.55, 0.05, 0.4, 1); /* 말려 올라가는 빠르기 곡선: 천천히 말리기 시작해 속도가 붙고 끝에서 줄어든다 */
-  --turn-shadow-rgb: 110, 40, 40;      /* 페이지 넘김 그림자 색. 검정이 아니라 테마의 붉은 갈색이라 종이 위에서 덜 뜬다 */
-  --turn-shadow-w: 150px;              /* 드러난 페이지에 드리우는 그림자의 폭. 바깥으로 갈수록 부드럽게 사라진다 */
-  --turn-shadow-a: 0.2;                /* 그 그림자의 가장 진한 곳 진하기 */
+  --turn-ms: 1000ms;                   /* 페이지 넘김 전체 시간(모서리 들기 → 위로 젖히기 → 뒤로 내려가기) */
+  --turn-a: 0.28;                      /* 모서리 들기가 끝나는 시점(전체 시간의 비율). 이때부터 위로 젖혀지기 시작한다 */
+  --turn-b: 0.66;                      /* 다 젖혀지는 시점. 이때부터 팝업 뒤로 내려간다 */
+  --turn-corner: 0.28;                 /* 모서리가 접히는 크기(대각선 길이에 대한 비율) */
+  --turn-perspective: 1800px;          /* 젖혀질 때의 원근감. 작을수록 과장된다 */
+  --turn-shadow-w: 150px;              /* 모서리가 들린 자리에서 드러난 페이지에 드리우는 그림자의 폭 */
+  --turn-shadow-a: 0.2;                /* 그 그림자의 가장 진한 곳 진하기. 그림자 색은 팝업마다 --turn-shadow-rgb */
   --turn-flap-shade-w: 90px;           /* 접혀 넘어온 뒷면에서 꺾임선 쪽이 어두워지는 폭 */
   --turn-flap-shade-a: 0.2;            /* 그 어두운 정도(꺾임선 가장자리) */
-  --turn-flap-ghost-a: 0.13;           /* 접힌 뒷면에 거울상으로 비치는 앞면 글자의 진하기 */
-  --turn-flap-scale: 1.06;             /* 접힌 뒷면이 눈앞으로 들려 올라온 듯 커지는 배율(꺾임선 중심). 키우면 팝업 틀 밖으로 더 넘쳐 나온다. 1이면 틀 안에 머문다 */
-  --turn-flap-lift: 7px 9px 14px;      /* 접힌 뒷면이 팝업 위·밖으로 드리우는 그림자(오프셋X 오프셋Y 번짐). 색은 --turn-shadow-rgb */
+  --turn-cast-w: 200px;                /* 젖혀 올라가는 페이지가 아래쪽에 드리우는 그림자의 폭 */
+  --turn-cast-a: 0.24;                 /* 그 그림자의 진하기 */
+  --turn-lit-a: 0.16;                  /* 젖혀지며 기울어질수록 앞면이 어두워지는 정도 */
   --modal-shadow-ms: 220ms;            /* 팝업 그림자가 나타나고 사라지는 시간 */
   --modal-swap-start-close: 0.02;     /* 닫을 때의 --modal-swap-start. 닫을 때 도착한 뒤 가만히 있는 시간을 줄이려고 따로 둔다 */
   --modal-swap-close: 0.16;           /* 닫을 때의 --modal-swap. 길게 둔 이유: '일정과 설정' 버튼은 원래 '할 일' 버튼 뒤에 있는데 날아오는 동안은 앞에 있어서, 도착한 뒤 클론이 천천히 사라져야 겹친 부분의 앞뒤가 툭 바뀌어 보이지 않는다 */
@@ -1004,20 +1006,29 @@ html.carpet-next-on #carpet-next { display: block; min-height: 60vh; color: #999
   pointer-events: none;
 }
 
-/* 페이지 넘김: 견출지로 페이지를 바꿀 때 오른쪽 아래 모서리에서 들춰 넘기는 효과. 도형은 JS가 프레임마다 계산한다.
-   접혀 넘어온 뒷면은 팝업 틀 밖으로도 나가므로 이 층은 자르지 않는다. 팝업 모양대로 자르는 것은 각 층의 clip-path가 맡는다 */
-.page-curl {
+/* 페이지 넘김: 위쪽이 스프링으로 묶인 메모장처럼, 견출지로 페이지를 바꿀 때 모서리가 들리고 페이지가 위로 젖혀져 뒤로 내려간다. 도형은 JS가 프레임마다 계산한다.
+   그림자 색은 팝업 종이색을 진하게 한 색이라 종이 위에서 칙칙한 검정으로 뜨지 않는다 */
+.page-curl, .page-book {
   position: absolute;
   inset: 0;
-  z-index: 3; /* 팝업 내용 위. 스프링·붉은 접합부(z-index 4)는 이 위에 있어 연출 시작 때 가려졌다 나타나지 않는다 */
+  z-index: 3; /* 팝업 내용 위. 스프링·붉은 접합부(z-index 4)는 이 위에 있어 연출 시작 때 가려졌다 나타나지 않는다. book은 젖혀진 뒤 JS가 -1(팝업 뒤)로 바꾼다 */
   pointer-events: none;
 }
 
-#modal-goals .page-curl { --turn-paper: var(--note-paper); }
-#modal-settings .page-curl { --turn-paper: var(--cal-paper); }
+.page-book { transform-style: preserve-3d; transform-origin: 50% 0; } /* 위쪽 가장자리가 축 */
 
-.pc-page, .pc-shade, .pc-flap-wrap, .pc-flap { position: absolute; inset: 0; } /* .pc-page는 진짜 .modal-scroll의 복제본이라 종이·여백·글자가 같다 */
-.pc-flap-wrap { filter: drop-shadow(var(--turn-flap-lift) rgba(var(--turn-shadow-rgb), 0.28)); } /* 접힌 뒷면이 아래 페이지와 팝업 밖 배경에 드리우는 그림자 */
-.pc-flap { background-color: color-mix(in srgb, var(--turn-paper) 91%, rgb(var(--turn-shadow-rgb))); overflow: hidden; } /* 접혀 넘어온 종이의 뒷면. 앞면보다 살짝 어둡고 테마색이 돈다 */
+#modal-goals .page-curl, #modal-goals .page-book { --turn-paper: var(--note-paper); --turn-shadow-rgb: 150, 118, 40; }     /* 메모지(노랑)를 진하게 */
+#modal-settings .page-curl, #modal-settings .page-book { --turn-paper: var(--cal-paper); --turn-shadow-rgb: 140, 112, 84; } /* 달력 종이(크림)를 진하게 */
+
+.pc-page, .pc-shade, .pc-cast, .pc-lit, .pc-flap, .pc-back { position: absolute; inset: 0; } /* .pc-page는 진짜 .modal-scroll의 복제본이라 종이·여백·글자가 같다 */
+.pc-page, .pc-lit, .pc-flap, .pc-back { backface-visibility: hidden; }
+.pc-lit { border-radius: var(--modal-radius); }
+.pc-flap { background-color: color-mix(in srgb, var(--turn-paper) 90%, rgb(var(--turn-shadow-rgb))); transform: translateZ(0.5px); } /* 접혀 넘어온 종이의 뒷면. 앞면보다 살짝 어둡다 */
 .pc-flap::after { content: ''; position: absolute; inset: 0; background: var(--flap-shade); }
-.pc-ghost { position: absolute; inset: 0; transform-origin: 0 0; opacity: var(--turn-flap-ghost-a); filter: grayscale(1); }
+.pc-back { /* 젖혀졌을 때 보이는 종이 뒷면: 위쪽(묶인 곳)이 살짝 어둡다 */
+  transform: rotateX(180deg);
+  border-radius: var(--modal-radius);
+  background:
+    linear-gradient(to bottom, rgba(var(--turn-shadow-rgb), 0.22), transparent 30%),
+    color-mix(in srgb, var(--turn-paper) 90%, rgb(var(--turn-shadow-rgb)));
+}
