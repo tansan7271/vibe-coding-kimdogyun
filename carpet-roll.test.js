@@ -28,9 +28,18 @@ test('다 펼쳐지면 롤은 심지만 남고 카펫은 화면 너비 전체다
   assert.equal(p.remaining, 0);
 });
 
-test('시작할 때 롤이 화면 왼쪽 밖으로 잘리지 않는다', () => {
+test('시작할 때 롤이 화면 왼쪽 밖에 통째로 있다', () => {
   const p = rollPose({ ...base, progress: 0 });
-  assert.ok(p.cx - p.radius >= -1e-6, `왼쪽 끝 ${p.cx - p.radius}`);
+  assert.ok(p.cx + p.radius <= 1e-6, `롤 오른쪽 끝 ${p.cx + p.radius}`);
+  assert.ok(p.startX < 0);
+  const q = rollPose({ ...base, progress: 0, startMargin: 4 });
+  assert.ok(q.cx + q.radius <= -4 + 1e-6, `여유를 두면 더 멀리 ${q.cx + q.radius}`);
+});
+
+test('롤이 굴러 들어와 화면 안으로 들어온다', () => {
+  const p = rollPose({ ...base, progress: 0.2 });
+  assert.ok(p.cx > 0 && p.cx - p.radius < 0 + p.radius * 3, `중심 ${p.cx}`);
+  assert.ok(rollPose({ ...base, progress: 0.5 }).cx > p.cx);
 });
 
 test('롤은 펼칠수록 작아지고 오른쪽으로 간다', () => {

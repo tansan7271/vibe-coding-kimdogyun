@@ -10,7 +10,8 @@
 //  [ ] 단계 드래그로 다른 날에 고정(마우스, 터치는 길게 눌러 시작, 안내 토스트)
 //  [ ] 지남 박스(마감이 지나 깔리지 않은 단계)
 //  [ ] 지난 주 요약(총 부하, 초과한 날 수, 밀린 횟수)
-//  [ ] 카펫 선: 부하만큼 처짐, 안전선, 예산선, 눈금, 시간 초과 짐 상자, 오늘 칸 배경
+//  [ ] 카펫 선: 부하만큼 처짐, 시간 초과 짐 상자
+//  [x] 눈금: 가로 눈금, 예산선, 안전선, 날짜 구분선, 오늘 칸 배경(눈금 숫자와 날짜 글자는 아직 안 넣음)
 //  [ ] 좁은 화면(가로 스크롤)
 //  숨은 부작용(빠뜨리기 쉬움)
 //  [ ] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
@@ -30,7 +31,19 @@ const INTRO_STYLE = {
   spacing: 11,          // 롤 바퀴 사이 간격(px). lineWidth보다 커야 바퀴 사이 틈이 보인다. 키우면 롤이 커진다
   coreRadius: 7,        // 롤 가운데 심 반지름(px)
   topMargin: 20,        // 롤 위쪽 여백(px)
-  bottomMargin: 56,     // 펼쳐진 카펫 아래 여백(px). 이후 카펫이 처질 자리
+  entryGap: 6,          // 시작할 때 롤이 화면 왼쪽 가장자리에서 떨어져 있는 거리(px). 클수록 화면 밖에서 더 늦게 들어온다
+};
+
+// 눈금(카펫 아래 격자) 모양 값. 점선 모양(길이·간격·두께·둥근 끝)은 공용 스티치 값(style.css의 --stitch-*)을 쓴다
+const STAGE_STYLE = {
+  maxSag: 180,                 // 예산만큼 찼을 때 카펫이 처지는 깊이(px). 눈금 전체 높이가 된다
+  bottomMargin: 24,            // 예산선 아래 여백(px)
+  gridMaxLines: 5,             // 가로 눈금선 최대 개수
+  gridColor: '#e6e1da',        // 눈금선 색
+  gridWidth: 2,                // 눈금선 두께(px)
+  budgetColor: '#b9b2a8',      // 예산선(맨 아래 눈금) 색
+  dividerColor: '#d6cfc4',     // 날짜 구분 점선 색(모양은 스티치). 안전선은 스티치 색(주황)을 그대로 쓴다
+  todayFill: 'rgba(184,32,58,0.08)', // 오늘 칸 배경. 마지막 숫자를 올리면 진해진다
 };
 
 (function () {
@@ -39,12 +52,16 @@ const INTRO_STYLE = {
   document.documentElement.classList.add('carpet-next-on'); // 옛 카펫을 숨기고 새 카펫 자리를 연다
   const stage = document.getElementById('carpet-next');
   stage.hidden = false;
-  stage.innerHTML = '<svg class="carpet-intro" aria-hidden="true"><path class="laid"/><path class="roll"/></svg>'
-    + '<p class="carpet-next-note">새 카펫 (작업 중)</p>';
+  stage.innerHTML = '<svg class="carpet-intro" aria-hidden="true">'
+    + '<clipPath id="carpet-reveal"><rect class="reveal"/></clipPath>'
+    + '<g class="grid" clip-path="url(#carpet-reveal)"></g><path class="laid"/><path class="roll"/></svg>';
   const svg = stage.querySelector('svg');
   const laidPath = svg.querySelector('.laid');
   const rollPath = svg.querySelector('.roll');
+  const gridG = svg.querySelector('.grid');
+  const revealRect = svg.querySelector('.reveal');
   const S = INTRO_STYLE;
+  const G = STAGE_STYLE;
   [laidPath, rollPath].forEach(p => {
     p.setAttribute('fill', 'none');
     p.setAttribute('stroke', S.lineColor);
@@ -52,14 +69,49 @@ const INTRO_STYLE = {
   });
   rollPath.setAttribute('stroke-linejoin', 'round');
 
+  // 눈금: 7칸을 화면 너비로 똑같이 나눠 그린다. 오늘 칸은 배경을 깐다. 폭이나 높이가 바뀔 때만 다시 만든다
+  let gridKey = '';
+  function drawGrid(width, groundY, height) {
+    const key = [width, groundY, height].join();
+    if (key === gridKey) return;
+    gridKey = key;
+    const cs = getComputedStyle(document.documentElement);
+    const dash = cs.getPropertyValue('--stitch-dash').trim(), gap = cs.getPropertyValue('--stitch-gap').trim();
+    const stitchW = cs.getPropertyValue('--stitch-width').trim(), yarn = cs.getPropertyValue('--stitch-color').trim();
+    const stitch = `stroke-dasharray="${dash} ${gap}" stroke-width="${stitchW}" stroke-linecap="round"`;
+    const st = state.settings;
+    const today = todayStr();
+    const dates = Placement.dateRange(Placement.weekStart(today), Placement.addDays(Placement.weekStart(today), 6));
+    const colW = width / 7;
+    const columns = dates.map((_, i) => ({ left: i * colW, right: (i + 1) * colW }));
+    const shape = Carpet.carpetShape({
+      loads: dates.map(() => 0), capacity: st.capacity, safeRatio: st.safeRatio, columns, width,
+      baseY: groundY, maxSag: G.maxSag, gridMaxLines: G.gridMaxLines,
+    });
+    const todayIdx = dates.indexOf(today);
+    gridG.innerHTML =
+      (todayIdx >= 0 ? `<rect x="${columns[todayIdx].left}" y="${groundY}" width="${colW}" height="${height - G.bottomMargin - groundY}" fill="${G.todayFill}"/>` : '')
+      + shape.gridLines.map(g => `<line x1="0" y1="${g.y}" x2="${width}" y2="${g.y}" stroke="${g.isBudget ? G.budgetColor : G.gridColor}" stroke-width="${G.gridWidth}"/>`).join('')
+      + (shape.safeLine ? `<line x1="0" y1="${shape.safeLine.y}" x2="${width}" y2="${shape.safeLine.y}" stroke="${yarn}" ${stitch}/>` : '')
+      + shape.dividers.map(x => `<line x1="${x}" y1="${groundY}" x2="${x}" y2="${height - G.bottomMargin}" stroke="${G.dividerColor}" ${stitch}/>`).join('');
+  }
+
   // 롤 그리기. eased는 0~1(곡선을 입힌 진행도)
   function draw(eased) {
     const width = svg.clientWidth || stage.clientWidth + 32;
     const P = { spacing: S.spacing, coreRadius: S.coreRadius };
-    const groundY = S.topMargin + 2 * CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0 }).radius; // 땅에서 롤 지름 + 위 여백
-    const pose = CarpetRoll.rollPose({ progress: eased, width, ...P, groundY });
-    svg.setAttribute('height', Math.ceil(groundY + S.bottomMargin));
-    laidPath.setAttribute('d', `M0 ${groundY} H${pose.contactX.toFixed(2)}`);
+    const startMargin = S.entryGap + S.lineWidth / 2;
+    const groundY = S.topMargin + 2 * CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0, startMargin }).radius; // 땅에서 롤 지름 + 위 여백
+    const pose = CarpetRoll.rollPose({ progress: eased, width, ...P, groundY, startMargin });
+    const height = Math.ceil(groundY + G.maxSag + G.bottomMargin);
+    svg.setAttribute('height', height);
+    drawGrid(width, groundY, height);
+    // 눈금은 롤이 깔고 지나간 자리까지만 드러난다
+    revealRect.setAttribute('x', -50);
+    revealRect.setAttribute('y', 0);
+    revealRect.setAttribute('width', Math.max(0, pose.contactX + 50));
+    revealRect.setAttribute('height', height);
+    laidPath.setAttribute('d', `M${pose.startX.toFixed(2)} ${groundY} H${pose.contactX.toFixed(2)}`);
     const pts = pose.theta > 0.001 ? CarpetRoll.spiralPoints(pose, P) : [];
     rollPath.setAttribute('d', pts.length > 1 ? 'M' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join('L') : '');
   }
@@ -92,6 +144,7 @@ const INTRO_STYLE = {
 
   function finish() {
     draw(1);
+    gridG.removeAttribute('clip-path'); // 다 펼쳐졌으니 눈금을 가리던 틀을 걷는다
     stage.classList.add('intro-done');
     window.addEventListener('resize', () => draw(1)); // 다 펼쳐진 선은 화면 너비를 따라간다
   }

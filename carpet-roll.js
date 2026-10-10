@@ -21,12 +21,13 @@
   }
 
   // progress 0~1(0: 막 시작, 1: 다 펼쳐짐)일 때 롤의 자세.
-  // width: 카펫 전체 길이(= 화면 너비). 시작할 때 롤이 화면 밖으로 잘리지 않도록, 롤 반지름만큼 이미 깔린 상태에서 시작한다
-  function rollPose({ progress, width, spacing, coreRadius, groundY }) {
+  // width: 화면 너비. 롤은 화면 왼쪽 밖에 통째로 있는 상태에서 시작해 굴러 들어온다(startMargin: 가장자리에서 더 띄우는 거리).
+  // 카펫 전체 길이는 롤이 땅에 처음 닿은 점(startX, 화면 밖)에서 오른쪽 끝(width)까지다
+  function rollPose({ progress, width, spacing, coreRadius, groundY, startMargin = 0 }) {
     const p = Math.min(1, Math.max(0, progress));
     let startX = 0;
-    for (let i = 0; i < 8; i++) {
-      startX = spiralEnd({ remaining: width - startX, spacing, coreRadius }).radius;
+    for (let i = 0; i < 16; i++) { // 롤 크기는 전체 길이에, 전체 길이는 롤 위치에 달려 있어서 반복해 맞춘다
+      startX = -(spiralEnd({ remaining: width - startX, spacing, coreRadius }).radius + startMargin);
     }
     const contactX = startX + p * (width - startX);
     const remaining = width - contactX;
