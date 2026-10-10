@@ -44,6 +44,20 @@
   --patch-stitch-inset: 8px;   /* 털실 점선이 가장자리에서 안쪽으로 들어간 거리. 꼭짓점이 화면 밖으로 나간 만큼(14px)보다 작으면 위·오른쪽 점선이 화면 밖으로 완전히 잘린다. 점선 모서리 둥글기는 HTML의 rx(= 둥글기 − 이 값)로 맞춘다 */
   --patch-z: 110;              /* 헤더(100) 바로 위 */
 
+  /* 주 이동 버튼(이전 주·다음 주·이번 주): 종이색 버튼에 털실 점선, 호버·누름 기울기 */
+  --wbtn-pad: 9px 16px;        /* 안쪽 여백(위아래 / 좌우) */
+  --wbtn-font: 15px;
+  --wbtn-radius: 8px;          /* 모서리 둥글기. 점선 모서리(HTML의 rx)는 이 값 − 점선 안쪽 거리 */
+  --wbtn-chevron: 16px;        /* 화살표(chevron) 크기 */
+  --wbtn-stitch-inset: 4px;    /* 점선이 가장자리에서 안쪽으로 들어간 거리 */
+  --wbtn-stitch-dash: 3;       /* 점 길이. 버튼이 작아서 공용 토큰(--stitch-dash)보다 작게 쓴다 */
+  --wbtn-stitch-gap: 4;        /* 점 사이 간격 */
+  --wbtn-stitch-width: 1.4;    /* 털실 두께 */
+  --wbtn-shadow: 0 3px 6px rgba(0, 0, 0, 0.28); /* 버튼 그림자. 어두운 회색 */
+  --wbtn-hover-tilt: 2.5deg;   /* 마우스를 올리면 시계 방향으로 기우는 각도 */
+  --wbtn-press-tilt: -3.5deg;  /* 누르면 반시계 방향으로 기우는 각도 */
+  --wbtn-ms: 140ms;            /* 기울어지고 돌아오는 시간 */
+
   /* 아래쪽 버튼: 스프링 메모장(할 일)과 일마다 찢는 달력(일정과 설정). 크기·기울기·색은 여기서 바꾼다.
      화면 아래로 일부러 잘려 나가고, 두 버튼이 서로 겹친다 */
   --dock-bottom: -30px;        /* 화면 아래에서 띄우는 거리. 음수면 그만큼 화면 밖으로 잘려 나간다 */
@@ -653,12 +667,51 @@ button.btn-plain {
   stroke-linecap: round;
 }
 
-.week-patch .btn-plain { /* 붉은 천 위라 종이색 버튼으로 */
+.week-patch .wbtn { /* 붉은 천 위라 종이색 버튼으로 */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--wbtn-pad);
+  font-family: inherit;
+  font-size: var(--wbtn-font);
   background: var(--note-paper);
   color: var(--note-ink);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--wbtn-radius);
+  box-shadow: var(--wbtn-shadow);
+  cursor: pointer;
+  transition: transform var(--wbtn-ms) ease-out;
 }
+
+.week-patch .wbtn .btn-stitch { /* 털실 점선 */
+  position: absolute;
+  inset: var(--wbtn-stitch-inset);
+  width: calc(100% - var(--wbtn-stitch-inset) * 2);
+  height: calc(100% - var(--wbtn-stitch-inset) * 2);
+  overflow: visible;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--stitch-color);
+  stroke-width: var(--wbtn-stitch-width);
+  stroke-dasharray: var(--wbtn-stitch-dash) var(--wbtn-stitch-gap);
+  stroke-linecap: round;
+}
+
+.week-patch .wbtn .chev {
+  width: var(--wbtn-chevron);
+  height: var(--wbtn-chevron);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (hover: hover) {
+  .week-patch .wbtn:hover { transform: rotate(var(--wbtn-hover-tilt)); } /* 시계 방향 */
+}
+
+.week-patch .wbtn:active { transform: rotate(var(--wbtn-press-tilt)); } /* 반대(반시계) 방향으로 더 */
 
 .week-patch .week-label { color: #fff; }
 
