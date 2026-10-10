@@ -439,7 +439,7 @@ const STAGE_STYLE = {
       lockX: isBottom,
     });
     box.tilt = isBottom ? 0 : (hash01(item.id, 't') - 0.5) * 2 * G.boxTiltDeg;
-    sim.els.set(item.id, makeBoxEl(box, item.kind === 'todo' ? 'todo' : 'paper', item));
+    sim.els.set(item.id, makeBoxEl(box, item.kind === 'todo' ? 'todo' : item.kind === 'fixed' ? 'paper fixed' : 'paper', item));
     if (item.kind === 'done') sim.seals.set(item.id, makeSealEl(box));
   }
 
