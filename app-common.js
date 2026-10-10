@@ -184,7 +184,8 @@
     const persp = cssVar('--modal-perspective');
     const half = parseFloat(cssVar('--modal-flip-deg')) / 2; // 앞면이 이만큼 돌아 옆면이 되고, 거기서 뒷면이 이어받는다
     const delay = cssMs('--modal-content-delay');
-    const swapStart = cssMs('--modal-swap-start'), swap = cssMs('--modal-swap'); // 원본 버튼과 복제본이 서로 바뀌는 구간(시간 비율 0~1)
+    // 원본 버튼과 복제본이 서로 바뀌는 구간(시간 비율 0~1). 닫을 때는 도착한 뒤 가만히 있는 시간이 길어 보이지 않게 따로 짧게 둔다
+    const swapStart = cssMs(reverse ? '--modal-swap-start-close' : '--modal-swap-start'), swap = cssMs(reverse ? '--modal-swap-close' : '--modal-swap');
     const ms = cssMs(reverse ? '--modal-anim-close-ms' : '--modal-anim-ms');
     const timing = { duration: ms, easing: cssVar(reverse ? '--modal-ease-close' : '--modal-ease'), fill: 'both' };
     const landEase = cssVar('--modal-ease-land');
