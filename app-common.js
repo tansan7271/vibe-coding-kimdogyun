@@ -185,8 +185,16 @@
     const half = parseFloat(cssVar('--modal-flip-deg')) / 2; // 앞면이 이만큼 돌아 옆면이 되고, 거기서 뒷면이 이어받는다
     const delay = cssMs('--modal-content-delay');
     const swapStart = cssMs('--modal-swap-start'), swap = cssMs('--modal-swap'); // 원본 버튼과 복제본이 서로 바뀌는 구간(시간 비율 0~1)
-    const dir = reverse ? 'reverse' : 'normal';
-    const timing = { duration: cssMs('--modal-anim-ms'), easing: cssVar('--modal-ease'), direction: dir, fill: 'both' };
+    const timing = { duration: cssMs('--modal-anim-ms'), easing: cssVar(reverse ? '--modal-ease-close' : '--modal-ease'), fill: 'both' };
+    const landEase = cssVar('--modal-ease-land');
+    // 닫을 때는 키프레임을 직접 뒤집어 앞으로 재생한다. direction: 'reverse'로는 구간마다 다른 곡선을 줄 수 없다.
+    // land 표시가 붙은 키프레임에서 시작하는 구간(복제본이 버튼 자리로 내려앉는 마지막 이동)에만 닫을 때 landEase를 건다
+    const frames = list => {
+      const n = list.length;
+      const f = list.map((k, i) => ({ ...k, offset: k.offset ?? i / (n - 1) }));
+      const out = reverse ? f.map(k => ({ ...k, offset: 1 - k.offset })).reverse() : f;
+      return out.map(({ land, ...k }) => (reverse && land ? { ...k, easing: landEase } : k));
+    };
 
     // 앞면: 버튼 복제본. 버튼 크기 그대로 두고 변환만 준다
     const front = btn.cloneNode(true);
@@ -205,29 +213,29 @@
     const blur = cssVar('--modal-blur');
     const anims = [
       // 뒤 화면의 어두움과 흐림만 페이드한다. modal 전체의 opacity를 건드리면 팝업까지 투명해진다
-      modal.animate([
+      modal.animate(frames([
         { backgroundColor: bg.replace(/[\d.]+\)$/, '0)'), backdropFilter: 'blur(0px)', webkitBackdropFilter: 'blur(0px)' },
         { backgroundColor: bg, backdropFilter: `blur(${blur})`, webkitBackdropFilter: `blur(${blur})` },
-      ], { duration: cssMs('--modal-anim-ms') * cssMs('--modal-fade-ratio'), easing: 'ease-in-out', direction: dir, fill: 'both' }),
+      ]), { duration: cssMs('--modal-anim-ms') * cssMs('--modal-fade-ratio'), easing: 'ease-in-out', fill: 'both' }),
       // 앞면(버튼 복제본): 서서히 나타나 원본을 덮고, 팝업 쪽으로 이동하며 늘어나 옆면까지 돈 뒤 사라진다
-      front.animate([
+      front.animate(frames([
         { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 0, offset: 0 },
         { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 0, offset: swapStart },
         { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 1, offset: swap }, // 교차하는 동안은 원본 위에 가만히 있어서 글자가 두 겹으로 보이지 않는다
-        { transform: tf(dx / 2, dy / 2, tilt / 2, (1 + kx) / 2, (1 + ky) / 2, half), opacity: 1, offset: 0.5 },
+        { transform: tf(dx / 2, dy / 2, tilt / 2, (1 + kx) / 2, (1 + ky) / 2, half), opacity: 1, offset: 0.5, land: true },
         { transform: tf(dx / 2, dy / 2, tilt / 2, (1 + kx) / 2, (1 + ky) / 2, half), opacity: 0, offset: 0.5001 },
         { transform: tf(dx, dy, 0, kx, ky, half), opacity: 0, offset: 1 },
-      ], timing),
+      ]), timing),
       // 원본 버튼: 복제본이 덮은 뒤 빠진다 (닫을 때는 거꾸로 먼저 켜진다)
-      btn.animate([{ opacity: 1, offset: 0 }, { opacity: 1, offset: swap }, { opacity: 0, offset: swap + 0.0001 }, { opacity: 0, offset: 1 }], timing),
+      btn.animate(frames([{ opacity: 1, offset: 0 }, { opacity: 1, offset: swap }, { opacity: 0, offset: swap + 0.0001 }, { opacity: 0, offset: 1 }]), timing),
       // 뒷면(팝업): 옆면에서 이어받아 펴지며 자리를 잡는다
-      panel.animate([
+      panel.animate(frames([
         { transform: tf(-dx, -dy, tilt, 1 / kx, 1 / ky, -half), opacity: 0, offset: 0 },
         { transform: tf(-dx / 2, -dy / 2, tilt / 2, (1 + 1 / kx) / 2, (1 + 1 / ky) / 2, -half), opacity: 0, offset: 0.4999 },
         { transform: tf(-dx / 2, -dy / 2, tilt / 2, (1 + 1 / kx) / 2, (1 + 1 / ky) / 2, -half), opacity: 1, offset: 0.5 },
         { transform: tf(0, 0, 0, 1, 1, 0), opacity: 1, offset: 1 },
-      ], timing),
-      ...[...scroll.children].map(el => el.animate([{ opacity: 0 }, { opacity: 0, offset: delay }, { opacity: 1 }], timing)),
+      ]), timing),
+      ...[...scroll.children].map(el => el.animate(frames([{ opacity: 0 }, { opacity: 0, offset: delay }, { opacity: 1 }]), timing)),
     ];
     modalBusy = true;
     Promise.all(anims.map(a => a.finished)).then(() => {
