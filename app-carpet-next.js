@@ -6,16 +6,16 @@
 //  [x] 주 이동(이전·다음·이번 주)과 날짜 범위 표시. 버튼은 헤더의 week-patch가 가지고 있다. 이동하는 주는 연출 없이 정착한 모습으로 슬라이드해 들어온다
 //  [x] 날짜 7칸: 일정, 그날의 단계, 부하/예산, 남은 시간(눈금 밑 막대; 여유는 부하 막대와 겹쳐 뺌), 오늘 표시
 //  [ ] 초과 표시 3종: 안전선 초과, 예산 초과, 시간 초과
-//  [ ] 단계를 누르면 메뉴: 완료(됨, 박스 누르기) / 이 날 안 함(밀림) / 다른 날에 고정(둘은 드래그가 맡는다)
+//  [x] 단계를 누르면: 완료(박스 누르기). 다른 날로 옮기는 것은 드래그가 맡는다. "이 날 안 함"과 밀린 횟수는 없앴다
 //  [x] 단계 드래그로 다른 날에 고정(마우스, 터치는 길게 눌러 시작). 안내는 토스트 대신 화면 가장자리 구역
 //  [ ] 지남 박스(마감이 지나 깔리지 않은 단계)
-//  [ ] 지난 주 요약(총 부하, 초과한 날 수, 밀린 횟수)
+//  [x] 지난 주 요약: 없앴다(SPEC에서도 뺌)
 //  [ ] 카펫 선: 부하만큼 처짐, 시간 초과 짐 상자
 //  [x] 눈금: 가로 눈금, 예산선, 안전선, 날짜 구분선, 오늘 칸 배경. 예산선 아래에는 아무것도 없다
 //  [x] 날짜 숫자: 카펫 선 위쪽 여백 안, 칸마다 왼쪽 정렬. 폰트 파일 없이 숫자 윤곽선(barista-digits.js)으로 그린다(눈금 숫자와 요일 글자는 아직 안 넣음)
 //  [x] 헤더의 월 표시: Red Carpet ∙ 10월
 //  [x] 박스(일정·완료·남은 단계) 낙하: 위에서 떨어져 부딪히고 쌓이며 카펫이 무게만큼 눌렸다 정착한다. 첫 입장 때 한 번(carpet-physics.js)
-//  [x] 박스 위 글자(제목)와 아이콘(부하·시간·밀림), 완료 도장. 박스 크기(부하)에 따라 배치가 달라진다
+//  [x] 박스 위 글자(제목)와 아이콘(부하·시간), 완료 도장. 박스 크기(부하)에 따라 배치가 달라진다
 //  [x] 박스 누르기: 제자리에서 커지며 모든 정보와 버튼(완료, 반복 일정의 이 날만 빼기)이 보인다  [x] 끌어 놓으면 다시 낙하(박스를 끌어 날짜칸에 놓으면 그 날에 고정되고 위에서 떨어진다. 화면 끝에 머물면 주 이동, 위쪽에 놓으면 취소)
 //  [ ] 좁은 화면(가로 스크롤)
 //  숨은 부작용(빠뜨리기 쉬움)
@@ -25,7 +25,7 @@
 //
 // 새 연출 체크리스트
 //  [x] 첫 입장 롤 펼침: 페이지를 열 때마다 한 번. 주 이동이나 수정으로 다시 그릴 때는 없다. 모션 줄이기 설정이면 건너뛴다
-//  [x] 주 넘기기 슬라이드(버튼과 터치 스와이프)  [ ] 끌어 놓으면 낙하   (전체 보기는 기각, 밀린 단계 주름도 기각: 밀림은 박스의 알람 아이콘으로 한다)
+//  [x] 주 넘기기 슬라이드(버튼과 터치 스와이프)  [ ] 끌어 놓으면 낙하   (전체 보기는 기각, 밀린 단계 주름도 기각. 밀린 횟수는 없앴다)
 //  [x] 세로축: 부하 1당 높이는 일정하고(예산 15일 때의 눈금 간격), 예산 설정에 따라 예산선 깊이가 늘고 줄어 아래로 스크롤이 생긴다
 //  [x] 예산 초과: 카펫이 예산선 밑으로 부하만큼 계속 처지고, 그 날의 박스와 카펫이 아이폰 홈 화면 수정 모드처럼 떤다(예산을 바꾸면 눈금과 처짐이 바로 따라간다)
 
@@ -461,15 +461,15 @@ const STAGE_STYLE = {
     const items = [];
     const goalTitle = new Map(state.goals.map(g => [g.id, g.title])); // 단계의 상위 할 일
     page.stats.forEach((st, col) => {
-      st.events.forEach(ev => items.push({ id: `ev:${ev.id}:${st.date}`, col, load: ev.load, kind: 'fixed', title: ev.title, minutes: Placement.eventDurationMinutes(ev), push: 0, eventId: ev.id, date: st.date }));
-      st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done', title: s.title, goal: goalTitle.get(s.goalId) || '', minutes: s.minutes, push: s.pushCount || 0, stepId: s.id }));
-      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo', title: step.title, goal: goalTitle.get(step.goalId) || '', minutes: step.minutes, push: step.pushCount || 0, stepId: step.id }));
+      st.events.forEach(ev => items.push({ id: `ev:${ev.id}:${st.date}`, col, load: ev.load, kind: 'fixed', title: ev.title, minutes: Placement.eventDurationMinutes(ev), eventId: ev.id, date: st.date }));
+      st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done', title: s.title, goal: goalTitle.get(s.goalId) || '', minutes: s.minutes, stepId: s.id }));
+      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo', title: step.title, goal: goalTitle.get(step.goalId) || '', minutes: step.minutes, stepId: step.id }));
     });
     return items.filter(it => it.load > 0);
   }
 
   // 박스 안 내용(글자만, 눌러서 동작하는 것은 없다). 박스 높이(부하)에 따라 배치가 달라진다:
-  //  col: 제목 여러 줄 + (자리가 남으면 흐린 상위 할 일) + 아래 아이콘 줄(밀림·시간·부하)   row: 한 줄에 제목과 아이콘(밀림·시간). 부하는 박스 높이가 이미 보여 주므로 뺀다
+  //  col: 제목 여러 줄 + (자리가 남으면 흐린 상위 할 일) + 아래 아이콘 줄(시간·부하)   row: 한 줄에 제목과 아이콘(시간). 부하는 박스 높이가 이미 보여 주므로 뺀다
   // 폭이 모자라면 style.css의 컨테이너 쿼리가 부하, 그다음 시간 아이콘을 먼저 숨긴다
   function boxContent(item, w, h, inset) {
     const icon = name => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${BoxIcons.paths[name]}"/></svg>`;
@@ -481,8 +481,7 @@ const STAGE_STYLE = {
     if (h >= need(G.boxPad)) { tier = 'col'; pad = inset + G.boxPad; }
     else if (h >= need(G.boxPadTight)) { tier = 'col'; pad = inset + G.boxPadTight; }
     else { tier = 'row'; pad = inset + G.boxPadTiny; }
-    const metrics = (item.push > 0 ? metric('m-push', 'push', item.push) : '')
-      + metric('m-time', 'time', shortDuration(item.minutes))
+    const metrics = metric('m-time', 'time', shortDuration(item.minutes))
       + (tier === 'row' ? '' : metric('m-load', 'load', item.load));
     // 위아래 배치에서 남는 높이: 제목은 들어가는 만큼 여러 줄, 제목 한 줄을 두고도 한 줄이 더 들어가면 그 아래에 상위 할 일을 흐리게 보여 준다
     const avail = h - 2 * pad - (G.boxIcon + 2) - 2;
@@ -893,7 +892,7 @@ const STAGE_STYLE = {
       sub = `<div class="fx-goal">${escapeHtml(item.goal)}</div>`;
     }
     if (item.kind === 'todo') actions = button('done', '완료', true);
-    const metrics = (item.push > 0 ? metric('push', `밀림 ${item.push}회`) : '') + metric('time', shortDuration(item.minutes)) + metric('load', `부하 ${item.load}`);
+    const metrics = metric('time', shortDuration(item.minutes)) + metric('load', `부하 ${item.load}`);
     return `<div class="fx-title">${escapeHtml(item.title || '')}</div>${sub}<div class="fx-metrics">${metrics}</div>${actions ? `<div class="fx-actions">${actions}</div>` : ''}`;
   }
 

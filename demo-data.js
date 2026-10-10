@@ -235,8 +235,7 @@ const DEMO_DATA = {
       "load": 4,
       "minutes": 120,
       "order": 2,
-      "done": false,
-      "pushCount": 1
+      "done": false
     },
     {
       "id": "step_demo_05_4",
@@ -264,8 +263,7 @@ const DEMO_DATA = {
       "load": 5,
       "minutes": 240,
       "order": 1,
-      "done": false,
-      "pushCount": 2
+      "done": false
     },
     {
       "id": "step_demo_06_3",
@@ -302,8 +300,7 @@ const DEMO_DATA = {
       "load": 5,
       "minutes": 240,
       "order": 1,
-      "done": false,
-      "pushCount": 1
+      "done": false
     },
     {
       "id": "step_demo_07_3",
@@ -367,8 +364,7 @@ const DEMO_DATA = {
       "load": 4,
       "minutes": 120,
       "order": 0,
-      "done": false,
-      "pushCount": 1
+      "done": false
     },
     {
       "id": "step_demo_09_2",

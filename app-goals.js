@@ -270,7 +270,7 @@
       const order = stepsForGoal(goalId).length;
       state.steps.push({
         id: uid('step'), goalId, title, load, minutes, order,
-        done: false, pushCount: 0,
+        done: false,
       });
       saveState();
       delete newStepDrafts[goalId];
@@ -513,7 +513,7 @@
     const goalId = uid('goal');
     state.goals.push({ id: goalId, title, deadline: d.deadline, createdAt: todayStr() });
     d.steps.forEach((s, i) => {
-      state.steps.push({ id: uid('step'), goalId, title: s.title.trim(), load: s.load, minutes: s.minutes, order: i, done: false, pushCount: 0 });
+      state.steps.push({ id: uid('step'), goalId, title: s.title.trim(), load: s.load, minutes: s.minutes, order: i, done: false });
     });
     saveState();
     expandedGoals.clear(); // 한 번에 하나만 펼친다
