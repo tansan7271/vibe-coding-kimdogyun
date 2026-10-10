@@ -58,7 +58,7 @@ app-common.js    공통: 상태·저장, 날짜·문자열 도우미, 팝업과 
 app-goals.js     할 일 화면, AI "텍스트로 만들기"
 app-settings.js  일정과 설정 화면, 데이터 내보내기/가져오기
 app-carpet.js    카펫 화면: 눈금·박스 물리·막대·박스 누르기·끌어서 고정·주 넘기기, INTRO_STYLE·STAGE_STYLE·SHADOW_STYLE. 처음 그리는 쪽이라 마지막에 읽는다
-demo-data.js     테스트 데모 모드의 예시 데이터(모두 허구, 올해 9~11월). 읽는 순서상 app-common보다 앞
+demo-data.js     테스트 데모 모드의 예시 데이터(모두 허구, 올해 9~11월). 앱 기능(지남·초과·반복·고정·완료)을 한 번에 보이게 짠다 (테스트 있음). 읽는 순서상 app-common보다 앞
 placement.js     배치 규칙 (순수 함수, 테스트 있음)
 carpet.js        카펫 모양 계산 (순수 함수, 테스트 있음)
 carpet-shadow.js 카펫 아래 그림자: 카펫 곡선의 가로 높이와 아래로 옅어지는 정도 (순수 함수, 테스트 있음)

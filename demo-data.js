@@ -1,4 +1,6 @@
 // RAD CARPET 데모 모드용 샘플 데이터 (모두 허구). 기준 오늘: 2026-10-10, 기간: 2026-09-01 ~ 2026-11-30
+// 앱의 기능을 한 번에 볼 수 있게 짰다: 완료 도장, 예산·안전선·시간 초과, 지남(마감이 지난 미완료 단계, 고정한 것 포함), 고정 단계,
+// 매주·격주·매월 반복과 이 날만 빼기·반복 종료일, 하루짜리 일정. demo-data.test.js가 이 구성을 지킨다
 const DEMO_DATA = {
   "version": 1,
   "goals": [
@@ -85,6 +87,18 @@ const DEMO_DATA = {
       "title": "팀플 최종 보고서",
       "deadline": "2026-11-27",
       "createdAt": "2026-10-10"
+    },
+    {
+      "id": "goal_demo_15",
+      "title": "교양 독서 리포트",
+      "deadline": "2026-10-06",
+      "createdAt": "2026-09-24"
+    },
+    {
+      "id": "goal_demo_16",
+      "title": "동아리 홍보물 제작",
+      "deadline": "2026-10-09",
+      "createdAt": "2026-09-30"
     }
   ],
   "steps": [
@@ -631,6 +645,53 @@ const DEMO_DATA = {
       "order": 4,
       "done": false,
       "pinnedDate": "2026-11-27"
+    },
+    {
+      "id": "step_demo_15_1",
+      "goalId": "goal_demo_15",
+      "title": "책 읽고 메모하기",
+      "load": 2,
+      "minutes": 120,
+      "order": 0,
+      "done": false
+    },
+    {
+      "id": "step_demo_15_2",
+      "goalId": "goal_demo_15",
+      "title": "리포트 초안 쓰기",
+      "load": 2,
+      "minutes": 90,
+      "order": 1,
+      "done": false
+    },
+    {
+      "id": "step_demo_16_1",
+      "goalId": "goal_demo_16",
+      "title": "홍보 문구 정하기",
+      "load": 1,
+      "minutes": 30,
+      "order": 0,
+      "done": true,
+      "doneDate": "2026-10-08"
+    },
+    {
+      "id": "step_demo_16_2",
+      "goalId": "goal_demo_16",
+      "title": "포스터 시안 만들기",
+      "load": 1,
+      "minutes": 60,
+      "order": 1,
+      "done": false
+    },
+    {
+      "id": "step_demo_16_3",
+      "goalId": "goal_demo_16",
+      "title": "인쇄소에 맡기기",
+      "load": 1,
+      "minutes": 30,
+      "order": 2,
+      "done": false,
+      "pinnedDate": "2026-10-13"
     }
   ],
   "events": [
@@ -1159,6 +1220,36 @@ const DEMO_DATA = {
       "load": 4,
       "repeat": "none",
       "date": "2026-11-27"
+    },
+    {
+      "id": "event_demo_51",
+      "title": "스터디 모임 (격주)",
+      "start": "14:00",
+      "end": "16:00",
+      "load": 2,
+      "repeat": "biweekly",
+      "weekday": 5,
+      "date": "2026-09-12",
+      "repeatUntil": "2026-11-28"
+    },
+    {
+      "id": "event_demo_52",
+      "title": "동아리 정기 회의 (매월)",
+      "start": "19:00",
+      "end": "21:00",
+      "load": 3,
+      "repeat": "monthly",
+      "date": "2026-09-15",
+      "repeatUntil": "2026-11-30"
+    },
+    {
+      "id": "event_demo_53",
+      "title": "봉사활동 (종일)",
+      "start": "08:00",
+      "end": "21:30",
+      "load": 2,
+      "repeat": "none",
+      "date": "2026-10-09"
     }
   ],
   "settings": {
