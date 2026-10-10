@@ -36,10 +36,11 @@ const INTRO_STYLE = {
 
 // 눈금(카펫 아래 격자) 모양 값. 점선 모양(길이·간격·두께·둥근 끝)은 공용 스티치 값(style.css의 --stitch-*)을 쓴다
 const STAGE_STYLE = {
-  maxSag: 180,                 // 예산만큼 찼을 때 카펫이 처지는 깊이(px). 가로 눈금(예산선까지)의 높이가 된다
-  columnDepthRatio: 2.5,       // 날짜 구분 점선과 오늘 칸이 카펫 선 아래로 내려가는 깊이 = maxSag × 이 값. 화면 바닥까지 닿아야 하므로 더 모자라면 바닥까지 늘린다
-  topSpaceRatio: 0.75,         // 카펫 선 위쪽 여백을 이 비율로 줄인다(1이면 그대로). 롤이 헤더 밑으로 파고들지 않는 선까지만 줄어든다
-  mainPadTop: 24,              // 본문 위쪽 여백(px, style.css의 main padding). 롤이 이 안까지는 올라가도 된다
+  // 예산 깊이(예산선이 카펫 선에서 내려가는 깊이)는 값으로 두지 않는다. 카펫 선 위쪽 여백(헤더 아랫단~카펫 선)과
+  // 예산선 아래쪽 여백(예산선~화면 바닥)이 같아지도록 화면 높이에서 계산한다
+  minSag: 120,                 // 화면이 아주 낮을 때 예산 깊이가 이보다 줄지 않게 하는 최소값(px)
+  topSpaceRatio: 0.375,        // 롤 크기로 정해지는 처음 위쪽 여백을 이 비율로 줄인다(1이면 그대로). 롤이 헤더 밑으로 파고들지 않는 선까지만 줄어든다
+  rollHeaderGap: 4,            // 롤 맨 위와 헤더 아랫단 사이에 남기는 최소 간격(px)
   gridMaxLines: 5,             // 가로 눈금선 최대 개수
   gridColor: '#e6e1da',        // 눈금선 색
   gridWidth: 2,                // 눈금선 두께(px)
@@ -73,8 +74,8 @@ const STAGE_STYLE = {
 
   // 눈금: 7칸을 화면 너비로 똑같이 나눠 그린다. 오늘 칸은 배경을 깐다. 폭이나 높이가 바뀔 때만 다시 만든다
   let gridKey = '';
-  function drawGrid(width, groundY, height) {
-    const key = [width, groundY, height].join();
+  function drawGrid(width, groundY, height, sag) {
+    const key = [width, groundY, height, sag].join();
     if (key === gridKey) return;
     gridKey = key;
     const cs = getComputedStyle(document.documentElement);
@@ -88,7 +89,7 @@ const STAGE_STYLE = {
     const columns = dates.map((_, i) => ({ left: i * colW, right: (i + 1) * colW }));
     const shape = Carpet.carpetShape({
       loads: dates.map(() => 0), capacity: st.capacity, safeRatio: st.safeRatio, columns, width,
-      baseY: groundY, maxSag: G.maxSag, gridMaxLines: G.gridMaxLines,
+      baseY: groundY, maxSag: sag, gridMaxLines: G.gridMaxLines,
     });
     const todayIdx = dates.indexOf(today);
     gridG.innerHTML =
@@ -98,21 +99,37 @@ const STAGE_STYLE = {
       + shape.dividers.map(x => `<line x1="${x}" y1="${groundY}" x2="${x}" y2="${height}" stroke="${G.dividerColor}" ${stitch}/>`).join('');
   }
 
+  // 세로 배치. 화면 폭과 높이가 바뀔 때만 다시 잰다
+  let layoutKey = '', L = null;
+  function layout(width) {
+    const key = `${width},${window.innerHeight}`;
+    if (key === layoutKey) return L;
+    layoutKey = key;
+    const P = { spacing: S.spacing, coreRadius: S.coreRadius };
+    const startMargin = S.entryGap + S.lineWidth / 2;
+    const groundY = S.topMargin + 2 * CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0, startMargin }).radius; // svg 안에서 땅 높이: 롤 지름 + 위 여백
+    const headerBottom = parseFloat(getComputedStyle(document.body).paddingTop) || 0; // 헤더 아랫단 높이(화면 위에서)
+    svg.style.marginTop = '0px';
+    const stageTop = svg.getBoundingClientRect().top + window.scrollY;
+    // 위 여백 줄이기: 그림은 그대로 두고 통째로 위로 끌어올린다. 롤 맨 위가 헤더 아랫단을 넘지 않는 만큼까지만
+    const lift = Math.max(0, Math.min((1 - G.topSpaceRatio) * groundY, stageTop + S.topMargin - headerBottom - G.rollHeaderGap));
+    svg.style.marginTop = `${-lift}px`;
+    const svgTop = stageTop - lift;
+    const lineY = svgTop + groundY;                // 카펫 선의 화면 높이
+    const topSpace = lineY - headerBottom;         // 위쪽 여백: 헤더 아랫단 ~ 카펫 선
+    const sag = Math.max(G.minSag, window.innerHeight - topSpace - lineY); // 아래쪽 여백(예산선 ~ 화면 바닥)을 위쪽 여백과 같게
+    const height = Math.floor(window.innerHeight - svgTop); // 구분 점선과 오늘 칸은 화면 바닥까지
+    L = { P, startMargin, groundY, lift, sag, height, topSpace };
+    return L;
+  }
+
   // 롤 그리기. eased는 0~1(곡선을 입힌 진행도)
   function draw(eased) {
     const width = svg.clientWidth || stage.clientWidth + 32;
-    const P = { spacing: S.spacing, coreRadius: S.coreRadius };
-    const startMargin = S.entryGap + S.lineWidth / 2;
-    const groundY = S.topMargin + 2 * CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0, startMargin }).radius; // 땅에서 롤 지름 + 위 여백
+    const { P, startMargin, groundY, sag, height } = layout(width);
     const pose = CarpetRoll.rollPose({ progress: eased, width, ...P, groundY, startMargin });
-    // 위 여백 줄이기: 그림은 그대로 두고 통째로 위로 끌어올린다. 롤 위쪽이 헤더 아랫단을 넘지 않는 만큼까지만
-    const lift = Math.min((1 - G.topSpaceRatio) * groundY, S.topMargin + G.mainPadTop - 4);
-    svg.style.marginTop = `${-lift}px`;
-    // 아래로는 화면 바닥까지: 구분 점선과 오늘 칸이 쭈욱 이어진다
-    const toBottom = Math.max(0, window.innerHeight - (svg.getBoundingClientRect().top + window.scrollY) - groundY);
-    const height = Math.floor(groundY + Math.max(G.columnDepthRatio * G.maxSag, toBottom)); // 내림: 올리면 1px 넘쳐 스크롤이 생긴다
     svg.setAttribute('height', height);
-    drawGrid(width, groundY, height);
+    drawGrid(width, groundY, height, sag);
     // 눈금은 롤이 깔고 지나간 자리까지만 드러난다
     revealRect.setAttribute('x', -50);
     revealRect.setAttribute('y', 0);
