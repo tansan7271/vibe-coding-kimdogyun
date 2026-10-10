@@ -108,8 +108,9 @@
    * @param {number} input.sleepHours 수면 시간
    * @param {number} input.lifeHours 생활 시간
    * @param {string} input.placeMode "fill" | "even"
-   * @returns {Array<{stepId:string, date:string|null, pinned:boolean, exceeded:boolean, overLoad:boolean, overTime:boolean, overdue:boolean}>}
+   * @returns {Array<{stepId:string, date:string, pinned:boolean, exceeded:boolean, overLoad:boolean, overTime:boolean, overdue:boolean}>}
    * overLoad: 초과가 부하(안전선) 때문인지, overTime: 초과가 시간 때문인지. 둘 다 true일 수 있다.
+   * overdue: 할 일의 마감이 지났는데 끝내지 못한 단계(지남). 완료하거나 마감을 고칠 때까지 오늘 칸에 따라오고 오늘의 부하·시간으로 센다(고정된 단계는 고정한 날에 둔다).
    */
   function placeSteps({ steps, doneSteps = [], goals, events, today, capacity, safeRatio, sleepHours, lifeHours, placeMode }) {
     const goalById = new Map(goals.map(g => [g.id, g]));
@@ -181,7 +182,8 @@
 
     pinnedSteps.forEach(step => {
       addToLedger(step.pinnedDate, step.load, step.minutes);
-      results.set(step.id, { stepId: step.id, date: step.pinnedDate, pinned: true, exceeded: false, overLoad: false, overTime: false, overdue: false });
+      const pinnedGoal = goalById.get(step.goalId);
+      results.set(step.id, { stepId: step.id, date: step.pinnedDate, pinned: true, exceeded: false, overLoad: false, overTime: false, overdue: Boolean(pinnedGoal) && pinnedGoal.deadline < today });
     });
 
     // 2. 할 일 마감 빠른 순, 같은 할 일 안에서는 순서대로
@@ -198,9 +200,12 @@
     ordered.forEach(step => {
       const goal = goalById.get(step.goalId);
 
-      // 7. 마감이 이미 지난 할 일의 단계는 지남으로 표시하고 깔지 않는다
+      // 7. 마감이 이미 지난 할 일의 단계는 지남으로 표시하고 오늘 칸에 깐다. 들어가는지 따지지 않고 오늘의 부하·시간으로 센다.
+      // 마감 빠른 순으로 처리하므로 다른 단계보다 먼저 깔려서, 나머지 단계들이 그 부하를 피해 들어간다
       if (goal.deadline < today) {
-        results.set(step.id, { stepId: step.id, date: null, pinned: false, exceeded: false, overLoad: false, overTime: false, overdue: true });
+        addToLedger(today, step.load, step.minutes);
+        lastPlacedDateByGoal.set(step.goalId, today);
+        results.set(step.id, { stepId: step.id, date: today, pinned: false, exceeded: false, overLoad: false, overTime: false, overdue: true });
         return;
       }
 

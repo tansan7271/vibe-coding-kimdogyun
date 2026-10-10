@@ -90,12 +90,71 @@ test('부하와 시간 둘 다 초과하면 둘 다 표시된다', () => {
   assert.equal(result[0].overTime, true);
 });
 
-test('마감이 이미 지난 할 일의 단계는 지남으로 표시하고 깔지 않는다', () => {
+test('마감이 이미 지난 할 일의 단계는 지남으로 표시하고 오늘 칸에 깐다', () => {
   const goals = [goal('g1', '2026-09-25')];
   const steps = [step({ id: 's1' })];
   const result = placeSteps({ steps, goals, events: [], today: '2026-10-01', ...defaultSettings });
   assert.equal(result[0].overdue, true);
-  assert.equal(result[0].date, null);
+  assert.equal(result[0].date, '2026-10-01');
+  assert.equal(result[0].exceeded, false);
+});
+
+test('지남 단계는 오늘의 부하와 시간으로 센다', () => {
+  const goals = [goal('g1', '2026-09-25')];
+  const steps = [step({ id: 's1', load: 4, minutes: 90 })];
+  const placements = placeSteps({ steps, goals, events: [], today: '2026-10-01', ...defaultSettings });
+  const today = dayStats({ date: '2026-10-01', steps, placements, events: [], ...defaultSettings });
+  assert.equal(today.load, 4);
+  assert.equal(today.steps.length, 1);
+  assert.equal(today.minutesLeft, 12 * 60 - 90);
+  const tomorrow = dayStats({ date: '2026-10-02', steps, placements, events: [], ...defaultSettings });
+  assert.equal(tomorrow.load, 0);
+});
+
+test('지남 단계는 들어가는지 따지지 않고 오늘에 깔려 부하를 넘겨도 그대로다', () => {
+  const goals = [goal('g1', '2026-09-25')];
+  const steps = [step({ id: 'a', order: 0, load: 5 }), step({ id: 'b', order: 1, load: 5 })];
+  const r = placeSteps({ steps, goals, events: [], today: '2026-10-01', ...defaultSettings });
+  assert.deepEqual(r.map(x => x.date), ['2026-10-01', '2026-10-01']);
+  assert.deepEqual(r.map(x => x.overdue), [true, true]);
+});
+
+test('지남 단계가 오늘을 차지하면 마감이 안 지난 단계는 그 부하를 피해 다음 날로 간다', () => {
+  const goals = [goal('late', '2026-09-25'), goal('ok', '2026-10-10')];
+  const steps = [step({ id: 'l', goalId: 'late', load: 5 }), step({ id: 'o', goalId: 'ok', load: 5 })]; // 5 + 5 > 안전선 8
+  const r = placeSteps({ steps, goals, events: [], today: '2026-10-01', ...defaultSettings });
+  assert.equal(r[0].date, '2026-10-01');
+  assert.equal(r[0].overdue, true);
+  assert.equal(r[1].date, '2026-10-02');
+  assert.equal(r[1].overdue, false);
+});
+
+test('마감이 어제까지 지났어도 오늘이 마감이면 지남이 아니다. 어제가 마감이면 지남', () => {
+  const today = '2026-10-01';
+  const onDeadline = placeSteps({ steps: [step({})], goals: [goal('g1', '2026-10-01')], events: [], today, ...defaultSettings });
+  assert.equal(onDeadline[0].overdue, false);
+  const yesterday = placeSteps({ steps: [step({})], goals: [goal('g1', '2026-09-30')], events: [], today, ...defaultSettings });
+  assert.equal(yesterday[0].overdue, true);
+  assert.equal(yesterday[0].date, today);
+});
+
+test('고정한 지남 단계는 고정한 날에 두고 지남으로 표시한다', () => {
+  const r = placeSteps({ steps: [step({ pinnedDate: '2026-10-04' })], goals: [goal('g1', '2026-09-25')], events: [], today: '2026-10-01', ...defaultSettings });
+  assert.equal(r[0].date, '2026-10-04');
+  assert.equal(r[0].pinned, true);
+  assert.equal(r[0].overdue, true);
+});
+
+test('지남 단계는 날이 바뀌면 그날(오늘) 칸으로 따라온다', () => {
+  const goals = [goal('g1', '2026-09-25')];
+  const steps = [step({})];
+  assert.equal(placeSteps({ steps, goals, events: [], today: '2026-10-01', ...defaultSettings })[0].date, '2026-10-01');
+  assert.equal(placeSteps({ steps, goals, events: [], today: '2026-10-05', ...defaultSettings })[0].date, '2026-10-05');
+});
+
+test('지남 단계는 깔기 방식이 고르게여도 오늘이다', () => {
+  const r = placeSteps({ steps: [step({})], goals: [goal('g1', '2026-09-25')], events: [], today: '2026-10-01', ...defaultSettings, placeMode: 'even' });
+  assert.equal(r[0].date, '2026-10-01');
 });
 
 test('마감이 오늘이면 후보가 오늘 하루뿐이고, 들어가면 오늘 깔린다', () => {

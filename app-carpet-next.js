@@ -8,7 +8,7 @@
 //  [ ] 초과 표시 3종: 안전선 초과, 예산 초과, 시간 초과
 //  [x] 단계를 누르면: 완료(박스 누르기). 다른 날로 옮기는 것은 드래그가 맡는다. "이 날 안 함"과 밀린 횟수는 없앴다
 //  [x] 단계 드래그로 다른 날에 고정(마우스, 터치는 길게 눌러 시작). 안내는 토스트 대신 화면 가장자리 구역
-//  [ ] 지남 박스(마감이 지나 깔리지 않은 단계)
+//  [x] 지남 박스: 마감이 지난 미완료 단계는 오늘 칸에 부하로 세어 얹히고, 박스 모서리에 붉은 도장(알람 아이콘)이 붙는다
 //  [x] 지난 주 요약: 없앴다(SPEC에서도 뺌)
 //  [ ] 카펫 선: 부하만큼 처짐, 시간 초과 짐 상자
 //  [x] 눈금: 가로 눈금, 예산선, 안전선, 날짜 구분선, 오늘 칸 배경. 예산선 아래에는 아무것도 없다
@@ -125,6 +125,7 @@ const STAGE_STYLE = {
   focusMs: 260,                // 커지고 줄어드는 시간(ms)
   focusTitleFont: 17,          // 커진 박스의 제목 글자 크기(px)
   focusFont: 13,               // 그 밖의 글자 크기(px)
+  lateIconScale: 1.9,          // 지남 도장 안 알람 아이콘의 크기(24칸 그림의 배율. 도장 지름 100 중 24 × 이 값)
   sealInset: 0.2,              // 도장 중심이 박스 오른쪽 위 모서리에서 안쪽으로 들어간 거리(도장 지름의 배수). 작을수록 더 튀어나간다
   sealLobes: 18,               // 도장 가장자리의 물결 수
   carpetFlatRatio: 0.75,       // 카펫이 처졌을 때 칸 폭 중 평평한 바닥 비율. 키우면 바닥이 넓고 날짜 사이 경사가 가팔라진다(박스 폭보다 작으면 박스 끝이 경사 위로 살짝 나온다)
@@ -149,6 +150,11 @@ const STAGE_STYLE = {
     + `<path style="fill:var(--seal-fill);stroke:var(--seal-edge);stroke-width:1.4" d="${BoxIcons.sealPath(STAGE_STYLE.sealLobes)}"/>`
     // 체크: 선 두께를 스티치와 같게(--stitch-width, 화면 크기 그대로: non-scaling-stroke), 끝은 스티치처럼 둥글게
     + '<polyline points="-23,2 -8,17 23,-17" style="fill:none;stroke:var(--seal-check);stroke-width:var(--stitch-width);stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke"/>'
+    + '</symbol>'
+    // 지남 도장: 같은 모양에 붉은 톤, 체크 대신 알람 아이콘(24칸 그림을 도장 가운데에 맞춰 키운다)
+    + '<symbol id="cn-seal-late-sym" viewBox="-50 -50 100 100">'
+    + `<path style="fill:var(--late-fill);stroke:var(--late-edge);stroke-width:1.4" d="${BoxIcons.sealPath(STAGE_STYLE.sealLobes)}"/>`
+    + `<path transform="translate(-${12 * STAGE_STYLE.lateIconScale} -${12 * STAGE_STYLE.lateIconScale}) scale(${STAGE_STYLE.lateIconScale})" style="fill:var(--late-mark)" d="${BoxIcons.paths.push}"/>`
     + '</symbol></svg>';
   const pagesEl = stage.querySelector('.cn-pages');
   const S = INTRO_STYLE;
@@ -460,10 +466,11 @@ const STAGE_STYLE = {
   function boxItems(page) {
     const items = [];
     const goalTitle = new Map(state.goals.map(g => [g.id, g.title])); // 단계의 상위 할 일
+    const goalDeadline = new Map(state.goals.map(g => [g.id, g.deadline])); // 지남 안내에 쓴다
     page.stats.forEach((st, col) => {
       st.events.forEach(ev => items.push({ id: `ev:${ev.id}:${st.date}`, col, load: ev.load, kind: 'fixed', title: ev.title, minutes: Placement.eventDurationMinutes(ev), eventId: ev.id, date: st.date }));
       st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done', title: s.title, goal: goalTitle.get(s.goalId) || '', minutes: s.minutes, stepId: s.id }));
-      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo', title: step.title, goal: goalTitle.get(step.goalId) || '', minutes: step.minutes, stepId: step.id }));
+      st.steps.forEach(({ step, placement }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo', title: step.title, goal: goalTitle.get(step.goalId) || '', minutes: step.minutes, stepId: step.id, overdue: Boolean(placement.overdue), deadline: placement.overdue ? goalDeadline.get(step.goalId) : undefined }));
     });
     return items.filter(it => it.load > 0);
   }
@@ -519,13 +526,13 @@ const STAGE_STYLE = {
 
   // 완료 도장: 박스 오른쪽 위 모서리에 조금 튀어나가게 붙는다. 박스 층과 따로 둔 위층에 있어서 위에 쌓인 박스에 가려지지 않고,
   // 물리 계산에는 아무 영향이 없다(보이는 것만). 박스와 같은 transform을 받아 따라다닌다
-  function makeSealEl(page, box) {
+  function makeSealEl(page, box, late = false) {
     const tiny = box.h < G.sealTinyBelow;
     const s = tiny ? G.sealSizeTiny : G.sealSize;
     const wrap = document.createElement('div');
     wrap.className = 'cn-seal-wrap';
     const left = box.w / 2 - G.sealInset * s - s / 2, top = -box.h / 2 + G.sealInset * s - s / 2;
-    wrap.innerHTML = `<svg class="cn-seal" style="left:${left.toFixed(1)}px;top:${top.toFixed(1)}px;width:${s}px;height:${s}px" aria-hidden="true"><use href="#cn-seal-sym"/></svg>`;
+    wrap.innerHTML = `<svg class="cn-seal" style="left:${left.toFixed(1)}px;top:${top.toFixed(1)}px;width:${s}px;height:${s}px" aria-hidden="true"><use href="#${late ? 'cn-seal-late-sym' : 'cn-seal-sym'}"/></svg>`;
     page.sealsEl.appendChild(wrap);
     return wrap;
   }
@@ -609,8 +616,8 @@ const STAGE_STYLE = {
     const boxEl = makeBoxEl(page, box, item.kind === 'todo' ? 'todo' : item.kind === 'fixed' ? 'paper fixed' : 'paper', item);
     sim.els.set(item.id, boxEl);
     boxEl.style.transform = `rotate(${box.tilt.toFixed(2)}deg)`; // 기울기는 한 번만 정한다(위치는 translate, 떨림은 rotate 속성)
-    if (item.kind === 'done') {
-      const seal = makeSealEl(page, box);
+    if (item.kind === 'done' || item.overdue) { // 완료 도장, 또는 마감이 지난 단계의 붉은 도장
+      const seal = makeSealEl(page, box, Boolean(item.overdue));
       seal.style.transform = boxEl.style.transform;
       sim.seals.set(item.id, seal);
     }
@@ -891,6 +898,7 @@ const STAGE_STYLE = {
     } else if (item.goal) {
       sub = `<div class="fx-goal">${escapeHtml(item.goal)}</div>`;
     }
+    if (item.overdue && item.deadline) { const [, mo, da] = item.deadline.split('-').map(Number); sub += `<div class="fx-late">마감(${mo}월 ${da}일)이 지났습니다</div>`; }
     if (item.kind === 'todo') actions = button('done', '완료', true);
     const metrics = metric('time', shortDuration(item.minutes)) + metric('load', `부하 ${item.load}`);
     return `<div class="fx-title">${escapeHtml(item.title || '')}</div>${sub}<div class="fx-metrics">${metrics}</div>${actions ? `<div class="fx-actions">${actions}</div>` : ''}`;
@@ -967,7 +975,7 @@ const STAGE_STYLE = {
     const seal = sim.seals.get(id);
     if (seal) {
       const s = G.sealSize;
-      f.insertAdjacentHTML('beforeend', `<svg class="cn-seal" style="right:${(G.sealInset * s - s / 2).toFixed(1)}px;top:${(G.sealInset * s - s / 2).toFixed(1)}px;width:${s}px;height:${s}px" aria-hidden="true"><use href="#cn-seal-sym"/></svg>`);
+      f.insertAdjacentHTML('beforeend', `<svg class="cn-seal" style="right:${(G.sealInset * s - s / 2).toFixed(1)}px;top:${(G.sealInset * s - s / 2).toFixed(1)}px;width:${s}px;height:${s}px" aria-hidden="true"><use href="#${item.overdue ? 'cn-seal-late-sym' : 'cn-seal-sym'}"/></svg>`);
     }
     applyFocus(f, from);
     el.style.visibility = 'hidden';
