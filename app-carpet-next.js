@@ -103,10 +103,10 @@ const STAGE_STYLE = {
   focusCoverPad: 3,            // 커진 박스가 원래 박스보다 사방으로 이만큼 더 덮는다(px). 기울어 있던 박스의 모서리가 삐져나오지 않게
   // --- 날짜별 막대(부하, 남은 시간): 눈금 맨 아래 가로선 밑. 카펫이 그 선 밑으로 처지면 그 날의 막대가 카펫 그림자 밑으로 같은 여백을 두고 따라 내려온다. 색은 흐린 회색만 ---
   barsGap: 16,                 // 막대 묶음 위쪽 여백(px): 예산선(또는 카펫 그림자) 밑에서 얼마나 띄울지
-  barsShadowClear: 80,         // 카펫 아래 그림자가 눈에 보이는 깊이(px). 카펫이 선 밑으로 처지면 막대는 카펫 선에서 이 깊이 + barsGap 만큼 아래에 놓인다
-  barsShadowRamp: 240,         // 카펫이 예산선을 넘고 이만큼 처지는 동안 위 간격(barsShadowClear)이 서서히 자란다(px). 작을수록 막대가 카펫보다 빨리 내려간다
+  barsShadowClear: 56,         // 카펫 아래 그림자가 눈에 보이는 깊이(px). 카펫이 예산선 근처까지 내려오면 막대는 카펫 선에서 이 깊이 + barsGap 만큼 아래를 지키며 따라 내려온다
+  barsFadeMs: 600,             // 첫 입장 때 롤이 다 펼쳐진 뒤 막대가 서서히 나타나는 시간(ms)
   barsPadBottom: 28,           // 가장 아래 막대 밑에 남기는 여백(px). 아래 두 버튼에 가려도 끝까지 스크롤하면 보인다
-  barWidthRatio: 0.8,          // 막대 폭 / 칸 폭. 칸 왼쪽에서 날짜 숫자와 같은 거리(datePadXRatio)만큼 띄워 왼쪽 정렬
+  barSideInset: 10,            // 막대는 카펫의 평평한 바닥(carpetFlatRatio) 안에 놓이고, 카펫이 구부러지는 곳과 이 거리(px)만큼 더 떨어진다. 클수록 좌우 여백이 는다
   barLabelFont: 12,            // 막대 위 글자 크기(px)
   barHeight: 6,                // 막대 두께(px)
   barLabelGap: 5,              // 글자와 막대 사이(px)
@@ -288,7 +288,7 @@ const STAGE_STYLE = {
     pagesEl.appendChild(el);
     const q = sel => el.querySelector(sel);
     const page = {
-      offset, dates, stats: [], el, sim: null, m: null, mKey: '', gridKey: '',
+      offset, intro, dates, stats: [], el, sim: null, m: null, mKey: '', gridKey: '',
       gridSvg: q('.cn-grid'), gridG: q('.grid'), barsEl: q('.cn-bars'), barCols: [], barsY: [], carpetCanvas: q('.cn-carpet'),
       dropEl: q('.cn-drop'), boxesEl: q('.cn-boxes'), sealsEl: q('.cn-seals'), focusEl: q('.cn-focus'), shadowEl: q('.cn-shadow'),
       coverEl: q('.cn-cover'), laidEl: q('.cn-laid'), rollSvg: q('.cn-roll'), rollPath: q('.cn-roll path'),
@@ -351,7 +351,7 @@ const STAGE_STYLE = {
     page.mKey = key;
     const deepest = b.unit * Math.max(b.capacity, maxLoad);
     // 가장 깊이 처진 날의 막대 묶음 아래까지 페이지에 넣는다(예산선 밑 막대도 마찬가지). 아래 버튼에 가려지는 부분은 끝까지 스크롤하면 보인다
-    const barsBottom = DayBars.barsTop({ carpetY: b.groundY + deepest, budgetY: b.groundY + b.sag, gap: G.barsGap, clear: G.barsShadowClear, ramp: G.barsShadowRamp }) + barsBlockHeight() + G.barsPadBottom;
+    const barsBottom = DayBars.barsTop({ carpetY: b.groundY + deepest, budgetY: b.groundY + b.sag, gap: G.barsGap, clear: G.barsShadowClear }) + barsBlockHeight() + G.barsPadBottom;
     const height = Math.ceil(Math.max(b.groundY + deepest + G.scrollTail + 2, barsBottom));
     const m = page.m = { ...b, maxLoad, deepest, height };
     // 층 크기: 모든 층이 같은 좌표계(왼쪽 위가 (0,0))를 쓴다
@@ -376,23 +376,29 @@ const STAGE_STYLE = {
   function drawBars(page, width) {
     const colW = width / 7, safe = state.settings.safeRatio;
     page.barsEl.style.cssText = `--bar-label:${G.barLabelFont}px;--bar-h:${G.barHeight}px;--bar-label-gap:${G.barLabelGap}px;--bar-row-gap:${G.barRowGap}px;--bar-text:${G.barTextColor};--bar-track:${G.barTrackColor};--bar-fill:${G.barFillColor};--bar-safe:${G.barSafeColor}`;
+    const flat = colW * G.carpetFlatRatio; // 카펫의 평평한 바닥 폭: 막대는 그 안에 놓아 구부러지는 곳 밑을 피한다
     page.barsEl.innerHTML = page.stats.map((st, i) => {
       const used = st.availableMinutes - st.minutesLeft;
       const row = (label, ratio, mark) => `<div class="bar-row"><div class="bar-text">${label}</div><div class="bar"><i style="width:${(ratio * 100).toFixed(1)}%"></i>${mark}</div></div>`;
-      return `<div class="bar-col" style="left:${(i * colW + colW * G.datePadXRatio).toFixed(1)}px;width:${(colW * G.barWidthRatio).toFixed(1)}px">`
+      return `<div class="bar-col" style="left:${(i * colW + (colW - flat) / 2 + G.barSideInset).toFixed(1)}px;width:${Math.max(0, flat - 2 * G.barSideInset).toFixed(1)}px">`
         + row(`부하 ${st.load} / ${st.capacity}`, DayBars.fillRatio(st.load, st.capacity), safe > 0 && safe < 1 ? `<b style="left:${(safe * 100).toFixed(1)}%"></b>` : '')
         + row(`남은 시간 ${formatLeft(st.minutesLeft)}`, DayBars.fillRatio(used, st.availableMinutes), '')
         + '</div>';
     }).join('');
     page.barCols = [...page.barsEl.children];
     page.barsY = [];
+    if (!page.barsShown) { // 처음 나타날 때: 첫 입장(롤이 다 펼쳐진 뒤)이면 서서히, 주 넘기기로 들어오는 페이지는 바로
+      page.barsShown = true;
+      if (page.intro && !reduceMotion()) { page.barsEl.style.transition = `opacity ${G.barsFadeMs}ms ease`; void page.barsEl.offsetWidth; }
+      page.barsEl.classList.add('on');
+    }
   }
 
   // 날짜마다 막대 높이를 그 날의 카펫에 맞춘다: 예산선 밑이 기본이고, 카펫이 선 밑으로 처지면 그림자 밑으로 따라 내려온다
   function positionBars(page, world, m) {
     const budgetY = m.groundY + m.sag;
     page.barCols.forEach((el, c) => {
-      const y = DayBars.barsTop({ carpetY: m.groundY + world.sag[c], budgetY, gap: G.barsGap, clear: G.barsShadowClear, ramp: G.barsShadowRamp }).toFixed(1);
+      const y = DayBars.barsTop({ carpetY: m.groundY + world.sag[c], budgetY, gap: G.barsGap, clear: G.barsShadowClear }).toFixed(1);
       if (page.barsY[c] !== y) { page.barsY[c] = y; el.style.translate = `0 ${y}px`; }
     });
   }
