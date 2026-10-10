@@ -185,7 +185,8 @@
     const half = parseFloat(cssVar('--modal-flip-deg')) / 2; // 앞면이 이만큼 돌아 옆면이 되고, 거기서 뒷면이 이어받는다
     const delay = cssMs('--modal-content-delay');
     const swapStart = cssMs('--modal-swap-start'), swap = cssMs('--modal-swap'); // 원본 버튼과 복제본이 서로 바뀌는 구간(시간 비율 0~1)
-    const timing = { duration: cssMs('--modal-anim-ms'), easing: cssVar(reverse ? '--modal-ease-close' : '--modal-ease'), fill: 'both' };
+    const ms = cssMs(reverse ? '--modal-anim-close-ms' : '--modal-anim-ms');
+    const timing = { duration: ms, easing: cssVar(reverse ? '--modal-ease-close' : '--modal-ease'), fill: 'both' };
     const landEase = cssVar('--modal-ease-land');
     // 닫을 때는 키프레임을 직접 뒤집어 앞으로 재생한다. direction: 'reverse'로는 구간마다 다른 곡선을 줄 수 없다.
     // land 표시가 붙은 키프레임에서 시작하는 구간(복제본이 버튼 자리로 내려앉는 마지막 이동)에만 닫을 때 landEase를 건다
@@ -216,7 +217,7 @@
       modal.animate(frames([
         { backgroundColor: bg.replace(/[\d.]+\)$/, '0)'), backdropFilter: 'blur(0px)', webkitBackdropFilter: 'blur(0px)' },
         { backgroundColor: bg, backdropFilter: `blur(${blur})`, webkitBackdropFilter: `blur(${blur})` },
-      ]), { duration: cssMs('--modal-anim-ms') * cssMs('--modal-fade-ratio'), easing: 'ease-in-out', fill: 'both' }),
+      ]), { duration: ms * cssMs('--modal-fade-ratio'), easing: 'ease-in-out', fill: 'both' }),
       // 앞면(버튼 복제본): 서서히 나타나 원본을 덮고, 팝업 쪽으로 이동하며 늘어나 옆면까지 돈 뒤 사라진다
       front.animate(frames([
         { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 0, offset: 0 },
