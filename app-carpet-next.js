@@ -4,7 +4,7 @@
 //
 // 이관 체크리스트: 옛 카펫이 하는 일. 새 카펫이 다 채워야 교체한다. 채우면 [x]로 바꾼다
 //  [x] 주 이동(이전·다음·이번 주)과 날짜 범위 표시. 버튼은 헤더의 week-patch가 가지고 있다. 이동하는 주는 연출 없이 정착한 모습으로 슬라이드해 들어온다
-//  [ ] 날짜 7칸: 일정, 그날의 단계, 부하/예산, 여유, 남은 시간, 오늘 표시
+//  [x] 날짜 7칸: 일정, 그날의 단계, 부하/예산, 남은 시간(눈금 밑 막대; 여유는 부하 막대와 겹쳐 뺌), 오늘 표시
 //  [ ] 초과 표시 3종: 안전선 초과, 예산 초과, 시간 초과
 //  [ ] 단계를 누르면 메뉴: 완료(됨, 박스 누르기) / 이 날 안 함(밀림) / 다른 날에 고정(둘은 드래그가 맡는다)
 //  [x] 단계 드래그로 다른 날에 고정(마우스, 터치는 길게 눌러 시작). 안내는 토스트 대신 화면 가장자리 구역
@@ -101,6 +101,18 @@ const STAGE_STYLE = {
   focusPad: 16,                // 커진 박스 안쪽 여백(px)
   focusMargin: 12,             // 커진 박스가 화면 가장자리(양옆·헤더 아래·아래 메모지 위)에서 띄우는 거리(px)
   focusCoverPad: 3,            // 커진 박스가 원래 박스보다 사방으로 이만큼 더 덮는다(px). 기울어 있던 박스의 모서리가 삐져나오지 않게
+  // --- 날짜별 막대(부하, 남은 시간): 눈금 맨 아래 가로선 밑. 카펫이 그 선 밑으로 처지면 그 날의 막대가 카펫 그림자 밑으로 같은 여백을 두고 따라 내려온다. 색은 흐린 회색만 ---
+  barsGap: 16,                 // 막대 묶음 위쪽 여백(px): 예산선(또는 카펫 그림자) 밑에서 얼마나 띄울지
+  barsPadBottom: 28,           // 가장 아래 막대 밑에 남기는 여백(px). 아래 두 버튼에 가려도 끝까지 스크롤하면 보인다
+  barWidthRatio: 0.8,          // 막대 폭 / 칸 폭. 칸 왼쪽에서 날짜 숫자와 같은 거리(datePadXRatio)만큼 띄워 왼쪽 정렬
+  barLabelFont: 12,            // 막대 위 글자 크기(px)
+  barHeight: 6,                // 막대 두께(px)
+  barLabelGap: 5,              // 글자와 막대 사이(px)
+  barRowGap: 12,               // 부하 줄과 남은 시간 줄 사이(px)
+  barTextColor: '#aaa398',     // 글자 색
+  barTrackColor: '#e7e2da',    // 막대 바탕 색
+  barFillColor: '#c3bcb1',     // 채워진 부분 색
+  barSafeColor: '#9a9287',     // 안전선 눈금 색
   vanishMs: 280,               // 없어지는 박스가 투명해지는 시간(ms). 그동안 카펫은 줄어든 무게만큼 올라온다
   dragMovePx: 6,               // 마우스로 이만큼 움직이면 끌기가 시작된다(px). 그 전에 놓으면 그냥 누르기
   dragLongPressMs: 300,        // 터치는 이만큼 길게 눌러야 끌기가 시작된다(ms). 그 전에 움직이면 스크롤·주 넘기기 스와이프
@@ -265,7 +277,7 @@ const STAGE_STYLE = {
     el.className = 'cn-world';
     // 층(아래부터): 눈금(그려 두고 안 바뀜) -> 가리개(롤 앞의 눈금을 숨김) -> 깔린 카펫(처음 직선) -> 처진 카펫 -> 박스 -> 도장 -> 롤.
     // 움직이는 것은 층을 따로 둬서, 박스 하나가 움직일 때 눈금 점선이나 다른 박스까지 다시 그려지지 않게 한다(Safari 렉 방지).
-    el.innerHTML = '<svg class="cn-grid" aria-hidden="true"><g class="grid"></g></svg>'
+    el.innerHTML = '<svg class="cn-grid" aria-hidden="true"><g class="grid"></g></svg><div class="cn-bars"></div>'
       + (intro ? '<div class="cn-cover"></div><div class="cn-laid"></div>' : '')
       + '<canvas class="cn-shadow" aria-hidden="true"></canvas>'
       + '<canvas class="cn-carpet" aria-hidden="true"></canvas>'
@@ -275,7 +287,7 @@ const STAGE_STYLE = {
     const q = sel => el.querySelector(sel);
     const page = {
       offset, dates, stats: [], el, sim: null, m: null, mKey: '', gridKey: '',
-      gridSvg: q('.cn-grid'), gridG: q('.grid'), carpetCanvas: q('.cn-carpet'),
+      gridSvg: q('.cn-grid'), gridG: q('.grid'), barsEl: q('.cn-bars'), barCols: [], barsY: [], carpetCanvas: q('.cn-carpet'),
       dropEl: q('.cn-drop'), boxesEl: q('.cn-boxes'), sealsEl: q('.cn-seals'), focusEl: q('.cn-focus'), shadowEl: q('.cn-shadow'),
       coverEl: q('.cn-cover'), laidEl: q('.cn-laid'), rollSvg: q('.cn-roll'), rollPath: q('.cn-roll path'),
     };
@@ -336,7 +348,9 @@ const STAGE_STYLE = {
     if (page.mKey === key) return page.m;
     page.mKey = key;
     const deepest = b.unit * Math.max(b.capacity, maxLoad);
-    const height = Math.ceil(b.groundY + deepest + G.scrollTail + 2);
+    // 가장 깊이 처진 날의 막대 묶음 아래까지 페이지에 넣는다(예산선 밑 막대도 마찬가지). 아래 버튼에 가려지는 부분은 끝까지 스크롤하면 보인다
+    const barsBottom = DayBars.barsTop({ carpetY: b.groundY + deepest, budgetY: b.groundY + b.sag, gap: G.barsGap, clear: SHADOW_STYLE.fadeLength }) + barsBlockHeight() + G.barsPadBottom;
+    const height = Math.ceil(Math.max(b.groundY + deepest + G.scrollTail + 2, barsBottom));
     const m = page.m = { ...b, maxLoad, deepest, height };
     // 층 크기: 모든 층이 같은 좌표계(왼쪽 위가 (0,0))를 쓴다
     page.el.style.height = `${height}px`;
@@ -346,6 +360,39 @@ const STAGE_STYLE = {
     if (page.rollSvg) { page.rollSvg.setAttribute('width', b.rollSize); page.rollSvg.setAttribute('height', b.rollSize); }
     if (page === active) applyContainer(m);
     return m;
+  }
+
+  // ---- 날짜별 막대: 위는 부하, 아래는 남은 시간. 글자는 막대 위에 한 줄씩 ----
+  const barRowHeight = () => Math.ceil(G.barLabelFont * 1.3) + G.barLabelGap + G.barHeight;
+  const barsBlockHeight = () => 2 * barRowHeight() + G.barRowGap;
+  function formatLeft(min) { // 남은 시간(분): 1시간 30분, 45분, 음수는 앞에 -
+    const sign = min < 0 ? '-' : '', a = Math.abs(Math.round(min)), h = Math.floor(a / 60), m = a % 60;
+    return sign + (h && m ? `${h}시간 ${m}분` : h ? `${h}시간` : `${m}분`);
+  }
+
+  // 막대 일곱 묶음을 새로 만든다(바뀌는 건 글자와 길이뿐). 높이는 positionBars가 카펫을 따라 맞춘다
+  function drawBars(page, width) {
+    const colW = width / 7, safe = state.settings.safeRatio;
+    page.barsEl.style.cssText = `--bar-label:${G.barLabelFont}px;--bar-h:${G.barHeight}px;--bar-label-gap:${G.barLabelGap}px;--bar-row-gap:${G.barRowGap}px;--bar-text:${G.barTextColor};--bar-track:${G.barTrackColor};--bar-fill:${G.barFillColor};--bar-safe:${G.barSafeColor}`;
+    page.barsEl.innerHTML = page.stats.map((st, i) => {
+      const used = st.availableMinutes - st.minutesLeft;
+      const row = (label, ratio, mark) => `<div class="bar-row"><div class="bar-text">${label}</div><div class="bar"><i style="width:${(ratio * 100).toFixed(1)}%"></i>${mark}</div></div>`;
+      return `<div class="bar-col" style="left:${(i * colW + colW * G.datePadXRatio).toFixed(1)}px;width:${(colW * G.barWidthRatio).toFixed(1)}px">`
+        + row(`부하 ${st.load} / ${st.capacity}`, DayBars.fillRatio(st.load, st.capacity), safe > 0 && safe < 1 ? `<b style="left:${(safe * 100).toFixed(1)}%"></b>` : '')
+        + row(`남은 시간 ${formatLeft(st.minutesLeft)}`, DayBars.fillRatio(used, st.availableMinutes), '')
+        + '</div>';
+    }).join('');
+    page.barCols = [...page.barsEl.children];
+    page.barsY = [];
+  }
+
+  // 날짜마다 막대 높이를 그 날의 카펫에 맞춘다: 예산선 밑이 기본이고, 카펫이 선 밑으로 처지면 그림자 밑으로 따라 내려온다
+  function positionBars(page, world, m) {
+    const budgetY = m.groundY + m.sag;
+    page.barCols.forEach((el, c) => {
+      const y = DayBars.barsTop({ carpetY: m.groundY + world.sag[c], budgetY, gap: G.barsGap, clear: SHADOW_STYLE.fadeLength }).toFixed(1);
+      if (page.barsY[c] !== y) { page.barsY[c] = y; el.style.translate = `0 ${y}px`; }
+    });
   }
 
   // 보이는 페이지의 높이를 바깥 틀에 반영. 화면보다 길어지면 아래로 스크롤된다. 맨 아래까지 내려도 고정된 아래 두 버튼에 카펫이 가리지 않게 그 높이만큼 아래 여백을 둔다
@@ -493,6 +540,7 @@ const STAGE_STYLE = {
       loads, capacity: cEff, columns: world.columns, width, baseY: m.groundY, maxSag: m.unit * cEff, flatRatio: G.carpetFlatRatio, curve: 0.5,
     });
     drawCarpet(page, shape, width, m, !lineOnly); // 카펫 선과 그림자를 같은 곡선으로 같은 프레임에 그린다(떨림 루프에서는 선만)
+    if (!lineOnly) positionBars(page, world, m);
     if (!sim.carpetShown) {
       showShadow(page); // 카펫이 처음 그려질 때 그림자도 같이 서서히 나타난다. 이후로는 숨기지 않고 카펫을 따라 계속 그려진다 // 처음 한 번: 롤이 깔아 둔 직선과 가리개를 걷고 처지는 카펫으로 넘긴다(처음에는 같은 직선이라 티가 안 난다)
       sim.carpetShown = true;
@@ -730,6 +778,7 @@ const STAGE_STYLE = {
     const drops = dropIds ? all.filter(it => dropIds.has(it.id)) : all;
     const stays = dropIds ? all.filter(it => !dropIds.has(it.id)) : [];
     if (mode !== 'empty') { page.items = all.map(it => ({ ...it })); page.settingsKey = settingsKey(page); } // 다시 그릴 때 무엇이 달라졌는지 견주는 기준
+    drawBars(page, width);
     const over = page.stats.map(st => st.overBudget);
     const overSafe = page.stats.map(st => st.overSafe); // 안전선 초과(예산 초과 포함): 그림자가 붉어지는 기준
     const fidget = over.some(Boolean) && !reduceMotion();
@@ -802,6 +851,7 @@ const STAGE_STYLE = {
     const moved = diff.drop.filter(id => sim.els.has(id));
     [...diff.removed, ...moved].forEach(id => vanishBox(page, id));
     page.items = next.map(it => ({ ...it }));
+    drawBars(page, sim.width);
     const over = page.stats.map(st => st.overBudget);
     sim.over = over;
     sim.overSafe = page.stats.map(st => st.overSafe);
