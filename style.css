@@ -51,7 +51,7 @@
   --wbtn-chevron: 16px;        /* 화살표(chevron) 크기 */
   --wbtn-stitch-inset: 6px;    /* 점선이 가장자리에서 안쪽으로 들어간 거리. 점 길이·간격·두께는 공용 토큰(--stitch-*)을 그대로 쓴다 */
   --wbtn-shadow: 0 4px 14px rgba(0, 0, 0, 0.26); /* 버튼 그림자. 어두운 회색, 넓게 퍼지게 */
-  --wbtn-stitch-color: #d8cda4; /* 버튼 점선 색. 버튼 배경(종이색)보다 약간 어두운 색 */
+  --wbtn-stitch-color: var(--stitch-color); /* 버튼 점선 색. 공용 털실 색(주황) */
   --wbtn-press-bg: #ece2c0;    /* 누르고 있는 동안 버튼 배경. 종이색보다 약간 어둡게 */
   --wbtn-hover-tilt: 2.5deg;   /* 마우스를 올리면 시계 방향으로 기우는 각도 */
   --wbtn-press-tilt: -3.5deg;  /* 누르면 반시계 방향으로 기우는 각도 */
