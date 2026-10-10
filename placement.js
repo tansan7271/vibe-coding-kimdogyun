@@ -158,9 +158,7 @@
           return a.localeCompare(b);
         })[0];
       }
-      // fill (기본값)
-      const withLoad = candidates.filter(d => dayLoad(d) > 0).sort((a, b) => a.localeCompare(b));
-      if (withLoad.length) return withLoad[0];
+      // fill (기본값): 들어가는 날 중 가장 이른 날. 비어 있는 이른 날을 건너뛰고 일정이 있는 먼 날로 가지 않는다
       return candidates.slice().sort((a, b) => a.localeCompare(b))[0];
     }
 

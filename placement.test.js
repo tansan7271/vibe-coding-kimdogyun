@@ -127,14 +127,43 @@ test('고정된 단계의 부하는 다른 단계 배치에 영향을 준다', (
   assert.equal(byId.s2.date, '2026-10-02');
 });
 
-test('채우기 우선: 이미 부하가 있는 날 중 가장 이른 날을 고른다', () => {
+test('채우기 우선: 들어가는 날 중 가장 이른 날을 고른다 (일정이 있는 뒤쪽 날로 건너뛰지 않는다)', () => {
   const goals = [goal('g1', '2026-10-05')];
   const events = [
     { id: 'e1', title: '알바', load: 2, start: '09:00', end: '10:00', repeat: 'none', date: '2026-10-02' },
   ];
   const steps = [step({ id: 's1', load: 2, minutes: 30 })];
   const result = placeSteps({ steps, goals, events, today: '2026-10-01', ...defaultSettings, placeMode: 'fill' });
-  assert.equal(result[0].date, '2026-10-02');
+  assert.equal(result[0].date, '2026-10-01'); // 10/01은 비어 있어도 들어가는 가장 이른 날이다
+});
+
+test('채우기 우선: 이른 날이 가득 차서 못 들어가면 그다음 이른 날로 간다 (비어 있는 날을 건너뛰지 않는다)', () => {
+  // 10/03은 일정 부하 9라 부하 3을 넣으면 안전선(8) 초과, 10/04는 비어 있다, 10/05는 일정 부하 5 + 3 = 8로 들어간다
+  const goals = [goal('g1', '2026-10-06')];
+  const events = [
+    { id: 'e1', title: '수업', load: 9, start: '09:00', end: '10:00', repeat: 'none', date: '2026-10-03' },
+    { id: 'e2', title: '알바', load: 5, start: '09:00', end: '10:00', repeat: 'none', date: '2026-10-05' },
+  ];
+  const steps = [step({ id: 's1', load: 3, minutes: 30 })];
+  const result = placeSteps({ steps, goals, events, today: '2026-10-03', ...defaultSettings, placeMode: 'fill' });
+  assert.equal(result[0].date, '2026-10-04');
+});
+
+test('채우기 우선: 같은 할 일의 단계를 옮겨도 남은 단계가 빈 날을 두고 뒤로 밀리지 않는다', () => {
+  const goals = [goal('g1', '2026-10-20')];
+  const events = [
+    { id: 'e1', title: '수업', load: 5, start: '09:00', end: '10:00', repeat: 'none', date: '2026-10-05' },
+  ];
+  const steps = [
+    step({ id: 's1', order: 0, load: 3, minutes: 30 }),
+    step({ id: 's2', order: 1, load: 3, minutes: 30, pinnedDate: '2026-10-02' }),
+    step({ id: 's3', order: 2, load: 3, minutes: 30 }),
+  ];
+  const result = placeSteps({ steps, goals, events, today: '2026-10-01', ...defaultSettings, placeMode: 'fill' });
+  // 앞 단계(s1)가 깔린 날 이후의 가장 이른 날에 이어서 깔린다. 일정이 있는 10/05로 건너뛰지 않는다
+  const s1 = result[0].date, s3 = result[2].date;
+  assert.equal(s1, '2026-10-01');
+  assert.ok(s3 <= '2026-10-02', `s3=${s3}`);
 });
 
 test('고르게: 여유가 가장 큰 날을 고른다', () => {
