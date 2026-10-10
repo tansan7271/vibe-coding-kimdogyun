@@ -804,7 +804,7 @@ const STAGE_STYLE = {
     fx.style.width = `${width}px`;
     page.focusEl.appendChild(f);
     const naturalH = fx.offsetHeight; // fx는 글 흐름대로 높이가 정해진 채 재진다(아직 absolute 아님)
-    const rect = BoxFocus.focusRect({ box: { x: cx, y: cy }, size: { w: width, h: naturalH }, bounds, margin: G.focusMargin, cover: { w: box.w + 2 * G.focusCoverPad, h: box.h + 2 * G.focusCoverPad } });
+    const rect = BoxFocus.focusRect({ box: { x: cx, y: cy }, size: { w: Math.max(width, box.w + 2 * G.focusCoverPad), h: Math.max(naturalH, box.h + 2 * G.focusCoverPad) }, bounds, margin: G.focusMargin, cover: { w: box.w + 2 * G.focusCoverPad, h: box.h + 2 * G.focusCoverPad } }); // 원래 박스보다 작아지지 않는다: 남는 높이는 글자 아래에 비고, 버튼은 항상 아래 오른쪽 끝
     const to = { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, w: rect.width, h: rect.height, rot: 0 }; // 바탕: 내용 자리와 원래 박스 자리를 함께 덮는다
     f.classList.add('placed'); // 이제부터 fx는 박스 안에 얹힌다(스크롤은 넘칠 때만)
     const c = rect.content; // 글자와 버튼은 항상 보이는 영역 안. 바탕 안에서의 자리로 놓는다

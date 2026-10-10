@@ -1190,7 +1190,7 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .fx-metrics .m { display: inline-flex; align-items: center; gap: 3px; }
 .fx-metrics .m b { font-weight: 600; }
 .fx-metrics .ic { width: 15px; height: 15px; fill: currentColor; flex: none; }
-.fx-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.fx-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: auto; padding-top: 4px; } /* 버튼은 항상 박스 아래 오른쪽 끝. 나머지는 왼쪽 위부터 쌓인다 */
 .cn-fbox .sbtn { --wbtn-pad: 8px 16px; --wbtn-font: 14px; }
 
 /* 예산 초과인 날의 박스 떨림(홈 화면 수정 모드). 위치는 translate, 기울기는 transform, 떨림은 rotate 속성이 맡아 곱해진다. 박스마다 빠르기·시작점은 JS가 --jig-dur, --jig-delay로 준다.
