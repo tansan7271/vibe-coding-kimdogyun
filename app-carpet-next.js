@@ -15,7 +15,8 @@
 //  [x] 날짜 숫자: 카펫 선 위쪽 여백 안, 칸마다 왼쪽 정렬. 폰트 파일 없이 숫자 윤곽선(barista-digits.js)으로 그린다(눈금 숫자와 요일 글자는 아직 안 넣음)
 //  [x] 헤더의 월 표시: Red Carpet ∙ 10월
 //  [x] 박스(일정·완료·남은 단계) 낙하: 위에서 떨어져 부딪히고 쌓이며 카펫이 무게만큼 눌렸다 정착한다. 첫 입장 때 한 번(carpet-physics.js)
-//  [ ] 박스 위 글자, 박스 누르기(단계 메뉴), 끌어 놓으면 다시 낙하
+//  [x] 박스 위 글자(제목)와 아이콘(부하·시간·밀림), 완료 도장. 박스 크기(부하)에 따라 배치가 달라진다
+//  [ ] 박스 누르기(단계 메뉴 등 동작은 따로 정한다), 끌어 놓으면 다시 낙하
 //  [ ] 좁은 화면(가로 스크롤)
 //  숨은 부작용(빠뜨리기 쉬움)
 //  [ ] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
@@ -68,6 +69,22 @@ const STAGE_STYLE = {
   boxBounce: 0.5,              // 박스가 부딪힐 때 튕기는 정도(0~1). 클수록 통통 튄다. carpet-physics.js의 restitution
   boxSpawnVx: 190,             // 떨어질 때 옆으로 흔들리는 속도의 최대(px/s). 클수록 옆으로 흩어지며 떨어진다
   maxSettleMs: 12000,          // 마지막 박스가 떨어진 뒤 이 시간이 지나면 정착하지 못했어도 멈춘다(배터리를 쓰며 계속 도는 것을 막는 안전장치)
+  // --- 박스 위 글자·아이콘·완료 도장. 박스 높이(부하)에 따라 배치가 달라진다: 제목과 아이콘 줄이 위아래로 들어갈 높이가 되면 위아래(제목은 자리 되는 만큼 여러 줄),
+  //     모자라면 한 줄에 제목과 아이콘을 같이 둔다. 먼저 여백을 넉넉히(boxPad), 안 되면 좁혀서(boxPadTight) 위아래 배치를 시도한다 ---
+  boxTitleFont: 13,            // 제목 글자 크기(px). 가장 작은 박스는 boxTinyFont
+  boxTinyFont: 11.5,           // 가장 작은 박스의 제목 글자 크기
+  boxLineHeight: 1.25,         // 제목 줄 높이(글자 크기의 배수)
+  boxIcon: 13,                 // 아이콘 크기(px)
+  boxPad: 6,                   // 점선과 글자 사이 여백(px). 가장 작은 박스는 boxPadTiny
+  boxPadTight: 3,              // 박스가 낮을 때 점선과 글자 사이 여백
+  boxPadTiny: 2,               // 한 줄 배치일 때
+  boxInsetMin: 4.5,            // 점선이 가장자리에서 들어가는 거리의 범위(px). 박스가 작을수록 가장자리에 붙여 글자 자리를 만든다
+  boxInsetMax: 8,
+  sealSize: 30,                // 완료 도장 지름(px). 가장 작은 박스는 sealSizeTiny
+  sealSizeTiny: 24,            // 박스 높이가 sealTinyBelow보다 낮을 때
+  sealTinyBelow: 40,
+  sealInset: 0.2,              // 도장 중심이 박스 오른쪽 위 모서리에서 안쪽으로 들어간 거리(도장 지름의 배수). 작을수록 더 튀어나간다
+  sealLobes: 18,               // 도장 가장자리의 물결 수
   carpetFlatRatio: 0.75,       // 카펫이 처졌을 때 칸 폭 중 평평한 바닥 비율. 키우면 바닥이 넓고 날짜 사이 경사가 가팔라진다(박스 폭보다 작으면 박스 끝이 경사 위로 살짝 나온다)
   physics: {},                 // carpet-physics.js의 DEFAULTS를 덮어쓰는 값. 예: { gravity: 3000, restitution: 0.4 } (튕김·출렁임 조절)
 };
@@ -87,7 +104,13 @@ const STAGE_STYLE = {
     + '<div class="cn-laid"></div>'
     + '<svg class="cn-carpet" aria-hidden="true"><path/></svg>'
     + '<div class="cn-boxes"></div>'
+    + '<div class="cn-seals"></div>'
     + '<svg class="cn-roll" aria-hidden="true"><path/></svg>'
+    + '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="cn-seal-sym" viewBox="-50 -50 100 100">'
+    + `<path style="fill:var(--seal-fill);stroke:var(--seal-edge);stroke-width:1.4" d="${BoxIcons.sealPath(STAGE_STYLE.sealLobes)}"/>`
+    + '<circle r="35" style="fill:none;stroke:var(--seal-ring);stroke-width:3.2;stroke-dasharray:5 6.2;stroke-linecap:round"/>'
+    + `<path transform="translate(-23 -23) scale(1.92)" style="fill:var(--seal-check)" d="${BoxIcons.paths.check}"/>`
+    + '</symbol></svg>'
     + '</div>';
   const world_el = stage.querySelector('.cn-world');
   const gridSvg = world_el.querySelector('.cn-grid');
@@ -97,6 +120,7 @@ const STAGE_STYLE = {
   const carpetSvg = world_el.querySelector('.cn-carpet');
   const carpetPath = carpetSvg.querySelector('path');
   const boxesEl = world_el.querySelector('.cn-boxes');
+  const sealsEl = world_el.querySelector('.cn-seals');
   const rollSvg = world_el.querySelector('.cn-roll');
   const rollPath = rollSvg.querySelector('path');
   const S = INTRO_STYLE;
@@ -287,9 +311,9 @@ const STAGE_STYLE = {
   function boxItems() {
     const items = [];
     (work.weekStats || []).forEach((st, col) => { // 계산 단계가 실패했으면 박스 없이 간다
-      st.events.forEach(ev => items.push({ id: `ev:${ev.id}:${st.date}`, col, load: ev.load, kind: 'fixed' }));
-      st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done' }));
-      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo' }));
+      st.events.forEach(ev => items.push({ id: `ev:${ev.id}:${st.date}`, col, load: ev.load, kind: 'fixed', title: ev.title, minutes: Placement.eventDurationMinutes(ev), push: 0 }));
+      st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done', title: s.title, minutes: s.minutes, push: s.pushCount || 0 }));
+      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo', title: step.title, minutes: step.minutes, push: step.pushCount || 0 }));
     });
     return items.filter(it => it.load > 0);
   }
@@ -299,17 +323,66 @@ const STAGE_STYLE = {
 
   function cssNum(name) { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)); }
 
-  // 박스 하나: 둥근 모서리 몸통(div, 그림자는 box-shadow) + 안쪽 털실 점선(한 번 그리면 안 바뀌는 작은 SVG). 색은 style.css의 .cn-box 규칙.
-  // 움직일 때는 transform만 바꾼다. 중심이 (0,0)에 오게 두고 translate로 옮긴다
-  function makeBoxEl(box, kind) {
-    const inset = cssNum('--box-stitch-inset'), radius = cssNum('--box-radius');
+  // 시간(분)을 짧게: 30분, 1시간, 1시간30분
+  function shortDuration(min) {
+    const h = Math.floor(min / 60), m = Math.round(min % 60);
+    if (h && m) return `${h}시간${m}분`;
+    if (h) return `${h}시간`;
+    return `${m}분`;
+  }
+
+  // 박스 안 내용(글자만, 눌러서 동작하는 것은 없다). 박스 높이(부하)에 따라 배치가 달라진다:
+  //  tall: 제목 여러 줄 + 아래 아이콘 줄(밀림·시간·부하)   mid: 제목 한 줄(자리가 되면 두 줄) + 아래 아이콘 줄
+  //  tiny: 한 줄에 제목과 아이콘(밀림·시간)을 같이 둔다. 부하는 박스 높이가 이미 보여 주므로 뺀다
+  // 폭이 모자라면 style.css의 컨테이너 쿼리가 부하, 그다음 시간 아이콘을 먼저 숨긴다
+  function boxContent(item, w, h, inset) {
+    const icon = name => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${BoxIcons.paths[name]}"/></svg>`;
+    const metric = (cls, name, text) => `<span class="m ${cls}">${icon(name)}<b>${text}</b></span>`;
+    // 위아래 배치가 들어갈 높이: 위아래 여백 + 제목 한 줄 + 아이콘 줄 + 사이
+    const lineH = G.boxTitleFont * G.boxLineHeight;
+    const need = padv => 2 * (inset + padv) + lineH + (G.boxIcon + 2) + 2;
+    let tier, pad;
+    if (h >= need(G.boxPad)) { tier = 'col'; pad = inset + G.boxPad; }
+    else if (h >= need(G.boxPadTight)) { tier = 'col'; pad = inset + G.boxPadTight; }
+    else { tier = 'row'; pad = inset + G.boxPadTiny; }
+    const metrics = (item.push > 0 ? metric('m-push', 'push', item.push) : '')
+      + metric('m-time', 'time', shortDuration(item.minutes))
+      + (tier === 'row' ? '' : metric('m-load', 'load', item.load));
+    const lines = tier === 'row' ? 1 : Math.max(1, Math.min(4, Math.floor((h - 2 * pad - (G.boxIcon + 2) - 2) / lineH)));
+    const font = tier === 'row' ? G.boxTinyFont : G.boxTitleFont;
+    // 완료 도장이 박스 안쪽으로 파고드는 만큼(도장 지름의 0.7배 - 이미 있는 여백) 글자 쪽을 비켜 준다
+    const sealPad = item.kind === 'done' ? Math.max(0, 0.7 * (h < G.sealTinyBelow ? G.sealSizeTiny : G.sealSize) - pad) : 0;
+    return `<div class="bx bx-${tier}" style="--bx-seal:${sealPad.toFixed(1)}px;--bx-pad:${pad.toFixed(1)}px;--bx-lines:${lines};--bx-font:${font}px;--bx-icon:${G.boxIcon}px;--bx-lh:${G.boxLineHeight}">`
+      + `<div class="bx-title">${escapeHtml(item.title || '')}</div><div class="bx-metrics">${metrics}</div></div>`;
+  }
+
+  // 박스 하나: 둥근 모서리 몸통(div, 그림자는 box-shadow) + 안쪽 털실 점선(한 번 그리면 안 바뀌는 작은 SVG) + 글자·아이콘. 색은 style.css의 .cn-box 규칙.
+  // 작은 박스는 점선을 가장자리에 더 붙여 글자 자리를 만든다. 움직일 때는 transform만 바꾼다. 중심이 (0,0)에 오게 두고 translate로 옮긴다
+  function makeBoxEl(box, kind, item) {
+    const baseRadius = cssNum('--box-radius');
+    const inset = Math.max(G.boxInsetMin, Math.min(G.boxInsetMax, (box.h - 22) / 3));
+    const radius = Math.min(baseRadius, box.h / 2.6, box.w / 4);
     const el = document.createElement('div');
     el.className = `cn-box ${kind}`;
-    el.style.cssText = `width:${box.w.toFixed(1)}px;height:${box.h.toFixed(1)}px;margin:${(-box.h / 2).toFixed(1)}px 0 0 ${(-box.w / 2).toFixed(1)}px`;
-    el.innerHTML = `<svg width="${box.w.toFixed(1)}" height="${box.h.toFixed(1)}" viewBox="0 0 ${box.w.toFixed(1)} ${box.h.toFixed(1)}" aria-hidden="true">`
-      + `<rect x="${inset}" y="${inset}" width="${(box.w - inset * 2).toFixed(1)}" height="${(box.h - inset * 2).toFixed(1)}" rx="${Math.max(0, radius - inset)}"/></svg>`;
+    el.style.cssText = `width:${box.w.toFixed(1)}px;height:${box.h.toFixed(1)}px;margin:${(-box.h / 2).toFixed(1)}px 0 0 ${(-box.w / 2).toFixed(1)}px;border-radius:${radius.toFixed(1)}px`;
+    el.innerHTML = `<svg class="stitch" width="${box.w.toFixed(1)}" height="${box.h.toFixed(1)}" viewBox="0 0 ${box.w.toFixed(1)} ${box.h.toFixed(1)}" aria-hidden="true">`
+      + `<rect x="${inset.toFixed(1)}" y="${inset.toFixed(1)}" width="${(box.w - inset * 2).toFixed(1)}" height="${(box.h - inset * 2).toFixed(1)}" rx="${Math.max(0, radius - inset).toFixed(1)}"/></svg>`
+      + boxContent(item, box.w, box.h, inset);
     boxesEl.appendChild(el);
     return el;
+  }
+
+  // 완료 도장: 박스 오른쪽 위 모서리에 조금 튀어나가게 붙는다. 박스 층과 따로 둔 위층에 있어서 위에 쌓인 박스에 가려지지 않고,
+  // 물리 계산에는 아무 영향이 없다(보이는 것만). 박스와 같은 transform을 받아 따라다닌다
+  function makeSealEl(box) {
+    const tiny = box.h < G.sealTinyBelow;
+    const s = tiny ? G.sealSizeTiny : G.sealSize;
+    const wrap = document.createElement('div');
+    wrap.className = 'cn-seal-wrap';
+    const left = box.w / 2 - G.sealInset * s - s / 2, top = -box.h / 2 + G.sealInset * s - s / 2;
+    wrap.innerHTML = `<svg class="cn-seal" style="left:${left.toFixed(1)}px;top:${top.toFixed(1)}px;width:${s}px;height:${s}px" aria-hidden="true"><use href="#cn-seal-sym"/></svg>`;
+    sealsEl.appendChild(wrap);
+    return wrap;
   }
 
   // 지금 세계 상태를 화면에 반영: 카펫 선(처짐)과 박스 위치
@@ -330,7 +403,12 @@ const STAGE_STYLE = {
       const el = els.get(b.id);
       if (!el) return;
       const t = `translate3d(${b.x.toFixed(1)}px,${b.y.toFixed(1)}px,0) rotate(${b.tilt.toFixed(2)}deg)`;
-      if (b.lastT !== t) { b.lastT = t; el.style.transform = t; } // 움직인 박스만 바꾼다
+      if (b.lastT !== t) { // 움직인 박스만 바꾼다
+        b.lastT = t;
+        el.style.transform = t;
+        const seal = sim.seals.get(b.id);
+        if (seal) seal.style.transform = t;
+      }
     });
   }
 
@@ -353,7 +431,8 @@ const STAGE_STYLE = {
       lockX: isBottom,
     });
     box.tilt = isBottom ? 0 : (hash01(item.id, 't') - 0.5) * 2 * G.boxTiltDeg;
-    sim.els.set(item.id, makeBoxEl(box, item.kind === 'todo' ? 'todo' : 'paper'));
+    sim.els.set(item.id, makeBoxEl(box, item.kind === 'todo' ? 'todo' : 'paper', item));
+    if (item.kind === 'done') sim.seals.set(item.id, makeSealEl(box));
   }
 
   // 날짜 칸들이 돌아가며 하나씩 떨어지도록 순서를 짜고(열마다 k번째 박스를 한 바퀴씩), 박스마다 떨어뜨릴 시각(at, ms)을 정한다.
@@ -383,6 +462,7 @@ const STAGE_STYLE = {
   function startBoxes(animate) {
     stopSim();
     boxesEl.innerHTML = '';
+    sealsEl.innerHTML = '';
     const width = world_el.clientWidth || stage.clientWidth + 32;
     const Lr = layout(width);
     const capacity = state.settings.capacity;
@@ -392,7 +472,7 @@ const STAGE_STYLE = {
       columns, capacity, maxSag: Lr.sag, baseY: Lr.groundY - S.lineWidth / 2, // 박스는 카펫 선의 윗면에 얹힌다
       params: { restitution: G.boxBounce, ...G.physics },
     });
-    sim = { world, width, colW, unit: Lr.sag / capacity, els: new Map(), pending: releaseOrder(boxItems()), raf: 0, start: 0, last: 0, released: 0, carpetShown: false };
+    sim = { world, width, colW, unit: Lr.sag / capacity, els: new Map(), seals: new Map(), pending: releaseOrder(boxItems()), raf: 0, start: 0, last: 0, released: 0, carpetShown: false };
     stage.dataset.boxes = String(sim.pending.length);
     if (!animate) {
       sim.pending.forEach(spawn);

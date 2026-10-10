@@ -29,6 +29,11 @@
   --box-todo-bg: #f6d2d7;                /* 남은 단계 박스 색: 붉은 음영 */
   --box-todo-stitch: #cf5a6c;            /* 그 박스의 스티치 색: 배경에 맞춘 붉은 계열 */
   --box-shadow: 0 3px 9px rgba(0, 0, 0, 0.2); /* 박스 그림자 */
+  --box-ink: var(--note-ink);            /* 박스 위 글자·아이콘 색 */
+  --seal-fill: var(--stitch-color);      /* 완료 도장 색(주황) */
+  --seal-edge: #c78a1f;                  /* 도장 가장자리 선 */
+  --seal-ring: var(--note-paper);        /* 도장 안쪽 점선 고리 */
+  --seal-check: var(--note-paper);       /* 도장 안의 체크 */
 
   /* 털실 스티치 공용 값. 헤더 말고 다른 요소에도 가져다 쓴다.
      점선: SVG 요소는 CSS로 stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-width: var(--stitch-width); stroke: var(--stitch-color);
@@ -999,11 +1004,31 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .cn-boxes { width: 100%; height: 100%; pointer-events: none; }
 
 /* 박스: div 몸통 + 안쪽 털실 점선(작은 SVG). 그림자는 box-shadow(SVG 필터는 Safari에서 느리다) */
-.cn-box { position: absolute; left: 0; top: 0; will-change: transform; background: var(--box-paper); border-radius: calc(var(--box-radius) * 1px); box-shadow: var(--box-shadow); }
-.cn-box svg { position: absolute; left: 0; top: 0; overflow: visible; }
-.cn-box svg rect { fill: none; stroke: var(--box-stitch); stroke-width: var(--stitch-width); stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-linecap: round; }
+.cn-box { position: absolute; left: 0; top: 0; will-change: transform; background: var(--box-paper); box-shadow: var(--box-shadow); container-type: size; } /* 모서리 둥글기는 박스 크기에 맞춰 JS가 정한다. container-type: 박스 폭에 따라 안쪽 아이콘을 줄인다 */
+.cn-box > .stitch { position: absolute; left: 0; top: 0; overflow: visible; }
+.cn-box > .stitch rect { fill: none; stroke: var(--box-stitch); stroke-width: var(--stitch-width); stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-linecap: round; }
 .cn-box.todo { background: var(--box-todo-bg); }
-.cn-box.todo svg rect { stroke: var(--box-todo-stitch); }
+.cn-box.todo > .stitch rect { stroke: var(--box-todo-stitch); }
+
+/* 박스 안 글자와 아이콘(눌러서 동작하는 것은 없다). 크기·줄 수는 JS가 박스 높이에 맞춰 변수(--bx-*)로 넘긴다 */
+.bx { position: absolute; inset: var(--bx-pad); display: flex; color: var(--box-ink); font-size: var(--bx-font); line-height: var(--bx-lh); user-select: none; }
+.bx-col { flex-direction: column; justify-content: space-between; gap: 2px; }
+.bx-row { flex-direction: row; align-items: center; gap: 6px; padding-right: var(--bx-seal, 0px); }
+.bx-col .bx-title { padding-right: var(--bx-seal, 0px); } /* 완료 도장이 있는 박스는 도장 쪽을 비켜 준다 */
+.bx-title { min-width: 0; font-weight: 600; overflow: hidden; overflow-wrap: anywhere; word-break: keep-all; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--bx-lines); }
+.bx-row .bx-title { flex: 1; }
+.bx-metrics { flex: none; display: flex; align-items: center; gap: 8px; font-size: calc(var(--bx-font) * 0.86); color: color-mix(in srgb, var(--box-ink) 72%, transparent); white-space: nowrap; }
+.bx-col .bx-metrics { line-height: var(--bx-icon); }
+.bx-metrics .m { display: inline-flex; align-items: center; gap: 2px; }
+.bx-metrics .m b { font-weight: 600; }
+.bx-metrics .ic { width: var(--bx-icon); height: var(--bx-icon); fill: currentColor; flex: none; }
+@container (max-width: 120px) { .bx-col .m-load { display: none; } } /* 폭이 모자라면 부하(박스 높이로 이미 보인다)부터 숨긴다 */
+@container (max-width: 96px) { .bx-row .m-time { display: none; } }                   /* 가장 작고 좁은 박스는 제목과 밀림만 */
+
+/* 완료 도장: 박스 오른쪽 위에 조금 튀어나가 붙는다. 박스 위층이라 위에 쌓인 박스에 가려지지 않는다 */
+.cn-seals { width: 100%; height: 100%; pointer-events: none; }
+.cn-seal-wrap { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
+.cn-seal { position: absolute; overflow: visible; }
 
 /* 새 카펫(작업 중). ?carpet=next 일 때만 켜진다(app-carpet-next.js). 교체가 끝나면 이 블록과 옛 카펫 규칙을 정리한다 */
 #carpet-next { display: none; }
