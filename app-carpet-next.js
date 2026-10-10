@@ -21,7 +21,7 @@
 //  숨은 부작용(빠뜨리기 쉬움)
 //  [x] 그릴 때마다 마지막 배치 결과(placedDate)를 저장한다. 다음에 앱을 열 때 자동 밀림 판정에 쓴다
 //  [x] 다른 화면(팝업 닫기, 할 일·일정·설정 변경)이 전역 renderCarpet()을 불러 다시 그리게 한다. 바뀐 박스만 위에서 다시 떨어진다
-//  [ ] 오늘 날짜는 todayStr()로만 읽는다(UTC 쓰지 않기, 자정 전후·오전 9시 이전 확인)
+//  [x] 오늘 날짜는 todayStr()로만 읽는다(UTC 쓰지 않기). 한국 오전 9시 이전, 자정 전후, 월요일 자정, 서쪽 시간대, 마감 오늘·지남을 가짜 시계로 확인했고, 열어 둔 채 자정을 넘기거나 탭으로 돌아오면 오늘 기준으로 다시 그린다
 //
 // 새 연출 체크리스트
 //  [x] 첫 입장 롤 펼침: 페이지를 열 때마다 한 번. 주 이동이나 수정으로 다시 그릴 때는 없다. 모션 줄이기 설정이면 건너뛴다
@@ -1267,6 +1267,18 @@ const STAGE_STYLE = {
     startBoxes(page, still ? 'instant' : 'drop', still ? null : new Set(diff.drop));
   }
   window.renderCarpet = refreshCarpet; // 옛 카펫의 같은 이름 함수를 이어받는다(옛 화면은 숨겨져 있다)
+
+  // 앱을 열어 둔 채 날짜가 바뀌면(자정이 지났거나, 오래 가려져 있던 탭으로 돌아오면) 오늘 기준으로 다시 그린다. 자정은 로컬 시계의 다음 날 0시다(UTC를 쓰지 않는다)
+  let midnightTimer = 0;
+  function checkRollover() { if (introDone && todayStr() !== work.today) refreshCarpet(); }
+  function armMidnight() {
+    clearTimeout(midnightTimer);
+    const now = new Date();
+    const ms = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+    midnightTimer = setTimeout(() => { checkRollover(); armMidnight(); }, ms + 1000);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkRollover(); armMidnight(); } });
+  armMidnight();
 
   // 이동할 주의 페이지를 만든다. 눈금과 날짜 숫자, 평평한 카펫만 있고 박스는 없다(롤 펼침은 첫 입장 때만, 박스는 슬라이드가 끝난 뒤 위에서 떨어진다)
   function buildPage(offset) {
