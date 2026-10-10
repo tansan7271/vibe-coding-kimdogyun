@@ -40,7 +40,8 @@
   const DEMO_FLAG_KEY = 'radcarpet-demo-on';
   const DEMO_STORAGE_KEY = 'radcarpet-demo-data';
   const demoOn = localStorage.getItem(DEMO_FLAG_KEY) === '1' && typeof DEMO_DATA !== 'undefined';
-  const STORAGE_KEY = demoOn ? DEMO_STORAGE_KEY : 'radcarpet-data';
+  const PERSONAL_STORAGE_KEY = 'radcarpet-data'; // 내 데이터. 데모를 보는 동안에는 건드리지 않는다
+  const STORAGE_KEY = demoOn ? DEMO_STORAGE_KEY : PERSONAL_STORAGE_KEY;
 
   function defaultState() {
     return {

@@ -336,6 +336,20 @@
 
   document.getElementById('import-btn').addEventListener('click', () => importFile.click());
 
+  // 초기화: 내 데이터(할 일·단계·일정·설정)를 모두 지우고 처음 상태로 돌린다. 저장 공간을 비우고 페이지를 다시 불러온다.
+  // 데모를 보는 동안은 내 데이터가 아니라 데모 데이터를 보고 있으므로 이 버튼을 막는다(데모 데이터는 테스트 데모 카드의 '데이터 초기화')
+  const resetBtn = document.getElementById('reset-btn');
+  if (demoOn) {
+    resetBtn.disabled = true;
+    setDataMessage('데모 모드를 보는 동안에는 내 데이터를 지울 수 없습니다. 데모를 끈 뒤에 사용하세요.', false);
+  }
+  resetBtn.addEventListener('click', () => {
+    if (demoOn) return;
+    if (!confirm('내 할 일, 단계, 일정, 설정이 모두 지워지고 처음 상태로 돌아갑니다. 되돌릴 수 없습니다.\n먼저 내보내기로 백업해 두는 것을 권합니다.\n\n정말 모두 지울까요?')) return;
+    localStorage.removeItem(PERSONAL_STORAGE_KEY);
+    location.reload();
+  });
+
   importFile.addEventListener('change', async () => {
     const file = importFile.files[0];
     importFile.value = '';
