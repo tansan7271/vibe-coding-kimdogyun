@@ -123,3 +123,19 @@ test('시간 초과: 초과인 날만 상자가 있고 칸 폭보다 넓다. 부
   assert.ok(b.x < columns[1].left && b.x + b.width > columns[1].right);
   assert.equal(b.y, 10 - 12);
 });
+
+test('카펫 곡선이 지나는 세로 범위(band)를 돌려준다', () => {
+  const flat = carpetShape({ ...base, loads: [0, 0, 0, 0, 0, 0, 0] });
+  assert.deepEqual(flat.band, { top: 10, bottom: 10 });
+  const s = carpetShape({ ...base, loads: [0, 2, 5, 8, 10, 3, 0] });
+  const ys = [10, ...s.floors.map(f => f.y)];
+  assert.equal(s.band.top, 10);
+  assert.equal(s.band.bottom, Math.max(...ys));
+});
+
+test('band 안에 곡선 경로의 모든 높이가 들어간다 (S자가 꼭짓점 밖으로 나가지 않는다)', () => {
+  const s = carpetShape({ ...base, loads: [3, 9, 1, 10, 0, 6, 2] });
+  const nums = s.linePath.match(/-?\d+(\.\d+)?/g).map(Number);
+  // 경로는 M x y, C x1 y1 x2 y2 x y, L x y 순서라 짝수 번째 수가 y
+  for (let i = 1; i < nums.length; i += 2) assert.ok(nums[i] >= s.band.top - 1e-6 && nums[i] <= s.band.bottom + 1e-6, `y=${nums[i]}`);
+});

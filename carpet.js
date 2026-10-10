@@ -87,7 +87,11 @@
       }
     }
 
-    return { overflowBoxes, points, floors, gridLines, safeLine, sags, linePath, dividers };
+    // 곡선이 지나는 세로 범위. 곡선은 양 끝 접선이 수평인 S자라 꼭짓점 높이 밖으로 나가지 않는다. 캔버스에서 이 띠만 지우고 다시 그리는 데 쓴다
+    const ys = nodes.map(n => n.y);
+    const band = { top: Math.min(...ys), bottom: Math.max(...ys) };
+
+    return { overflowBoxes, points, floors, gridLines, safeLine, sags, linePath, dividers, band };
   }
 
   return { carpetShape };

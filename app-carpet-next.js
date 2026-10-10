@@ -54,7 +54,9 @@ const STAGE_STYLE = {
   jiggleHz: 5.5,               // 박스가 떠는 빠르기(초당 왕복). 박스마다 ±10% 다르고 시작점도 제각각이다
   jiggleCarpetPx: 1.8,         // 예산 초과인 날의 카펫(과 그 위 박스)이 위아래로 떠는 크기(px). 이웃 날짜와 이어진 곡선이 따라서 자연스럽게 이어진다
   jiggleCarpetHz: 6.5,         // 카펫이 떠는 빠르기
-  jiggleCarpetFps: 30,         // 카펫 선을 다시 그리는 초당 횟수. 카펫이 떠는 동안 매 프레임 SVG 선을 다시 그리는 비용을 줄인다(박스 떨림은 이 값과 무관하게 부드럽다). 화면 주사율보다 크면 매 프레임 그린다
+  jiggleCarpetFps: 20,         // 카펫 선을 다시 그리는 초당 횟수. 카펫이 떠는 동안 매 프레임 선과 그림자 캔버스를 다시 그리는 비용을 줄인다(박스 떨림은 이 값과 무관하게 부드럽다). 화면 주사율보다 크면 매 프레임 그린다
+  jiggleCarpetScaleMax: 1,     // 카펫이 떠는 동안 카펫 선 캔버스의 화면 배율 상한(1~2). 2로 두면 떠는 동안에도 또렷하지만 캔버스가 4배 커서 무겁다. 떨림이 없는 주는 항상 최대 2배
+  scrollPauseMs: 150,          // 스크롤이 멈춘 뒤 이만큼 지나야 카펫 떨림을 다시 그린다(ms). 스크롤 중 끊김을 줄인다. 박스 떨림(CSS)은 계속된다
   resizeDebounceMs: 150,       // 창 크기를 바꿀 때 마지막 변화 뒤 이만큼 기다렸다가 한 번만 다시 놓는다(ms)
   rollTuckRatio: 0.4,          // 처음 롤 윗부분이 헤더 뒤로 들어가는 정도(롤 지름의 비율). 클수록 위쪽 여백이 줄어든다. 위쪽 여백 ≈ 롤 지름 × (1 − 이 값)
   gridMaxLines: 5,             // 가로 눈금선 최대 개수
@@ -595,20 +597,30 @@ const STAGE_STYLE = {
   // 캔버스 크기를 맞춘다(CSS 크기는 화면 픽셀, 캔버스 크기는 scale배). 크기가 같으면 아무것도 하지 않는다. 캔버스 크기를 바꾸면 내용이 지워진다
   function sizeCanvas(el, cssW, cssH, scale) {
     const w = Math.ceil(cssW * scale), h = Math.ceil(cssH * scale);
-    if (el.width === w && el.height === h) return;
-    el.width = w; el.height = h;
+    if (el.width === w && el.height === h) return false;
+    el.width = w; el.height = h; // 크기를 바꾸면 내용이 다 지워진다
     el.style.width = `${cssW}px`; el.style.height = `${cssH}px`;
+    return true;
+  }
+
+  // 캔버스에서 지울 세로 범위(CSS px): 이번 띠와 지난번 띠를 합친 만큼만. 처음이거나 크기가 바뀌어 이미 지워졌으면 전체
+  function dirtyRange(page, key, band, total, resized) {
+    const prev = resized ? null : page[key];
+    page[key] = band;
+    return prev ? [Math.max(0, Math.min(prev.top, band.top)), Math.min(total, Math.max(prev.bottom, band.bottom))] : [0, total];
   }
 
   // 카펫 선과 그 아래 그림자를 캔버스에 그린다. 선은 화면 배율(최대 2배)로 또렷하게, 그림자는 부드러워 절반 해상도로.
   // 박스가 눌러 처지는 동안과 예산 초과로 떠는 동안에도 같은 곡선으로 같은 프레임에 그려서 그림자가 카펫을 실시간으로 따라간다
   function drawCarpet(page, shape, width, m) {
-    const k = Math.min(2, window.devicePixelRatio || 1);
+    const k = Math.min(page.sim && page.sim.fidget ? G.jiggleCarpetScaleMax : 2, window.devicePixelRatio || 1); // 떠는 주는 낮은 배율(큰 캔버스를 자주 그리지 않게)
     const el = page.carpetCanvas;
-    sizeCanvas(el, width, m.height, k);
+    const resized = sizeCanvas(el, width, m.height, k);
     const ctx = el.getContext('2d');
+    const pad = S.lineWidth / 2 + 2; // 선 두께의 절반과 여유
+    const [y0, y1] = dirtyRange(page, 'carpetBand', { top: shape.band.top - pad, bottom: shape.band.bottom + pad }, m.height, resized);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, el.width, el.height);
+    ctx.clearRect(0, Math.floor(y0 * k), el.width, Math.ceil((y1 - y0) * k) + 1); // 선이 지나는 띠만 지운다
     ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.lineWidth = S.lineWidth;
     ctx.lineJoin = 'round';
@@ -623,23 +635,29 @@ const STAGE_STYLE = {
     const el = page.shadowEl;
     if (!el) return;
     const k = SHADOW_STYLE.resolution;
-    sizeCanvas(el, width, m.height, k);
+    const resized = sizeCanvas(el, width, m.height, k);
     const ctx = el.getContext('2d');
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, el.width, el.height);
     const fade = SHADOW_STYLE.fadeLength;
     const steps = SHADOW_STYLE.mixSteps;
-    const stops = CarpetShadow.falloffStops(SHADOW_STYLE.alpha);
-    const grads = Array.from({ length: steps + 1 }, (_, b) => { // 검정(0)에서 붉은색(steps)까지 단계마다 그라데이션 하나. 곡선 높이를 0으로 둔 것을 줄마다 옮겨 재사용한다
-      const rgb = CarpetShadow.mixRgb(SHADOW_STYLE.rgb, SHADOW_STYLE.overRgb, b / steps);
-      const g = ctx.createLinearGradient(0, 0, 0, fade);
-      stops.forEach(([t, a]) => g.addColorStop(t, `rgba(${rgb},${a})`));
-      return g;
-    });
+    const [y0, y1] = dirtyRange(page, 'shadowBand', { top: shape.band.top, bottom: shape.band.bottom + fade }, m.height, resized); // 그림자는 곡선에서 fade만큼 아래까지
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, Math.floor(y0 * k), el.width, Math.ceil((y1 - y0) * k) + 1);
+    if (!page.shadowGrads) { // 검정(0)에서 붉은색(steps)까지 단계마다 그라데이션 하나. 모양이 고정이라 한 번 만들어 계속 쓴다. 곡선 높이를 0으로 둔 것을 줄마다 옮겨 재사용한다
+      const stops = CarpetShadow.falloffStops(SHADOW_STYLE.alpha);
+      page.shadowGrads = Array.from({ length: steps + 1 }, (_, b) => {
+        const rgb = CarpetShadow.mixRgb(SHADOW_STYLE.rgb, SHADOW_STYLE.overRgb, b / steps);
+        const g = ctx.createLinearGradient(0, 0, 0, fade);
+        stops.forEach(([t, a]) => g.addColorStop(t, `rgba(${rgb},${a})`));
+        return g;
+      });
+    }
+    const grads = page.shadowGrads;
     const step = 1 / k; // 가로로 한 줄 폭(화면 픽셀). 해상도 절반이면 2px
     const over = page.sim ? page.sim.over : [];
     const ys = CarpetShadow.curveYs({ linePath: shape.linePath, width, step });
-    const weights = CarpetShadow.overWeights({ over, width, flatRatio: G.carpetFlatRatio, step });
+    const weightsKey = `${over.map(Number).join('')}|${width}|${step}`; // 붉은 톤 가중치는 어느 날이 초과인지와 폭에만 달렸다
+    if (!page.shadowWeights || page.shadowWeights.key !== weightsKey) page.shadowWeights = { key: weightsKey, w: CarpetShadow.overWeights({ over, width, flatRatio: G.carpetFlatRatio, step }) };
+    const weights = page.shadowWeights.w;
     ys.forEach((y, i) => {
       const room = m.height - y; // 이 줄에서 캔버스 맨 아래까지 남은 높이
       if (room <= 0.5) return;
@@ -662,6 +680,8 @@ const STAGE_STYLE = {
   // 다 자리를 잡은 뒤에도, 예산 초과인 날이 있으면 떨림을 계속 그린다(물리 계산은 멈춰 있고 그리기만). 탭이 가려지면 브라우저가 알아서 멈춘다
   // 카펫 선은 jiggleCarpetFps로 줄여 그리고, 떠는 열의 박스 위치만 바꾼다. 슬라이드·끌기·팝업이 떠 있는 동안은 그리지 않고 CSS 박스 떨림도 멈춘다
   const openModals = document.getElementsByClassName('modal-backdrop open');
+  let lastScrollAt = -Infinity;
+  window.addEventListener('scroll', () => { lastScrollAt = performance.now(); }, { passive: true });
   function startFidget(page) {
     const sim = page.sim;
     if (!sim.fidget) return;
@@ -672,7 +692,8 @@ const STAGE_STYLE = {
       if (page.sim !== sim) return; // 새로 놓았으면 옛 루프는 끝낸다
       const paused = busy || !!drag || openModals.length > 0;
       stage.classList.toggle('cn-paused', paused);
-      if (!paused && now - lastDraw >= minGap) { lastDraw = now; renderSim(page, now, jigBoxes); }
+      const scrolling = now - lastScrollAt < G.scrollPauseMs; // 스크롤 중에는 카펫만 멈춘다(CSS 박스 떨림은 그대로)
+      if (!paused && !scrolling && now - lastDraw >= minGap) { lastDraw = now; renderSim(page, now, jigBoxes); }
       sim.fidgetRaf = requestAnimationFrame(tick);
     };
     sim.fidgetRaf = requestAnimationFrame(tick);
