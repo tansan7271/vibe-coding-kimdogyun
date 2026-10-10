@@ -71,9 +71,9 @@ const STAGE_STYLE = {
   maxSettleMs: 12000,          // 마지막 박스가 떨어진 뒤 이 시간이 지나면 정착하지 못했어도 멈춘다(배터리를 쓰며 계속 도는 것을 막는 안전장치)
   // --- 박스 위 글자·아이콘·완료 도장. 박스 높이(부하)에 따라 배치가 달라진다: 제목과 아이콘 줄이 위아래로 들어갈 높이가 되면 위아래(제목은 자리 되는 만큼 여러 줄),
   //     모자라면 한 줄에 제목과 아이콘을 같이 둔다. 먼저 여백을 넉넉히(boxPad), 안 되면 좁혀서(boxPadTight) 위아래 배치를 시도한다 ---
-  boxTitleFont: 13,            // 제목 글자 크기(px). 가장 작은 박스는 boxTinyFont
-  boxTinyFont: 11.5,           // 가장 작은 박스의 제목 글자 크기
+  boxTitleFont: 13,            // 제목 글자 크기(px). 박스 크기와 상관없이 모두 같다. 길면 …로 줄인다
   boxLineHeight: 1.25,         // 제목 줄 높이(글자 크기의 배수)
+  boxGoalScale: 0.85,          // 상위 할 일(목표) 제목의 글자 크기 / 제목 글자 크기. 칸이 남을 때만 제목 아래에 흐리게 나온다
   boxIcon: 13,                 // 아이콘 크기(px)
   boxPad: 6,                   // 점선과 글자 사이 여백(px). 가장 작은 박스는 boxPadTiny
   boxPadTight: 3,              // 박스가 낮을 때 점선과 글자 사이 여백
@@ -311,10 +311,11 @@ const STAGE_STYLE = {
   // 이번 주 항목을 박스 목록으로. 한 날짜 안에서는 일정 -> 완료 -> 남은 단계 순(먼저 떨어진 것이 아래에 깔린다)
   function boxItems() {
     const items = [];
+    const goalTitle = new Map(state.goals.map(g => [g.id, g.title])); // 단계의 상위 할 일
     (work.weekStats || []).forEach((st, col) => { // 계산 단계가 실패했으면 박스 없이 간다
       st.events.forEach(ev => items.push({ id: `ev:${ev.id}:${st.date}`, col, load: ev.load, kind: 'fixed', title: ev.title, minutes: Placement.eventDurationMinutes(ev), push: 0 }));
-      st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done', title: s.title, minutes: s.minutes, push: s.pushCount || 0 }));
-      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo', title: step.title, minutes: step.minutes, push: step.pushCount || 0 }));
+      st.doneSteps.forEach(s => items.push({ id: `done:${s.id}`, col, load: s.load, kind: 'done', title: s.title, goal: goalTitle.get(s.goalId) || '', minutes: s.minutes, push: s.pushCount || 0 }));
+      st.steps.forEach(({ step }) => items.push({ id: `step:${step.id}`, col, load: step.load, kind: 'todo', title: step.title, goal: goalTitle.get(step.goalId) || '', minutes: step.minutes, push: step.pushCount || 0 }));
     });
     return items.filter(it => it.load > 0);
   }
@@ -349,12 +350,18 @@ const STAGE_STYLE = {
     const metrics = (item.push > 0 ? metric('m-push', 'push', item.push) : '')
       + metric('m-time', 'time', shortDuration(item.minutes))
       + (tier === 'row' ? '' : metric('m-load', 'load', item.load));
-    const lines = tier === 'row' ? 1 : Math.max(1, Math.min(4, Math.floor((h - 2 * pad - (G.boxIcon + 2) - 2) / lineH)));
-    const font = tier === 'row' ? G.boxTinyFont : G.boxTitleFont;
+    // 위아래 배치에서 남는 높이: 제목은 들어가는 만큼 여러 줄, 제목 한 줄을 두고도 한 줄이 더 들어가면 그 아래에 상위 할 일을 흐리게 보여 준다
+    const avail = h - 2 * pad - (G.boxIcon + 2) - 2;
+    const goalH = G.boxTitleFont * G.boxGoalScale * G.boxLineHeight + 1;
+    const showGoal = tier === 'col' && !!item.goal && avail - lineH >= goalH;
+    const lines = tier === 'row' ? 1 : Math.max(1, Math.min(4, Math.floor((avail - (showGoal ? goalH : 0)) / lineH)));
+    const font = G.boxTitleFont;
     // 한 줄 배치는 위아래 여백은 작아도 되지만 좌우는 더 둔다(점선에 글자가 붙어 보이지 않게). 완료 도장은 글자 자리에 영향을 주지 않는다(위에 얹힐 뿐)
     const padX = tier === 'row' ? inset + G.boxPadXRow : pad;
-    return `<div class="bx bx-${tier}" style="--bx-padx:${padX.toFixed(1)}px;--bx-pad:${pad.toFixed(1)}px;--bx-lines:${lines};--bx-font:${font}px;--bx-icon:${G.boxIcon}px;--bx-lh:${G.boxLineHeight}">`
-      + `<div class="bx-title">${escapeHtml(item.title || '')}</div><div class="bx-metrics">${metrics}</div></div>`;
+    return `<div class="bx bx-${tier}" style="--bx-padx:${padX.toFixed(1)}px;--bx-pad:${pad.toFixed(1)}px;--bx-lines:${lines};--bx-font:${font}px;--bx-icon:${G.boxIcon}px;--bx-lh:${G.boxLineHeight};--bx-goal-scale:${G.boxGoalScale}">`
+      + `<div class="bx-title">${escapeHtml(item.title || '')}</div>`
+      + (showGoal ? `<div class="bx-goal">${escapeHtml(item.goal)}</div>` : '')
+      + `<div class="bx-metrics">${metrics}</div></div>`;
   }
 
   // 박스 하나: 둥근 모서리 몸통(div, 그림자는 box-shadow) + 안쪽 털실 점선(한 번 그리면 안 바뀌는 작은 SVG) + 글자·아이콘. 색은 style.css의 .cn-box 규칙.

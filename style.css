@@ -1141,12 +1141,14 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 
 /* 박스 안 글자와 아이콘(눌러서 동작하는 것은 없다). 크기·줄 수는 JS가 박스 높이에 맞춰 변수(--bx-*)로 넘긴다 */
 .bx { position: absolute; inset: var(--bx-pad) var(--bx-padx, var(--bx-pad)); display: flex; color: var(--box-ink); font-size: var(--bx-font); line-height: var(--bx-lh); user-select: none; }
-.bx-col { flex-direction: column; justify-content: space-between; gap: 2px; }
+.bx-col { flex-direction: column; justify-content: flex-start; gap: 2px; } /* 제목, 상위 할 일은 위에 붙고 아이콘 줄은 맨 아래 */
 .bx-row { flex-direction: row; align-items: center; gap: 6px; }
 .bx-title { min-width: 0; font-weight: 600; overflow: hidden; overflow-wrap: anywhere; word-break: keep-all; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--bx-lines); }
 .bx-row .bx-title { flex: 1; }
+.bx-col .bx-title { flex: 0 1 auto; }
+.bx-goal { flex: none; margin-top: -1px; font-size: calc(var(--bx-font) * var(--bx-goal-scale, 0.85)); color: color-mix(in srgb, var(--box-ink) 50%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* 상위 할 일: 칸이 남을 때만, 흐린 글씨 */
 .bx-metrics { flex: none; display: flex; align-items: center; gap: 8px; font-size: calc(var(--bx-font) * 0.86); color: color-mix(in srgb, var(--box-ink) 72%, transparent); white-space: nowrap; }
-.bx-col .bx-metrics { line-height: var(--bx-icon); }
+.bx-col .bx-metrics { line-height: var(--bx-icon); margin-top: auto; }
 .bx-metrics .m { display: inline-flex; align-items: center; gap: 2px; }
 .bx-metrics .m b { font-weight: 600; }
 .bx-metrics .ic { width: var(--bx-icon); height: var(--bx-icon); fill: currentColor; flex: none; }
