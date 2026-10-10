@@ -59,9 +59,11 @@ const STAGE_STYLE = {
   // 색과 스티치는 style.css의 --box-* 값
   boxWidthMin: 0.6,            // 박스 폭 / 칸 폭의 최소. 박스마다 이 사이에서 정해진다
   boxWidthMax: 0.86,           // 최대
-  boxTiltDeg: 1.4,             // 박스마다 살짝 기운 각도의 최대(±도). 쌓인 모양이 손으로 놓은 듯하게
+  boxTiltDeg: 1.4,             // 박스마다 살짝 기운 각도의 최대(±도). 쌓인 모양이 손으로 놓은 듯하게. 맨 아래 박스는 기울지 않는다
+  bottomBoxFit: 0.96,          // 맨 아래 박스는 칸 가운데에 놓이고 가로로 움직이지 않는다. 폭은 카펫 평평한 바닥(carpetFlatRatio)의 이 비율까지만
   boxStaggerMs: 70,            // 박스가 하나씩 떨어지는 간격(ms). 날짜 칸들이 돌아가며 떨어진다
   boxSpawnVx: 120,             // 떨어질 때 옆으로 흔들리는 속도의 최대(px/s)
+  maxSettleMs: 12000,          // 마지막 박스가 떨어진 뒤 이 시간이 지나면 정착하지 못했어도 멈춘다(배터리를 쓰며 계속 도는 것을 막는 안전장치)
   carpetFlatRatio: 0.75,       // 카펫이 처졌을 때 칸 폭 중 평평한 바닥 비율. 키우면 바닥이 넓고 날짜 사이 경사가 가팔라진다(박스 폭보다 작으면 박스 끝이 경사 위로 살짝 나온다)
   physics: {},                 // carpet-physics.js의 DEFAULTS를 덮어쓰는 값. 예: { gravity: 3000, restitution: 0.4 } (튕김·출렁임 조절)
 };
@@ -72,24 +74,38 @@ const STAGE_STYLE = {
   document.documentElement.classList.add('carpet-next-on'); // 옛 카펫을 숨기고 새 카펫 자리를 연다
   const stage = document.getElementById('carpet-next');
   stage.hidden = false;
-  stage.innerHTML = '<svg class="carpet-intro" aria-hidden="true">'
-    + '<defs><clipPath id="carpet-reveal"><rect class="reveal"/></clipPath>'
-    + '<filter id="cn-shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.2"/></filter></defs>'
-    + '<g class="grid" clip-path="url(#carpet-reveal)"></g><path class="laid"/><g class="boxes"></g><path class="roll"/></svg>';
-  const svg = stage.querySelector('svg');
-  const laidPath = svg.querySelector('.laid');
-  const rollPath = svg.querySelector('.roll');
-  const gridG = svg.querySelector('.grid');
-  const boxesG = svg.querySelector('.boxes');
-  const revealRect = svg.querySelector('.reveal');
+  // 층(아래부터): 눈금(그려 두고 안 바뀜) -> 가리개(롤 앞의 눈금을 숨김) -> 깔린 카펫(처음 직선) -> 처진 카펫 -> 박스 -> 롤.
+  // 움직이는 것은 층을 따로 둬서, 박스 하나가 움직일 때 눈금 점선이나 다른 박스까지 다시 그려지지 않게 한다(Safari 렉 방지).
+  // 박스·가리개·깔린 카펫·롤은 transform만 바꾼다(그래픽 카드가 위치만 옮긴다)
+  stage.innerHTML = '<div class="cn-world">'
+    + '<svg class="cn-grid" aria-hidden="true"><g class="grid"></g></svg>'
+    + '<div class="cn-cover"></div>'
+    + '<div class="cn-laid"></div>'
+    + '<svg class="cn-carpet" aria-hidden="true"><path/></svg>'
+    + '<div class="cn-boxes"></div>'
+    + '<svg class="cn-roll" aria-hidden="true"><path/></svg>'
+    + '</div>';
+  const world_el = stage.querySelector('.cn-world');
+  const gridSvg = world_el.querySelector('.cn-grid');
+  const gridG = gridSvg.querySelector('.grid');
+  const coverEl = world_el.querySelector('.cn-cover');
+  const laidEl = world_el.querySelector('.cn-laid');
+  const carpetSvg = world_el.querySelector('.cn-carpet');
+  const carpetPath = carpetSvg.querySelector('path');
+  const boxesEl = world_el.querySelector('.cn-boxes');
+  const rollSvg = world_el.querySelector('.cn-roll');
+  const rollPath = rollSvg.querySelector('path');
   const S = INTRO_STYLE;
   const G = STAGE_STYLE;
-  [laidPath, rollPath].forEach(p => {
+  [carpetPath, rollPath].forEach(p => {
     p.setAttribute('fill', 'none');
     p.setAttribute('stroke', S.lineColor);
     p.setAttribute('stroke-width', S.lineWidth);
+    p.setAttribute('stroke-linejoin', 'round');
   });
-  rollPath.setAttribute('stroke-linejoin', 'round');
+  laidEl.style.height = `${S.lineWidth}px`;
+  laidEl.style.background = S.lineColor;
+  coverEl.style.background = getComputedStyle(document.body).backgroundColor; // 페이지 바탕색: 롤 앞쪽 눈금을 이 색으로 덮어 숨긴다
 
   // 오늘이 든 주의 7일(YYYY-MM-DD)
   function thisWeekDates() {
@@ -152,12 +168,12 @@ const STAGE_STYLE = {
     const startMargin = S.entryGap + S.lineWidth / 2;
     const groundY = S.topMargin + 2 * CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0, startMargin }).radius; // svg 안에서 땅 높이: 롤 지름 + 위 여백
     const headerBottom = parseFloat(getComputedStyle(document.body).paddingTop) || 0; // 헤더 아랫단 높이(화면 위에서)
-    svg.style.marginTop = '0px';
-    const stageTop = svg.getBoundingClientRect().top + window.scrollY;
+    world_el.style.marginTop = '0px';
+    const stageTop = world_el.getBoundingClientRect().top + window.scrollY;
     // 위 여백 줄이기: 그림은 그대로 두고 통째로 위로 끌어올려, 처음 롤 윗부분이 지름의 rollTuckRatio만큼 헤더 뒤로 들어가게 한다
     const diameter = groundY - S.topMargin;
     const lift = Math.max(0, stageTop + S.topMargin - headerBottom + G.rollTuckRatio * diameter);
-    svg.style.marginTop = `${-lift}px`;
+    world_el.style.marginTop = `${-lift}px`;
     const svgTop = stageTop - lift;
     const lineY = svgTop + groundY;                // 카펫 선의 화면 높이
     const topSpace = lineY - headerBottom;         // 위쪽 여백: 헤더 아랫단 ~ 카펫 선
@@ -166,7 +182,18 @@ const STAGE_STYLE = {
     const budgetY = corner === null ? window.innerHeight - topSpace : corner + G.budgetBelowCorner;
     const sag = Math.max(G.minSag, budgetY - lineY);
     const height = Math.ceil(groundY + sag + 2);   // 그림 높이는 예산선까지(선 두께 여유 2px)
-    L = { P, startMargin, groundY, lift, sag, height, topSpace, svgTop };
+    const radius0 = CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0, startMargin }).radius;
+    L = { P, startMargin, groundY, lift, sag, height, topSpace, svgTop, radius0 };
+    // 층 크기: 모든 층이 같은 좌표계(왼쪽 위가 (0,0))를 쓴다
+    world_el.style.height = `${height}px`;
+    [gridSvg, carpetSvg].forEach(el => { el.setAttribute('width', width); el.setAttribute('height', height); });
+    laidEl.style.top = `${groundY - S.lineWidth / 2}px`;
+    laidEl.style.width = `${width}px`;
+    coverEl.style.height = `${height}px`;
+    coverEl.style.width = `${width}px`;
+    const rollSize = Math.ceil(2 * (radius0 + S.lineWidth));
+    rollSvg.setAttribute('width', rollSize); rollSvg.setAttribute('height', rollSize);
+    L.rollSize = rollSize;
     return L;
   }
 
@@ -198,21 +225,22 @@ const STAGE_STYLE = {
       + lay.glyphs.map(g => `<path transform="translate(${g.x} 0)" d="${B.glyphs[g.ch].d}"/>`).join('') + '</g></svg>';
   }
 
-  // 롤 그리기. eased는 0~1(곡선을 입힌 진행도)
+  // 롤 그리기. eased는 0~1(곡선을 입힌 진행도). 눈금은 이미 그려 있고, 가리개를 오른쪽으로 밀어 드러낸다
   function draw(eased) {
-    const width = svg.clientWidth || stage.clientWidth + 32;
-    const { P, startMargin, groundY, sag, height, topSpace } = layout(width);
+    const width = world_el.clientWidth || stage.clientWidth + 32;
+    const { P, startMargin, groundY, sag, height, topSpace, rollSize } = layout(width);
     const pose = CarpetRoll.rollPose({ progress: eased, width, ...P, groundY, startMargin });
-    svg.setAttribute('height', height);
     drawGrid(width, groundY, height, sag, topSpace);
-    // 눈금은 롤이 깔고 지나간 자리까지만 드러난다
-    revealRect.setAttribute('x', -50);
-    revealRect.setAttribute('y', 0);
-    revealRect.setAttribute('width', Math.max(0, pose.contactX + 50));
-    revealRect.setAttribute('height', height);
-    laidPath.setAttribute('d', `M${pose.startX.toFixed(2)} ${groundY} H${pose.contactX.toFixed(2)}`);
+    const contact = Math.max(0, pose.contactX);
+    coverEl.style.display = '';
+    coverEl.style.transform = `translate3d(${contact.toFixed(1)}px,0,0)`;           // 롤이 지나간 자리까지만 눈금이 보인다
+    laidEl.style.display = '';
+    laidEl.style.transform = `scaleX(${(contact / width).toFixed(4)})`;              // 깔린 카펫이 롤을 따라 늘어난다
+    // 롤: 중심을 그림 한가운데로 옮긴 작은 그림. 위치는 transform으로 옮기고, 굴러서 작아지는 모양만 다시 그린다
+    const half = rollSize / 2;
+    rollSvg.style.transform = `translate3d(${(pose.cx - half).toFixed(1)}px,${(pose.cy - half).toFixed(1)}px,0)`;
     const pts = pose.theta > 0.001 ? CarpetRoll.spiralPoints(pose, P) : [];
-    rollPath.setAttribute('d', pts.length > 1 ? 'M' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join('L') : '');
+    rollPath.setAttribute('d', pts.length > 1 ? 'M' + pts.map(([x, y]) => `${(x - pose.cx + half).toFixed(1)} ${(y - pose.cy + half).toFixed(1)}`).join('L') : '');
   }
 
   // 로딩 단계. 옛 카펫이 처음 그릴 때 하는 계산을 읽기만 한다(저장은 하지 않는다). 단계마다 따로 실행해 그 사이에 화면이 그려지게 한다
@@ -267,16 +295,17 @@ const STAGE_STYLE = {
 
   function cssNum(name) { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)); }
 
-  // 박스 하나를 SVG로: 몸통(둥근 사각형) + 안쪽 털실 점선. 색은 style.css의 .cn-box 규칙
+  // 박스 하나: 둥근 모서리 몸통(div, 그림자는 box-shadow) + 안쪽 털실 점선(한 번 그리면 안 바뀌는 작은 SVG). 색은 style.css의 .cn-box 규칙.
+  // 움직일 때는 transform만 바꾼다. 중심이 (0,0)에 오게 두고 translate로 옮긴다
   function makeBoxEl(box, kind) {
-    const radius = cssNum('--box-radius'), inset = cssNum('--box-stitch-inset');
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    g.setAttribute('class', `cn-box ${kind}`);
-    g.setAttribute('filter', 'url(#cn-shadow)');
-    g.innerHTML = `<rect class="body" x="${-box.w / 2}" y="${-box.h / 2}" width="${box.w}" height="${box.h}" rx="${radius}"/>`
-      + `<rect class="stitch" x="${-box.w / 2 + inset}" y="${-box.h / 2 + inset}" width="${box.w - inset * 2}" height="${box.h - inset * 2}" rx="${Math.max(0, radius - inset)}"/>`;
-    boxesG.appendChild(g);
-    return g;
+    const inset = cssNum('--box-stitch-inset'), radius = cssNum('--box-radius');
+    const el = document.createElement('div');
+    el.className = `cn-box ${kind}`;
+    el.style.cssText = `width:${box.w.toFixed(1)}px;height:${box.h.toFixed(1)}px;margin:${(-box.h / 2).toFixed(1)}px 0 0 ${(-box.w / 2).toFixed(1)}px`;
+    el.innerHTML = `<svg width="${box.w.toFixed(1)}" height="${box.h.toFixed(1)}" viewBox="0 0 ${box.w.toFixed(1)} ${box.h.toFixed(1)}" aria-hidden="true">`
+      + `<rect x="${inset}" y="${inset}" width="${(box.w - inset * 2).toFixed(1)}" height="${(box.h - inset * 2).toFixed(1)}" rx="${Math.max(0, radius - inset)}"/></svg>`;
+    boxesEl.appendChild(el);
+    return el;
   }
 
   // 지금 세계 상태를 화면에 반영: 카펫 선(처짐)과 박스 위치
@@ -287,10 +316,17 @@ const STAGE_STYLE = {
       loads: world.sag.map(s => (s / Lr.sag) * world.capacity), capacity: world.capacity, safeRatio: state.settings.safeRatio,
       columns: world.columns, width, baseY: Lr.groundY, maxSag: Lr.sag, flatRatio: G.carpetFlatRatio, curve: 0.5,
     });
-    laidPath.setAttribute('d', shape.linePath);
+    carpetPath.setAttribute('d', shape.linePath);
+    if (!sim.carpetShown) { // 처음 한 번: 롤이 깔아 둔 직선과 가리개를 걷고 처지는 카펫으로 넘긴다(처음에는 같은 직선이라 티가 안 난다)
+      sim.carpetShown = true;
+      laidEl.style.display = 'none';
+      coverEl.style.display = 'none';
+    }
     world.boxes.forEach(b => {
       const el = els.get(b.id);
-      if (el) el.setAttribute('transform', `translate(${b.x.toFixed(2)} ${b.y.toFixed(2)}) rotate(${b.tilt.toFixed(2)})`);
+      if (!el) return;
+      const t = `translate3d(${b.x.toFixed(1)}px,${b.y.toFixed(1)}px,0) rotate(${b.tilt.toFixed(2)}deg)`;
+      if (b.lastT !== t) { b.lastT = t; el.style.transform = t; } // 움직인 박스만 바꾼다
     });
   }
 
@@ -298,16 +334,20 @@ const STAGE_STYLE = {
   function spawn(item) {
     const { world, width, unit, colW } = sim;
     const col = world.columns[item.col];
-    const w = colW * (G.boxWidthMin + (G.boxWidthMax - G.boxWidthMin) * hash01(item.id, 'w'));
+    // 한 칸의 첫 박스(맨 아래에 깔린다)는 칸 가운데, 기울지 않고, 가로로 움직이지 않는다. 폭은 카펫 평평한 바닥 안에 들어가게 해서 경사에 걸리지 않는다
+    const isBottom = !world.boxes.some(b => b.col === item.col);
+    let w = colW * (G.boxWidthMin + (G.boxWidthMax - G.boxWidthMin) * hash01(item.id, 'w'));
+    if (isBottom) w = Math.min(w, colW * G.carpetFlatRatio * G.bottomBoxFit);
     const h = item.load * unit;
-    const x = (col.left + col.right) / 2 + (hash01(item.id, 'x') - 0.5) * (colW - w) * 0.85;
+    const x = (col.left + col.right) / 2 + (isBottom ? 0 : (hash01(item.id, 'x') - 0.5) * (colW - w) * 0.85);
     let bottom = -layout(width).svgTop - 24; // 화면 맨 위 바로 위(헤더 뒤)에서 시작
     world.boxes.forEach(b => { if (b.col === item.col) bottom = Math.min(bottom, b.y - b.h / 2 - 8); });
     const box = CarpetPhysics.addBox(world, {
       id: item.id, col: item.col, x, y: bottom - h / 2, w, h, load: item.load,
-      vx: (hash01(item.id, 'v') - 0.5) * 2 * G.boxSpawnVx,
+      vx: isBottom ? 0 : (hash01(item.id, 'v') - 0.5) * 2 * G.boxSpawnVx,
+      lockX: isBottom,
     });
-    box.tilt = (hash01(item.id, 't') - 0.5) * 2 * G.boxTiltDeg;
+    box.tilt = isBottom ? 0 : (hash01(item.id, 't') - 0.5) * 2 * G.boxTiltDeg;
     sim.els.set(item.id, makeBoxEl(box, item.kind === 'todo' ? 'todo' : 'paper'));
   }
 
@@ -329,8 +369,8 @@ const STAGE_STYLE = {
   // animate=true: 하나씩 떨어지는 연출. false: 보이지 않게 끝까지 계산해 정착한 모습만 보여 준다(창 크기가 바뀐 때, 모션 줄이기)
   function startBoxes(animate) {
     stopSim();
-    boxesG.innerHTML = '';
-    const width = svg.clientWidth || stage.clientWidth + 32;
+    boxesEl.innerHTML = '';
+    const width = world_el.clientWidth || stage.clientWidth + 32;
     const Lr = layout(width);
     const capacity = state.settings.capacity;
     const colW = width / 7;
@@ -339,7 +379,7 @@ const STAGE_STYLE = {
       columns, capacity, maxSag: Lr.sag, baseY: Lr.groundY - S.lineWidth / 2, // 박스는 카펫 선의 윗면에 얹힌다
       params: G.physics,
     });
-    sim = { world, width, colW, unit: Lr.sag / capacity, els: new Map(), pending: releaseOrder(boxItems()), raf: 0, start: 0, last: 0, released: 0 };
+    sim = { world, width, colW, unit: Lr.sag / capacity, els: new Map(), pending: releaseOrder(boxItems()), raf: 0, start: 0, last: 0, released: 0, carpetShown: false };
     stage.dataset.boxes = String(sim.pending.length);
     if (!animate) {
       sim.pending.forEach(spawn);
@@ -350,12 +390,14 @@ const STAGE_STYLE = {
       return;
     }
     stage.dataset.boxState = 'falling';
+    renderSim(); // 카펫 선을 처지는 카펫으로 먼저 넘겨 둔다(처음엔 직선)
     function frame(now) {
       if (!sim.start) { sim.start = now; sim.last = now; }
       const due = Math.floor((now - sim.start) / G.boxStaggerMs) + 1; // 지금까지 떨어뜨렸어야 할 박스 수
-      while (sim.released < due && sim.pending.length) { spawn(sim.pending.shift()); sim.released++; }
+      while (sim.released < due && sim.pending.length) { spawn(sim.pending.shift()); sim.released++; sim.lastSpawnAt = now; }
       CarpetPhysics.advance(world, Math.min(50, now - sim.last));
       sim.last = now;
+      if (!sim.pending.length && now - sim.lastSpawnAt > G.maxSettleMs) world.settled = true; // 안전장치
       renderSim();
       if (sim.pending.length || !world.settled) sim.raf = requestAnimationFrame(frame);
       else { sim.raf = 0; stage.dataset.boxState = 'settled'; }
@@ -365,7 +407,6 @@ const STAGE_STYLE = {
 
   function finish() {
     draw(1);
-    gridG.removeAttribute('clip-path'); // 다 펼쳐졌으니 눈금을 가리던 틀을 걷는다
     stage.classList.add('intro-done');
     startBoxes(!window.matchMedia('(prefers-reduced-motion: reduce)').matches); // 첫 입장 때만 떨어지는 연출
     window.addEventListener('resize', () => { // 폭·높이가 바뀌면 선과 박스를 새 크기로 다시 놓는다(연출 없이)

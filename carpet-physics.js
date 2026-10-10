@@ -51,12 +51,13 @@
   }
 
   // 박스를 넣는다. col: 열 번호, x·y: 중심, w·h: 크기, load: 부하(카펫을 누르는 무게)
-  function addBox(world, { id, col, x, y, w, h, load, vx = 0, vy = 0, data = null }) {
+  // lockX: 가로로는 움직이지 않는다(맨 아래 박스를 카펫 가운데에 붙들어 두는 용도). 위아래로는 다른 박스처럼 떨어지고 눌린다
+  function addBox(world, { id, col, x, y, w, h, load, vx = 0, vy = 0, lockX = false, data = null }) {
     const c = world.columns[col];
     const half = w / 2;
     const box = {
-      id, col, w, h, load, data,
-      x: Math.min(c.right - half, Math.max(c.left + half, x)), y, vx, vy,
+      id, col, w, h, load, data, lockX,
+      x: Math.min(c.right - half, Math.max(c.left + half, x)), y, vx: lockX ? 0 : vx, vy,
       mass: w * h, landed: false, onFloor: false, supported: false,
     };
     world.boxes.push(box);
@@ -83,6 +84,7 @@
     // 1. 이동
     boxes.forEach(b => {
       b.vy += p.gravity * dt;
+      if (b.lockX) b.vx = 0;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.onFloor = false;
@@ -147,15 +149,18 @@
           } else {
             // 옆으로 겹침: 가로로 밀어낸다
             const left = a.x < b.x ? a : b, right = left === a ? b : a;
-            const tm = left.mass + right.mass;
-            left.x -= ox * (right.mass / tm);
-            right.x += ox * (left.mass / tm);
+            if (left.lockX && right.lockX) continue;
+            // 가로로 잠긴 박스는 움직이지 않는 벽처럼 다룬다(질량을 사실상 무한대로)
+            const lm = left.lockX ? 1e12 : left.mass, rm = right.lockX ? 1e12 : right.mass;
+            const tm = lm + rm;
+            left.x -= ox * (rm / tm);
+            right.x += ox * (lm / tm);
             const rv = left.vx - right.vx;
             if (rv > 0) {
               const e = rv > p.restSpeed ? p.restitution : 0;
-              const jv = (1 + e) * rv / (1 / left.mass + 1 / right.mass);
-              left.vx -= jv / left.mass;
-              right.vx += jv / right.mass;
+              const jv = (1 + e) * rv / (1 / lm + 1 / rm);
+              left.vx -= jv / lm;
+              right.vx += jv / rm;
             }
           }
         }

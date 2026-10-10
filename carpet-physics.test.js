@@ -78,6 +78,26 @@ test('박스는 자기 날짜 칸을 벗어나지 않고, 열끼리는 서로 �
   assert.ok(Math.abs(w.sag[0] - 1 * unit) < 1.5 && Math.abs(w.sag[5] - 2 * unit) < 1.5);
 });
 
+test('lockX 박스는 옆에서 다른 박스가 부딪혀도 가로로 움직이지 않고, 위아래로는 똑같이 떨어져 눌린다', () => {
+  const w = world();
+  const mid = (columns[2].left + columns[2].right) / 2;
+  const base = P.addBox(w, { id: 'base', col: 2, x: mid, y: -200, w: 100, h: 2 * unit, load: 2, lockX: true, vx: 500 });
+  // 바닥 박스의 옆을 때리며 떨어지는 박스, 그 위에 떨어지는 박스
+  P.addBox(w, { id: 'side', col: 2, x: mid + 70, y: -400, w: 110, h: unit, load: 1, vx: -300 });
+  P.addBox(w, { id: 'top', col: 2, x: mid - 40, y: -900, w: 90, h: unit, load: 1 });
+  P.settle(w, 20);
+  assert.ok(w.settled);
+  assert.equal(base.x, mid, '가로로 움직이지 않는다');
+  assert.equal(base.vx, 0);
+  assert.ok(Math.abs(base.y + base.h / 2 - P.floorY(w, 2)) < 1.5, '카펫 바닥에 닿아 있다');
+  assert.ok(Math.abs(w.sag[2] - 4 * unit) < 1.5, '부하 합만큼 카펫이 처진다');
+  const bs = w.boxes;
+  for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+    const ox = (bs[i].w + bs[j].w) / 2 - Math.abs(bs[i].x - bs[j].x), oy = (bs[i].h + bs[j].h) / 2 - Math.abs(bs[i].y - bs[j].y);
+    assert.ok(!(ox > 2 && oy > 2), `${bs[i].id}와 ${bs[j].id} 겹침`);
+  }
+});
+
 test('받침이 모자란 박스는 옆으로 미끄러져 내려와 바닥에 닿는다', () => {
   const w = world();
   const a = drop(w, 'a', 2, 1, { width: 90, dx: -30 });

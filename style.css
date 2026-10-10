@@ -28,6 +28,7 @@
   --box-stitch: var(--wbtn-stitch-color);/* 그 박스의 스티치 색(버튼과 같다) */
   --box-todo-bg: #f6d2d7;                /* 남은 단계 박스 색: 붉은 음영 */
   --box-todo-stitch: #cf5a6c;            /* 그 박스의 스티치 색: 배경에 맞춘 붉은 계열 */
+  --box-shadow: 0 3px 9px rgba(0, 0, 0, 0.2); /* 박스 그림자 */
 
   /* 털실 스티치 공용 값. 헤더 말고 다른 요소에도 가져다 쓴다.
      점선: SVG 요소는 CSS로 stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-width: var(--stitch-width); stroke: var(--stitch-color);
@@ -985,11 +986,24 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .header-month .num { display: flex; line-height: 0; } /* 월 숫자는 윤곽선 그림(app-carpet-next.js). 크기는 --header-month-num-size */
 .header-month .unit { font-size: var(--header-month-unit-size); }
 
-/* 새 카펫의 박스(app-carpet-next.js가 SVG로 만든다) */
-.cn-box .body { fill: var(--box-paper); }
-.cn-box .stitch { fill: none; stroke: var(--box-stitch); stroke-width: var(--stitch-width); stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-linecap: round; }
-.cn-box.todo .body { fill: var(--box-todo-bg); }
-.cn-box.todo .stitch { stroke: var(--box-todo-stitch); }
+/* 새 카펫의 층(app-carpet-next.js). 모든 층은 .cn-world 안에서 왼쪽 위가 (0,0)인 같은 좌표를 쓴다.
+   움직이는 것(박스·가리개·깔린 카펫·롤)은 transform만 바꿔서 그래픽 카드가 위치만 옮기게 한다 */
+.cn-world { position: relative; margin: 0 -16px; } /* 화면 너비 끝까지: main의 좌우 여백 16px을 되돌린다. 높이와 위쪽 당김은 JS가 정한다 */
+.cn-world > * { position: absolute; left: 0; top: 0; }
+.cn-grid, .cn-carpet, .cn-roll { overflow: visible; }
+.cn-grid, .cn-carpet { will-change: transform; } /* 각자 독립 레이어: 카펫 선이 바뀔 때 눈금 점선까지 다시 그려지지 않게 */
+.cn-cover, .cn-laid { transform-origin: 0 0; will-change: transform; }
+.cn-laid { border-radius: 0; }
+.cn-carpet { pointer-events: none; }
+.cn-roll { will-change: transform; pointer-events: none; }
+.cn-boxes { width: 100%; height: 100%; pointer-events: none; }
+
+/* 박스: div 몸통 + 안쪽 털실 점선(작은 SVG). 그림자는 box-shadow(SVG 필터는 Safari에서 느리다) */
+.cn-box { position: absolute; left: 0; top: 0; will-change: transform; background: var(--box-paper); border-radius: calc(var(--box-radius) * 1px); box-shadow: var(--box-shadow); }
+.cn-box svg { position: absolute; left: 0; top: 0; overflow: visible; }
+.cn-box svg rect { fill: none; stroke: var(--box-stitch); stroke-width: var(--stitch-width); stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-linecap: round; }
+.cn-box.todo { background: var(--box-todo-bg); }
+.cn-box.todo svg rect { stroke: var(--box-todo-stitch); }
 
 /* 새 카펫(작업 중). ?carpet=next 일 때만 켜진다(app-carpet-next.js). 교체가 끝나면 이 블록과 옛 카펫 규칙을 정리한다 */
 #carpet-next { display: none; }
@@ -997,7 +1011,6 @@ html.carpet-next-on #screen-carpet { display: none; }
 html.carpet-next-on main { padding-bottom: 0; } /* 새 카펫 화면은 아래 여백으로 스크롤이 생기지 않게 */
 html.carpet-next-on body { padding-bottom: 0; }
 html.carpet-next-on #carpet-next { display: block; min-height: 60vh; color: #999; font-size: 14px; }
-.carpet-intro { display: block; width: calc(100% + 32px); margin: 0 -16px; overflow: visible; } /* 롤과 카펫은 화면 너비 끝까지. main의 좌우 여백 16px을 되돌린다 */
 
 /* 데모 모드 표시: 내 데이터가 아니라 예시 데이터를 보고 있다는 알림. 아래쪽 버튼 묶음 왼쪽 구석, 팝업(200)보다 아래 */
 .demo-badge {
