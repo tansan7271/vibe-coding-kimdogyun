@@ -131,3 +131,11 @@ test('진행도: 일이 한꺼번에 끝나도 한 프레임에 확 튀지 않�
 test('진행도: 일 단계가 0개여도 시간만으로 끝난다', () => {
   assert.equal(introProgress({ elapsedMs: 1600, minMs: 1600, workDone: 0, workTotal: 0, prev: 0.999, dtMs: 100 }), 1);
 });
+
+test('간격이 0이거나 minMs가 0이어도 NaN이 나오지 않는다', () => {
+  const e = spiralEnd({ remaining: 100, spacing: 0, coreRadius: 7 });
+  assert.ok(Number.isFinite(e.theta) && Number.isFinite(e.radius));
+  const p = introProgress({ elapsedMs: 0, minMs: 0, workDone: 2, workTotal: 4, prev: 0, dtMs: 16 });
+  assert.ok(Number.isFinite(p), String(p));
+  assert.ok(p <= 0.5 + 1e-9); // 일이 절반이면 절반까지만
+});

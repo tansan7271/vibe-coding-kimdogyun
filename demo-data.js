@@ -1,6 +1,8 @@
-// RAD CARPET 데모 모드용 샘플 데이터 (모두 허구). 기준 오늘: 2026-10-10, 기간: 2026-09-01 ~ 2026-11-30
-// 앱의 기능을 한 번에 볼 수 있게 짰다: 완료 도장, 예산·안전선·시간 초과, 지남(마감이 지난 미완료 단계, 고정한 것 포함), 고정 단계,
-// 매주·격주·매월 반복과 이 날만 빼기·반복 종료일, 하루짜리 일정. demo-data.test.js가 이 구성을 지킨다
+// RAD CARPET 데모 모드용 샘플 데이터 (모두 허구). 기준 오늘: 2026-10-07(수)로 고정(실제 날짜와 상관없이 데모에서는 늘 이 날이 오늘), 기간: 2026-09-01 ~ 2026-11-30
+// 앱의 기능을 한 번에 볼 수 있게 짰다: 완료 도장, 예산·안전선·시간 초과, 지남(마감이 지난 미완료 단계, 고정한 것 포함), 마감이 오늘인 단계, 고정 단계,
+// 매주·격주·매월 반복과 이 날만 빼기(연휴·휴강 주간)·반복 종료일, 하루짜리 일정. 빽빽한 주(9/14, 10/12, 10/19, 11/16)와 한산한 주(9/21 추석, 10/26 학술제, 11/9 현장실습)가 섞여 있다.
+// demo-data.test.js가 이 구성을 지킨다
+const DEMO_TODAY = '2026-10-07'; // 데모 모드에서 todayStr()이 돌려주는 날(app-common.js)
 const DEMO_DATA = {
   "version": 1,
   "goals": [
@@ -97,7 +99,7 @@ const DEMO_DATA = {
     {
       "id": "goal_demo_16",
       "title": "동아리 홍보물 제작",
-      "deadline": "2026-10-09",
+      "deadline": "2026-10-05",
       "createdAt": "2026-09-30"
     }
   ],
@@ -240,7 +242,7 @@ const DEMO_DATA = {
       "minutes": 60,
       "order": 1,
       "done": true,
-      "doneDate": "2026-10-09"
+      "doneDate": "2026-10-06"
     },
     {
       "id": "step_demo_05_3",
@@ -268,7 +270,7 @@ const DEMO_DATA = {
       "minutes": 60,
       "order": 0,
       "done": true,
-      "doneDate": "2026-10-08"
+      "doneDate": "2026-10-07"
     },
     {
       "id": "step_demo_06_2",
@@ -407,7 +409,7 @@ const DEMO_DATA = {
       "minutes": 30,
       "order": 0,
       "done": true,
-      "doneDate": "2026-10-09"
+      "doneDate": "2026-10-05"
     },
     {
       "id": "step_demo_10_2",
@@ -456,15 +458,6 @@ const DEMO_DATA = {
       "done": false
     },
     {
-      "id": "step_demo_11_3",
-      "goalId": "goal_demo_11",
-      "title": "테스트와 제출",
-      "load": 3,
-      "minutes": 90,
-      "order": 2,
-      "done": false
-    },
-    {
       "id": "step_demo_12_1",
       "goalId": "goal_demo_12",
       "title": "주제 정하고 자료 찾기",
@@ -480,15 +473,6 @@ const DEMO_DATA = {
       "load": 4,
       "minutes": 180,
       "order": 1,
-      "done": false
-    },
-    {
-      "id": "step_demo_12_3",
-      "goalId": "goal_demo_12",
-      "title": "고쳐 쓰고 제출",
-      "load": 3,
-      "minutes": 90,
-      "order": 2,
       "done": false
     },
     {
@@ -591,24 +575,6 @@ const DEMO_DATA = {
       "done": false
     },
     {
-      "id": "step_demo_11_4",
-      "goalId": "goal_demo_11",
-      "title": "코드 리뷰 반영",
-      "load": 3,
-      "minutes": 120,
-      "order": 3,
-      "done": false
-    },
-    {
-      "id": "step_demo_12_4",
-      "goalId": "goal_demo_12",
-      "title": "참고문헌 정리",
-      "load": 2,
-      "minutes": 60,
-      "order": 3,
-      "done": false
-    },
-    {
       "id": "step_demo_13_6",
       "goalId": "goal_demo_13",
       "title": "테스트 데이터 준비",
@@ -672,7 +638,7 @@ const DEMO_DATA = {
       "minutes": 30,
       "order": 0,
       "done": true,
-      "doneDate": "2026-10-08"
+      "doneDate": "2026-10-05"
     },
     {
       "id": "step_demo_16_2",
@@ -692,6 +658,15 @@ const DEMO_DATA = {
       "order": 2,
       "done": false,
       "pinnedDate": "2026-10-13"
+    },
+    {
+      "id": "step_demo_04_4",
+      "goalId": "goal_demo_04",
+      "title": "발표 슬라이드 정리",
+      "load": 2,
+      "minutes": 60,
+      "order": 3,
+      "done": false
     }
   ],
   "events": [
@@ -706,7 +681,10 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-10-20"
+        "2026-10-20",
+        "2026-10-27",
+        "2026-11-10",
+        "2026-11-24"
       ]
     },
     {
@@ -721,7 +699,9 @@ const DEMO_DATA = {
       "repeatUntil": "2026-12-11",
       "skipDates": [
         "2026-09-24",
-        "2026-10-22"
+        "2026-10-22",
+        "2026-10-29",
+        "2026-11-12"
       ]
     },
     {
@@ -735,7 +715,9 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-10-19"
+        "2026-10-19",
+        "2026-10-26",
+        "2026-11-23"
       ]
     },
     {
@@ -749,7 +731,9 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-10-21"
+        "2026-10-21",
+        "2026-10-28",
+        "2026-11-11"
       ]
     },
     {
@@ -763,7 +747,10 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-10-20"
+        "2026-10-20",
+        "2026-10-27",
+        "2026-11-10",
+        "2026-11-24"
       ]
     },
     {
@@ -778,7 +765,9 @@ const DEMO_DATA = {
       "repeatUntil": "2026-12-11",
       "skipDates": [
         "2026-09-24",
-        "2026-10-22"
+        "2026-10-22",
+        "2026-10-29",
+        "2026-11-12"
       ]
     },
     {
@@ -792,7 +781,9 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-10-21"
+        "2026-10-21",
+        "2026-10-28",
+        "2026-11-11"
       ]
     },
     {
@@ -806,7 +797,9 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-10-21"
+        "2026-10-21",
+        "2026-10-28",
+        "2026-11-11"
       ]
     },
     {
@@ -820,7 +813,9 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-10-23"
+        "2026-09-25",
+        "2026-10-23",
+        "2026-10-30"
       ]
     },
     {
@@ -834,7 +829,9 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-10-23"
+        "2026-09-25",
+        "2026-10-23",
+        "2026-10-30"
       ]
     },
     {
@@ -848,7 +845,9 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-10-19"
+        "2026-10-19",
+        "2026-10-26",
+        "2026-11-23"
       ]
     },
     {
@@ -860,7 +859,10 @@ const DEMO_DATA = {
       "repeat": "weekly",
       "weekday": 0,
       "date": "2026-09-01",
-      "repeatUntil": "2026-12-11"
+      "repeatUntil": "2026-12-11",
+      "skipDates": [
+        "2026-10-26"
+      ]
     },
     {
       "id": "event_demo_13",
@@ -871,7 +873,10 @@ const DEMO_DATA = {
       "repeat": "weekly",
       "weekday": 1,
       "date": "2026-09-01",
-      "repeatUntil": "2026-12-11"
+      "repeatUntil": "2026-12-11",
+      "skipDates": [
+        "2026-10-27"
+      ]
     },
     {
       "id": "event_demo_14",
@@ -884,7 +889,9 @@ const DEMO_DATA = {
       "date": "2026-09-01",
       "repeatUntil": "2026-12-11",
       "skipDates": [
-        "2026-09-24"
+        "2026-09-24",
+        "2026-10-29",
+        "2026-11-12"
       ]
     },
     {
@@ -896,7 +903,10 @@ const DEMO_DATA = {
       "repeat": "weekly",
       "weekday": 5,
       "date": "2026-09-01",
-      "repeatUntil": "2026-12-11"
+      "repeatUntil": "2026-12-11",
+      "skipDates": [
+        "2026-10-31"
+      ]
     },
     {
       "id": "event_demo_16",
@@ -1139,24 +1149,6 @@ const DEMO_DATA = {
       "load": 4,
       "repeat": "none",
       "date": "2026-10-22"
-    },
-    {
-      "id": "event_demo_42",
-      "title": "팀플 중간 점검 회의",
-      "start": "18:00",
-      "end": "20:00",
-      "load": 3,
-      "repeat": "none",
-      "date": "2026-10-28"
-    },
-    {
-      "id": "event_demo_43",
-      "title": "전공 세미나",
-      "start": "10:00",
-      "end": "11:30",
-      "load": 2,
-      "repeat": "none",
-      "date": "2026-11-12"
     },
     {
       "id": "event_demo_44",

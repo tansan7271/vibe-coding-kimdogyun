@@ -7,16 +7,28 @@
   }
 })(typeof self !== 'undefined' ? self : this, function () {
 
+  const MAX_MINUTES = 7 * 24 * 60; // 단계 하나의 예상 시간 상한(분)
+  const MAX_CAPACITY = 100;        // 하루 예산 상한: 부하 1당 높이로 그리는 카펫이 브라우저 캔버스 한계를 넘지 않게
+
   const DEFAULT_SETTINGS = { capacity: 15, safeRatio: 0.8, sleepHours: 8, lifeHours: 4, placeMode: 'fill' };
 
   function isPlainObject(v) {
     return v !== null && typeof v === 'object' && !Array.isArray(v);
   }
 
-  // 실제 달력에 있는 YYYY-MM-DD인가 (Date를 쓰지 않는다)
+  // 날짜의 연도 범위. 9999년이나 0050년 같은 오타가 배치 계산을 멈추거나 틀리게 하지 않게 막는다
+  const MIN_YEAR = 2000, MAX_YEAR = 2100;
+
+  // 속성·키에 안전하게 들어가는 id인가. 화면이 id를 HTML 속성에 넣으므로(data-*-id) 따옴표·꺾쇠 같은 글자는 처음부터 받지 않는다
+  function isId(v) {
+    return typeof v === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(v);
+  }
+
+  // 실제 달력에 있는 YYYY-MM-DD이고 MIN_YEAR~MAX_YEAR 안인가 (Date를 쓰지 않는다)
   function isDateStr(v) {
     if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
     const [y, m, d] = v.split('-').map(Number);
+    if (y < MIN_YEAR || y > MAX_YEAR) return false;
     if (m < 1 || m > 12 || d < 1) return false;
     const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
     const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
@@ -68,7 +80,7 @@
     for (const [i, g] of raw.goals.entries()) {
       const at = `할 일 ${i + 1}번`;
       if (!isPlainObject(g)) return fail(`${at}이 객체가 아닙니다.`);
-      if (!nonEmptyString(g.id)) return fail(`${at}에 id가 없습니다.`);
+      if (!isId(g.id)) return fail(`${at}의 id가 없거나 허용되지 않는 글자가 있습니다(영문·숫자·_·-만, 80자까지): ${JSON.stringify(g.id)}`);
       if (goalIds.has(g.id)) return fail(`${at}의 id가 겹칩니다: ${g.id}`);
       goalIds.add(g.id);
       if (!nonEmptyString(g.title)) return fail(`${at}에 제목이 없습니다.`);
@@ -79,13 +91,13 @@
     for (const [i, s] of raw.steps.entries()) {
       const at = `중간 단계 ${i + 1}번`;
       if (!isPlainObject(s)) return fail(`${at}이 객체가 아닙니다.`);
-      if (!nonEmptyString(s.id)) return fail(`${at}에 id가 없습니다.`);
+      if (!isId(s.id)) return fail(`${at}의 id가 없거나 허용되지 않는 글자가 있습니다(영문·숫자·_·-만, 80자까지): ${JSON.stringify(s.id)}`);
       if (stepIds.has(s.id)) return fail(`${at}의 id가 겹칩니다: ${s.id}`);
       stepIds.add(s.id);
       if (!goalIds.has(s.goalId)) return fail(`${at}이 없는 할 일을 가리킵니다: ${JSON.stringify(s.goalId)}`);
       if (!nonEmptyString(s.title)) return fail(`${at}에 제목이 없습니다.`);
       if (!isLoad(s.load)) return fail(`${at}의 부하는 1~5 정수여야 합니다: ${JSON.stringify(s.load)}`);
-      if (typeof s.minutes !== 'number' || !(s.minutes > 0)) return fail(`${at}의 예상 시간은 0보다 커야 합니다.`);
+      if (typeof s.minutes !== 'number' || !Number.isFinite(s.minutes) || !(s.minutes > 0) || s.minutes > MAX_MINUTES) return fail(`${at}의 예상 시간은 0보다 크고 ${MAX_MINUTES}분(7일) 이하여야 합니다.`);
       if (typeof s.order !== 'number' || !Number.isFinite(s.order)) return fail(`${at}의 순서(order)가 숫자가 아닙니다.`);
       if (s.done !== undefined && typeof s.done !== 'boolean') return fail(`${at}의 done이 true/false가 아닙니다.`);
       if (s.done && !isDateStr(s.doneDate)) return fail(`${at}은 완료인데 완료일(doneDate)이 올바르지 않습니다.`);
@@ -100,7 +112,7 @@
     for (const [i, ev] of raw.events.entries()) {
       const at = `일정 ${i + 1}번`;
       if (!isPlainObject(ev)) return fail(`${at}이 객체가 아닙니다.`);
-      if (!nonEmptyString(ev.id)) return fail(`${at}에 id가 없습니다.`);
+      if (!isId(ev.id)) return fail(`${at}의 id가 없거나 허용되지 않는 글자가 있습니다(영문·숫자·_·-만, 80자까지): ${JSON.stringify(ev.id)}`);
       if (eventIds.has(ev.id)) return fail(`${at}의 id가 겹칩니다: ${ev.id}`);
       eventIds.add(ev.id);
       if (!nonEmptyString(ev.title)) return fail(`${at}에 제목이 없습니다.`);
@@ -118,6 +130,7 @@
           return fail(`${at}의 시작 날짜가 YYYY-MM-DD 형식이 아닙니다.`);
         }
         if (ev.repeatUntil !== undefined && !isDateStr(ev.repeatUntil)) return fail(`${at}의 반복 종료일이 YYYY-MM-DD 형식이 아닙니다.`);
+        if (ev.repeatUntil !== undefined && ev.date !== undefined && ev.repeatUntil < ev.date) return fail(`${at}의 반복 종료일이 시작 날짜보다 앞섭니다(한 번도 나타나지 않는 일정이 됩니다).`);
       } else {
         return fail(`${at}의 반복(repeat)은 none, weekly, biweekly, monthly 중 하나여야 합니다.`);
       }
@@ -133,11 +146,12 @@
     for (const key of Object.keys(DEFAULT_SETTINGS)) {
       if (inSettings[key] !== undefined) settings[key] = inSettings[key];
     }
-    if (typeof settings.capacity !== 'number' || !(settings.capacity > 0)) return fail('하루 예산(capacity)은 0보다 커야 합니다.');
+    if (typeof settings.capacity !== 'number' || !Number.isFinite(settings.capacity) || !(settings.capacity > 0) || settings.capacity > MAX_CAPACITY) return fail(`하루 예산(capacity)은 0보다 크고 ${MAX_CAPACITY} 이하여야 합니다.`);
     if (typeof settings.safeRatio !== 'number' || !(settings.safeRatio > 0 && settings.safeRatio <= 1)) return fail('안전선 비율(safeRatio)은 0보다 크고 1 이하여야 합니다.');
     for (const key of ['sleepHours', 'lifeHours']) {
       if (typeof settings[key] !== 'number' || !(settings[key] >= 0 && settings[key] <= 24)) return fail(`${key}는 0~24 사이여야 합니다.`);
     }
+    if (settings.sleepHours + settings.lifeHours > 24) return fail('수면 시간과 생활 시간의 합이 24시간을 넘습니다.');
     if (settings.placeMode !== 'fill' && settings.placeMode !== 'even') return fail('깔기 방식(placeMode)은 fill 또는 even이어야 합니다.');
 
     return {
@@ -156,5 +170,5 @@
     return { ok: false, error };
   }
 
-  return { parseImport, serializeExport, isDateStr };
+  return { parseImport, serializeExport, isDateStr, isId, MAX_CAPACITY, MAX_MINUTES };
 });

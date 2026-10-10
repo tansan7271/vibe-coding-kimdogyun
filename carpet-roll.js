@@ -16,6 +16,7 @@
   function spiralEnd({ remaining, spacing, coreRadius }) {
     if (remaining <= 0) return { theta: 0, radius: coreRadius };
     const a = spacing / (4 * Math.PI);
+    if (!(a > 0)) return { theta: remaining / Math.max(coreRadius, 1e-9), radius: coreRadius }; // 간격 0이면 나선이 아니라 원이다
     const theta = (-coreRadius + Math.sqrt(coreRadius * coreRadius + 4 * a * remaining)) / (2 * a);
     return { theta, radius: coreRadius + (spacing * theta) / (2 * Math.PI) };
   }
@@ -62,10 +63,10 @@
   // 펼침 진행도. 최소 시간과 실제 일의 진행 중 더 느린 쪽을 따른다.
   // 일이 단계 단위로 갑자기 끝나도 롤이 튀지 않게, 한 번에 올라가는 속도에 상한(speedLimit × 최소 시간 기준 속도)을 둔다
   function introProgress({ elapsedMs, minMs, workDone, workTotal, prev, dtMs, speedLimit = 2.5 }) {
-    const timeP = Math.min(1, Math.max(0, elapsedMs / minMs));
+    const timeP = minMs > 0 ? Math.min(1, Math.max(0, elapsedMs / minMs)) : 1; // minMs가 0이면 시간 제한 없이 일의 진행만 따른다
     const workP = workTotal > 0 ? Math.min(1, workDone / workTotal) : 1;
     const target = Math.min(timeP, workP);
-    const maxStep = (speedLimit / minMs) * Math.max(0, dtMs);
+    const maxStep = minMs > 0 ? (speedLimit / minMs) * Math.max(0, dtMs) : Infinity;
     const next = Math.min(target, prev + maxStep);
     return Math.max(prev, next);
   }

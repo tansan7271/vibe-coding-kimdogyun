@@ -42,9 +42,11 @@
    * @param {object} [input.params] DEFAULTS를 덮어쓰는 값
    */
   function createWorld({ columns, capacity, maxSag, baseY, params = {} }) {
+    const merged = { ...DEFAULTS, ...params };
+    if (!(merged.dt > 0)) merged.dt = DEFAULTS.dt; // dt가 0이면 settle이 끝나지 않는다
     return {
-      columns, capacity, maxSag, baseY,
-      p: { ...DEFAULTS, ...params },
+      columns, capacity: Math.max(capacity, 1), maxSag, baseY, // 예산이 0이면 목표 처짐이 0/0(NaN)이 되고 충격량도 무한대가 된다(예산은 부하 단위라 1보다 작을 일이 없다)
+      p: merged,
       boxes: [],
       sag: columns.map(() => 0),     // 카펫이 처진 깊이(px)
       lift: columns.map(() => false), // 박스를 빼서 카펫이 부드럽게 올라오는 중인 열(removeBox가 켜고, 목표에 닿거나 박스가 새로 들어오면 꺼진다)
@@ -58,6 +60,7 @@
   // lockX: 가로로는 움직이지 않는다(맨 아래 박스를 카펫 가운데에 붙들어 두는 용도). 위아래로는 다른 박스처럼 떨어지고 눌린다
   function addBox(world, { id, col, x, y, w, h, load, vx = 0, vy = 0, lockX = false, data = null }) {
     const c = world.columns[col];
+    w = Math.min(w, c.right - c.left); // 열보다 넓으면 양쪽 벽이 서로 반대로 밀어 정착하지 못한다
     const half = w / 2;
     const box = {
       id, col, w, h, load, data, lockX,

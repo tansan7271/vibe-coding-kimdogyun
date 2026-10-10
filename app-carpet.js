@@ -120,7 +120,7 @@ const STAGE_STYLE = {
     + '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="cn-seal-sym" viewBox="-50 -50 100 100">'
     + `<path style="fill:var(--seal-fill);stroke:var(--seal-edge);stroke-width:1.4" d="${BoxIcons.sealPath(STAGE_STYLE.sealLobes)}"/>`
     // 체크: 선 두께를 스티치와 같게(--stitch-width, 화면 크기 그대로: non-scaling-stroke), 끝은 스티치처럼 둥글게
-    + '<polyline points="-23,2 -8,17 23,-17" style="fill:none;stroke:var(--seal-check);stroke-width:var(--stitch-width);stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke"/>'
+    + '<polyline points="-17,1 -6,12 17,-12" style="fill:none;stroke:var(--seal-check);stroke-width:var(--stitch-width);stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke"/>'
     + '</symbol>'
     // 지남 도장: 같은 모양에 붉은 톤, 체크 대신 알람 아이콘(24칸 그림을 도장 가운데에 맞춰 키운다)
     + '<symbol id="cn-seal-late-sym" viewBox="-50 -50 100 100">'
@@ -153,13 +153,17 @@ const STAGE_STYLE = {
     return (h >>> 0) / 4294967296;
   }
 
-  // 시간(분)을 짧게: 30분, 1시간, 1시간30분
-  function shortDuration(min) {
-    const h = Math.floor(min / 60), m = Math.round(min % 60);
-    if (h && m) return `${h}시간${m}분`;
-    if (h) return `${h}시간`;
-    return `${m}분`;
+  // 시간(분)을 글자로: 30분, 1시간, 1시간30분(박스용, 짧게), spaced면 1시간 30분. 음수는 앞에 -
+  function shortDuration(min, spaced = false) {
+    const sign = min < 0 ? '-' : '', a = Math.abs(Math.round(min)), h = Math.floor(a / 60), m = a % 60;
+    return sign + (h && m ? `${h}시간${spaced ? ' ' : ''}${m}분` : h ? `${h}시간` : `${m}분`);
   }
+
+  // 헤더 아랫단 높이(화면 위에서). 큰 박스·끌기가 이 아래만 쓰게 한다
+  function headerBottomPx() { return parseFloat(getComputedStyle(document.body).paddingTop) || 0; }
+
+  // 페이지 폭(px). 아직 붙기 전이라 0이면 화면 폭으로 대신한다
+  function pageWidth(page) { return page.el.clientWidth || stage.clientWidth + 32; }
 
   // 숫자 문자열을 윤곽선 글리프 <g>로 만든다. x: 왼쪽 시작, baseline: 기준선의 y, fontSize: 글자 크기(px)
   function digitsSvg(text, x, baseline, fontSize, fill) {
@@ -214,7 +218,7 @@ const STAGE_STYLE = {
     return r.top + r.height / 2 + m.b * (-w / 2) + m.d * (-h / 2);
   }
 
-  // ---- 로딩 단계. 옛 카펫이 처음 그릴 때 하는 계산(마지막 배치 결과 placedDate 저장 포함). 단계마다 따로 실행해 그 사이에 화면이 그려지게 한다. 처음 두 단계는 다시 그릴 때(refreshCarpet)도 다시 돌린다 ----
+  // ---- 로딩 단계. 처음 그릴 때 하는 계산(마지막 배치 결과 placedDate 저장 포함). 단계마다 따로 실행해 그 사이에 화면이 그려지게 한다. 처음 두 단계는 다시 그릴 때(refreshCarpet)도 다시 돌린다 ----
   const work = {};
   const phases = [
     () => { // 1. 읽기
@@ -239,12 +243,18 @@ const STAGE_STYLE = {
       if (placedChanged) saveState();
     },
     () => { // 3. 첫 주(이번 주) 7일 구성
-      first.stats = statsFor(first.offset);
+      refreshStats(first);
     },
     () => {}, // 4. 그리기 준비
   ];
   let workDone = 0;
   const nextTask = () => new Promise(res => requestAnimationFrame(() => setTimeout(res, 0)));
+
+  // page의 7일 구성과 날짜를 지금 배치 결과로 다시 계산한다(처음 그릴 때와 다시 그릴 때가 같이 쓴다)
+  function refreshStats(page) {
+    page.stats = statsFor(page.offset);
+    page.dates = page.stats.map(st => st.date);
+  }
 
   // offset주 뒤(음수는 앞)의 7일 구성. 보이는 주가 아니어도 같은 배치 결과로 계산한다
   function statsFor(offset) {
@@ -257,7 +267,7 @@ const STAGE_STYLE = {
 
   // 페이지 하나를 만들어 붙인다. intro: 첫 입장 롤 펼침 층(가리개·깔린 카펫·롤)도 같이 만든다
   function createPage(offset, intro) {
-    const start = Placement.addDays(Placement.weekStart(todayStr()), offset * 7);
+    const start = Placement.addDays(Placement.weekStart(work.today || todayStr()), offset * 7); // 통계(statsFor)와 같은 '오늘'을 쓴다
     const dates = Placement.dateRange(start, Placement.addDays(start, 6));
     const el = document.createElement('div');
     el.className = 'cn-world';
@@ -278,12 +288,12 @@ const STAGE_STYLE = {
       dropEl: q('.cn-drop'), boxesEl: q('.cn-boxes'), sealsEl: q('.cn-seals'), focusEl: q('.cn-focus'), shadowEl: q('.cn-shadow'),
       coverEl: q('.cn-cover'), laidEl: q('.cn-laid'), rollSvg: q('.cn-roll'), rollPath: q('.cn-roll path'),
     };
-    [page.rollPath].filter(Boolean).forEach(p => {
-      p.setAttribute('fill', 'none');
-      p.setAttribute('stroke', S.lineColor);
-      p.setAttribute('stroke-width', S.lineWidth);
-      p.setAttribute('stroke-linejoin', 'round');
-    });
+    if (page.rollPath) { // 롤(첫 입장 때만 있다)의 선 모양. 카펫 선은 캔버스에 그려서 따로 정하지 않는다
+      page.rollPath.setAttribute('fill', 'none');
+      page.rollPath.setAttribute('stroke', S.lineColor);
+      page.rollPath.setAttribute('stroke-width', S.lineWidth);
+      page.rollPath.setAttribute('stroke-linejoin', 'round');
+    }
     if (page.laidEl) { page.laidEl.style.height = `${S.lineWidth}px`; page.laidEl.style.background = S.lineColor; }
     if (page.coverEl) page.coverEl.style.background = getComputedStyle(document.body).backgroundColor; // 페이지 바탕색: 롤 앞쪽 눈금을 이 색으로 덮어 숨긴다
     return page;
@@ -307,7 +317,7 @@ const STAGE_STYLE = {
     const startMargin = S.entryGap + S.lineWidth / 2;
     const radius0 = CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0, startMargin }).radius;
     const groundY = S.topMargin + 2 * radius0;     // 페이지 안에서 땅 높이: 롤 지름 + 위 여백
-    const headerBottom = parseFloat(getComputedStyle(document.body).paddingTop) || 0; // 헤더 아랫단 높이(화면 위에서)
+    const headerBottom = headerBottomPx(); // 헤더 아랫단 높이(화면 위에서)
     const liftHost = isMobile() ? stage : pagesEl; // 모바일에서는 pagesEl을 끌어올리면 스크롤 틀에 잘리므로 틀 자체를 올린다
     pagesEl.style.marginTop = '0px'; stage.style.marginTop = '';
     const stageTop = pagesEl.getBoundingClientRect().top + window.scrollY;
@@ -353,10 +363,6 @@ const STAGE_STYLE = {
   // ---- 날짜별 막대: 위는 부하, 아래는 남은 시간. 글자는 막대 위에 한 줄씩 ----
   const barRowHeight = () => Math.ceil(G.barLabelFont * 1.3) + G.barLabelGap + G.barHeight;
   const barsBlockHeight = () => 2 * barRowHeight() + G.barRowGap;
-  function formatLeft(min) { // 남은 시간(분): 1시간 30분, 45분, 음수는 앞에 -
-    const sign = min < 0 ? '-' : '', a = Math.abs(Math.round(min)), h = Math.floor(a / 60), m = a % 60;
-    return sign + (h && m ? `${h}시간 ${m}분` : h ? `${h}시간` : `${m}분`);
-  }
 
   // 막대 일곱 묶음을 새로 만든다(바뀌는 건 글자와 길이뿐). 높이는 positionBars가 카펫을 따라 맞춘다
   function drawBars(page, width) {
@@ -368,7 +374,7 @@ const STAGE_STYLE = {
       const row = (label, ratio, mark) => `<div class="bar-row"><div class="bar-text">${label}</div><div class="bar"><i style="width:${(ratio * 100).toFixed(1)}%"></i>${mark}</div></div>`;
       return `<div class="bar-col" style="left:${(i * colW + (colW - flat) / 2 + G.barSideInset).toFixed(1)}px;width:${Math.max(0, flat - 2 * G.barSideInset).toFixed(1)}px">`
         + row(`부하 ${st.load} / ${st.capacity}`, DayBars.fillRatio(st.load, st.capacity), safe > 0 && safe < 1 ? `<b style="left:${(safe * 100).toFixed(1)}%"></b>` : '')
-        + row(`남은 시간 ${formatLeft(st.minutesLeft)}`, DayBars.fillRatio(used, st.availableMinutes), '')
+        + row(`남은 시간 ${shortDuration(st.minutesLeft, true)}`, DayBars.fillRatio(used, st.availableMinutes), '')
         + '</div>';
     }).join('');
     page.barCols = [...page.barsEl.children];
@@ -424,7 +430,7 @@ const STAGE_STYLE = {
 
   // ---- 첫 입장 롤 그리기. eased는 0~1(곡선을 입힌 진행도). 눈금은 이미 그려 있고, 가리개를 오른쪽으로 밀어 드러낸다 ----
   function draw(page, eased) {
-    const width = page.el.clientWidth || stage.clientWidth + 32;
+    const width = pageWidth(page);
     const m = metrics(page, width);
     const pose = CarpetRoll.rollPose({ progress: eased, width, ...m.P, groundY: m.groundY, startMargin: m.startMargin });
     drawGrid(page, m, width);
@@ -536,7 +542,8 @@ const STAGE_STYLE = {
     drawCarpet(page, shape, width, m, !lineOnly); // 카펫 선과 그림자를 같은 곡선으로 같은 프레임에 그린다(떨림 루프에서는 선만)
     if (!lineOnly) positionBars(page, world, m);
     if (!sim.carpetShown) {
-      showShadow(page); // 카펫이 처음 그려질 때 그림자도 같이 서서히 나타난다. 이후로는 숨기지 않고 카펫을 따라 계속 그려진다 // 처음 한 번: 롤이 깔아 둔 직선과 가리개를 걷고 처지는 카펫으로 넘긴다(처음에는 같은 직선이라 티가 안 난다)
+      // 처음 한 번: 롤이 깔아 둔 직선과 가리개를 걷고 처지는 카펫으로 넘긴다(처음에는 같은 직선이라 티가 안 난다)
+      showShadow(page); // 카펫이 처음 그려질 때 그림자도 같이 서서히 나타난다. 이후로는 숨기지 않고 카펫을 따라 계속 그려진다
       sim.carpetShown = true;
       if (page.laidEl) page.laidEl.style.display = 'none';
       if (page.coverEl) page.coverEl.style.display = 'none';
@@ -760,7 +767,7 @@ const STAGE_STYLE = {
     stopSim(page);
     page.boxesEl.innerHTML = '';
     page.sealsEl.innerHTML = '';
-    const width = page.el.clientWidth || stage.clientWidth + 32;
+    const width = pageWidth(page);
     const m = metrics(page, width);
     const capacity = state.settings.capacity;
     const colW = width / 7;
@@ -778,7 +785,7 @@ const STAGE_STYLE = {
     const overSafe = page.stats.map(st => st.overSafe); // 안전선 초과(예산 초과 포함): 그림자가 붉어지는 기준
     const fidget = over.some(Boolean) && !reduceMotion();
     const sim = page.sim = { world, width, colW, unit: m.unit, over, overSafe, fidget, els: new Map(), seals: new Map(), pending: releaseOrder(drops), raf: 0, fidgetRaf: 0, start: 0, last: 0, released: 0, carpetShown: false };
-    const debug = state => { if (page === active) { stage.dataset.boxes = String(world.boxes.length + sim.pending.length); stage.dataset.boxState = state; } };
+    const debug = state => markState(page, state);
     if (mode === 'empty') {
       sim.pending = [];
       sim.fidget = false;
@@ -802,7 +809,7 @@ const STAGE_STYLE = {
   // 박스를 떨어뜨리고 물리를 진행해 정착할 때까지 프레임마다 그린다. 정착하면 떨림 루프로 넘어간다(처음 그릴 때와 제자리 갱신이 같이 쓴다)
   function runFrames(page) {
     const sim = page.sim, world = sim.world;
-    const debug = state => { if (page === active) { stage.dataset.boxes = String(world.boxes.length + sim.pending.length); stage.dataset.boxState = state; } };
+    const debug = state => markState(page, state);
     debug('falling');
     sim.start = 0;
     function frame(now) {
@@ -935,7 +942,7 @@ const STAGE_STYLE = {
     const pageRect = page.el.getBoundingClientRect();
     const bounds = {
       left: -pageRect.left, right: document.documentElement.clientWidth - pageRect.left,
-      top: (parseFloat(getComputedStyle(document.body).paddingTop) || 0) - pageRect.top,
+      top: headerBottomPx() - pageRect.top,
       bottom: (noteCornerY() ?? window.innerHeight) - pageRect.top,
     };
     const width = Math.min(G.focusWidth, bounds.right - bounds.left - 2 * G.focusMargin);
@@ -1106,7 +1113,7 @@ const STAGE_STYLE = {
     const r = d.el.getBoundingClientRect();
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     d.grabDx = d.startX - cx; d.grabDy = d.startY - cy; // 박스를 잡은 자리를 그대로 유지한다
-    d.topHeight = (parseFloat(getComputedStyle(document.body).paddingTop) || 0) + G.dragTopExtra;
+    d.topHeight = headerBottomPx() + G.dragTopExtra;
     d.fromDate = d.page.dates[d.item.col];
     const ghost = document.createElement('div');
     ghost.className = 'cn-ghost';
@@ -1121,12 +1128,15 @@ const STAGE_STYLE = {
     d.ghost = ghost;
     d.el.style.opacity = String(G.dragSourceOpacity);
     document.body.classList.add('dragging-box');
+    clearTimeout(dzHideTimer);
     dz.classList.add('show');
     requestAnimationFrame(() => dz.classList.add('on')); // 한 프레임 뒤에 켜야 서서히 나타난다
     d.dwellZone = null; d.dwellStart = performance.now(); d.wasBusy = false;
     updateBoxDrag();
     d.raf = requestAnimationFrame(dwellTick);
   }
+
+  let dzHideTimer = 0; // 안내 구역을 숨기는 타이머(새 끌기가 시작되면 취소해 이전 타이머가 새 끌기의 구역을 숨기지 않게 한다)
 
   function endBoxDrag(cancelled) {
     const d = boxDrag;
@@ -1138,10 +1148,11 @@ const STAGE_STYLE = {
     cancelAnimationFrame(d.raf);
     boxDrag = null;
     setTimeout(() => { suppressClick = false; }, 0);
-    if (!d.started) return;
+    if (!d.started) { if (refreshQueued) refreshCarpet(); return; } // 끌기가 시작되기 전에 끝나도 미뤄 둔 다시 그리기는 한다
     document.body.classList.remove('dragging-box');
     dz.classList.remove('on');
-    setTimeout(() => dz.classList.remove('show'), 220);
+    clearTimeout(dzHideTimer);
+    dzHideTimer = setTimeout(() => dz.classList.remove('show'), 220);
     Object.values(dzEl).forEach(el => el.classList.remove('active'));
     showDrop(d.hlPage, null);
     d.el.style.opacity = '';
@@ -1213,10 +1224,15 @@ const STAGE_STYLE = {
 
   // 읽기·배치를 다시 계산해 page의 7일 구성과 날짜를 새로 맞춘다
   function syncWork(page) {
+    // 앱을 열어 둔 채 날짜가 바뀌었으면 앱을 새로 열 때와 같게 밀림을 처리한다: 깔린 날이 어제 이전인 단계(어제로 고정한 단계 포함)는 오늘부터로 옮긴다
+    const nowStr = todayStr();
+    if (work.today && nowStr !== work.today) {
+      state.steps = Placement.autoPush({ steps: state.steps, today: nowStr }).steps;
+      saveState();
+    }
     phases[0]();
     phases[1]();
-    page.stats = statsFor(page.offset);
-    page.dates = page.stats.map(st => st.date);
+    refreshStats(page);
   }
 
   // 미뤄 둔 다시 그리기가 있으면, 박스를 놓기 전에 page에 반영한다(이어서 전부 떨어지므로 견줄 필요가 없다)
@@ -1259,6 +1275,13 @@ const STAGE_STYLE = {
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkRollover(); armMidnight(); } });
   armMidnight();
+
+  // 확인용: 지금 보이는 페이지의 박스 수와 상태(falling·settled)를 stage의 data 속성에 적는다(테스트·개발자 도구가 읽는다)
+  function markState(page, state) {
+    if (page !== active || !page.sim) return;
+    stage.dataset.boxes = String(page.sim.world.boxes.length + page.sim.pending.length);
+    stage.dataset.boxState = state;
+  }
 
   // 이동할 주의 페이지를 만든다. 눈금과 날짜 숫자, 평평한 카펫만 있고 박스는 없다(롤 펼침은 첫 입장 때만, 박스는 슬라이드가 끝난 뒤 위에서 떨어진다)
   function buildPage(offset) {
@@ -1313,7 +1336,9 @@ const STAGE_STYLE = {
     navTarget = target;
     const dir = target > active.offset ? 1 : -1;       // 다음 주(+1)면 새 페이지가 오른쪽에서 들어온다
     const old = active;
-    const next = buildPage(target);
+    let next = null;
+    try {
+    next = buildPage(target);
     const width = slideWidth();
     // 모바일 판: 새 주는 지난 주면 오른쪽 끝(일요일)에서, 다음 주면 왼쪽 끝(월요일)에서, 이번 주면 오늘 칸에서 시작한다.
     // 슬라이드 동안 스크롤 위치는 그대로 두고 새 페이지를 그만큼 비껴 놓았다가(shift), 도착하는 순간 비킨 것을 지우며 스크롤을 옮겨 튀지 않게 한다
@@ -1337,12 +1362,20 @@ const STAGE_STYLE = {
     setHeader(next);
     await Promise.all([animateX(old.el, 0, -dir * width, G.slideMs), animateX(next.el, dir * width + shift, shift, G.slideMs)]);
     arrive(old, next);
+    } catch (err) { // 중간에 예외가 나도 busy가 영원히 true로 남아 주 넘기기·다시 그리기·끌기가 전부 멈추는 일이 없게 원래 주로 되돌린다
+      console.error('주 넘기기 실패', err);
+      if (next && next !== active && next.el.isConnected) removePage(next);
+      active.el.style.transform = ''; active.el.style.clipPath = '';
+      stage.style.overflowX = ''; pendingScroll = null;
+      navTarget = active.offset; busy = false;
+      applyContainer(active.m);
+    }
   }
 
   // 터치 스와이프: 손가락을 따라 페이지가 움직이고, 놓을 때 충분히 밀었거나 빠르면 넘어가고 아니면 제자리로 돌아간다
   let drag = null;
   pagesEl.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'touch' || busy || !introDone || focus || boxDrag || isMobile()) return; // 모바일 판은 옆으로 밀면 날짜 스크롤이다
+    if (e.pointerType !== 'touch' || busy || !introDone || focus || (boxDrag && boxDrag.started) || isMobile()) return; // 모바일 판은 옆으로 밀면 날짜 스크롤이다. 박스를 막 누른(길게 누르기 전) 상태에서도 스와이프로 이어질 수 있다
     drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, mode: 'wait', dir: 0, other: null, dx: 0, lastX: e.clientX, lastT: e.timeStamp, v: 0 };
   });
   pagesEl.addEventListener('pointermove', e => {
@@ -1350,7 +1383,12 @@ const STAGE_STYLE = {
     const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
     if (drag.mode === 'wait') {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      if (Math.abs(dx) > Math.abs(dy) * 1.2) { drag.mode = 'drag'; try { pagesEl.setPointerCapture(e.pointerId); } catch (err) { /* 무시 */ } }
+      if (boxDrag && boxDrag.started) { drag = null; return; } // 길게 눌러 박스 끌기가 시작됐으면 스와이프가 아니다
+      if (Math.abs(dx) > Math.abs(dy) * 1.2) {
+        drag.mode = 'drag';
+        if (boxDrag) endBoxDrag(true); // 길게 누르기 전에 옆으로 밀었으면 박스 끌기 대기를 끝내고 스와이프로 간다
+        try { pagesEl.setPointerCapture(e.pointerId); } catch (err) { /* 무시 */ }
+      }
       else { drag = null; return; } // 세로로 밀면 스크롤에 맡긴다
     }
     const dt = e.timeStamp - drag.lastT;
@@ -1378,23 +1416,31 @@ const STAGE_STYLE = {
     busy = true;
     const remain = commit ? width - Math.abs(d.dx) : Math.abs(d.dx);       // 남은 거리에 비례해 짧게
     const ms = Math.max(160, G.slideMs * Math.min(1, remain / width));
-    if (commit) {
-      navTarget = next.offset;
-      setHeader(next);
-      await Promise.all([animateX(old.el, d.dx, -d.dir * width, ms), animateX(next.el, d.dx + d.dir * width, 0, ms)]);
-      arrive(old, next);
-    } else {
-      await Promise.all([animateX(old.el, d.dx, 0, ms), animateX(next.el, d.dx + d.dir * width, d.dir * width, ms)]);
-      removePage(next);
-      applyContainer(old.m);
-      busy = false;
-      if (refreshQueued) refreshCarpet();
+    try {
+      if (commit) {
+        navTarget = next.offset;
+        setHeader(next);
+        await Promise.all([animateX(old.el, d.dx, -d.dir * width, ms), animateX(next.el, d.dx + d.dir * width, 0, ms)]);
+        arrive(old, next);
+      } else {
+        await Promise.all([animateX(old.el, d.dx, 0, ms), animateX(next.el, d.dx + d.dir * width, d.dir * width, ms)]);
+        removePage(next);
+        applyContainer(old.m);
+        busy = false;
+        if (refreshQueued) refreshCarpet();
+      }
+    } catch (err) { // goTo와 같은 이유로 busy를 풀고 원래 주로 되돌린다
+      console.error('스와이프 주 넘기기 실패', err);
+      if (next && next !== active && next.el.isConnected) removePage(next);
+      active.el.style.transform = '';
+      navTarget = active.offset; busy = false;
+      applyContainer(active.m);
     }
   }
   pagesEl.addEventListener('pointerup', endDrag);
   pagesEl.addEventListener('pointercancel', endDrag);
 
-  // 헤더 패치의 이전 주·다음 주·이번 주 버튼. 옛 카펫의 같은 버튼 처리(app-carpet.js)가 먼저 돌지만 옛 화면은 숨겨져 있어 상관없다
+  // 헤더 패치의 이전 주·다음 주·이번 주 버튼
   document.getElementById('week-prev').addEventListener('click', () => goTo(navTarget - 1));
   document.getElementById('week-next').addEventListener('click', () => goTo(navTarget + 1));
   document.getElementById('week-today').addEventListener('click', async () => {
@@ -1427,12 +1473,17 @@ const STAGE_STYLE = {
     let resizeTimer = 0;
     window.addEventListener('resize', () => { // 폭·높이가 바뀌면 보이는 주의 선과 박스를 새 크기로 다시 놓는다(연출 없이). 창을 끄는 동안은 기다렸다가 멈추면 한 번만
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        if (busy || drag || boxDrag) return;
+      let tries = 0;
+      const replace = () => {
+        if (busy || drag || boxDrag) { // 슬라이드·스와이프·박스 끌기 중이면 끝날 때까지 기다렸다 다시 시도한다(낡은 폭으로 남지 않게)
+          if (++tries <= 40) resizeTimer = setTimeout(replace, 250);
+          return;
+        }
         const width = active.el.clientWidth;
         drawGrid(active, metrics(active, width), width);
         startBoxes(active, 'instant');
-      }, G.resizeDebounceMs);
+      };
+      resizeTimer = setTimeout(replace, G.resizeDebounceMs);
     });
   }
 

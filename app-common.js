@@ -62,25 +62,38 @@
   function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return demoOn ? JSON.parse(JSON.stringify(DEMO_DATA)) : defaultState(); // 데모는 처음 켤 때 예시 데이터에서 시작한다
+    // 저장된 데이터도 가져오기와 같은 검사를 통과해야 한다(version만 맞고 속이 깨진 데이터로 화면이 못 뜨는 것을 막는다). 빠진 설정은 기본값으로 채워진다
+    const r = Data.parseImport(raw);
+    if (r.ok) return r.state;
+    // 깨진 데이터: 원본은 백업 키에 옮겨 두고 새로 시작한다(사용자가 파일로 꺼내 볼 수 있게)
+    try { localStorage.setItem(`${STORAGE_KEY}-broken`, raw); } catch (e) { /* 저장 공간이 없으면 백업은 포기 */ }
+    loadProblem = r.error;
+    console.warn(`저장된 데이터가 올바르지 않아 ${STORAGE_KEY}-broken에 옮기고 새로 시작합니다: ${r.error}`);
+    return demoOn ? JSON.parse(JSON.stringify(DEMO_DATA)) : defaultState();
+  }
+
+  let loadProblem = ''; // 저장된 데이터가 깨져 있었으면 그 이유(화면이 뜬 뒤에 알린다)
+  let saveWarned = false;
+
+  function saveState() {
     try {
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object' || !parsed.version) return defaultState();
-      return parsed;
-    } catch (e) {
-      return defaultState();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) { // 저장 공간이 가득 찼거나 브라우저가 막은 경우: 화면과 저장이 어긋나므로 한 번 알린다
+      console.error('저장하지 못했습니다', e);
+      if (!saveWarned) {
+        saveWarned = true;
+        alert('저장하지 못했습니다(저장 공간이 가득 찼거나 브라우저가 막고 있습니다). 지금 내용은 이 화면을 닫으면 사라질 수 있습니다. 일정과 설정 > 전체 설정의 내보내기로 파일에 백업해 두세요.');
+      }
     }
   }
 
-  function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-
   const state = loadState();
+  if (loadProblem) setTimeout(() => alert(`저장된 데이터에 문제가 있어 새로 시작합니다. 원래 데이터는 브라우저 저장 공간(${STORAGE_KEY}-broken)에 그대로 남겨 두었습니다.\n이유: ${loadProblem}`), 300);
 
   if (demoOn) { // 지금 보는 것이 내 데이터가 아님을 늘 알린다
     const badge = document.createElement('div');
     badge.className = 'demo-badge';
-    badge.textContent = '데모 모드';
+    badge.textContent = typeof DEMO_TODAY !== 'undefined' ? `데모 모드 · ${Number(DEMO_TODAY.slice(5, 7))}월 ${Number(DEMO_TODAY.slice(8))}일 기준` : '데모 모드';
     document.body.appendChild(badge);
   }
 
@@ -124,7 +137,9 @@
     return String(n).padStart(2, '0');
   }
 
+  // 오늘 날짜(로컬 기준 YYYY-MM-DD). 데모 모드에서는 실제 날짜와 상관없이 데모 데이터의 기준일(DEMO_TODAY)로 고정한다
   function todayStr() {
+    if (demoOn && typeof DEMO_TODAY !== 'undefined') return DEMO_TODAY;
     const d = new Date();
     return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
   }
@@ -152,11 +167,26 @@
     return escapeHtml(str);
   }
 
+  // 단계 예상 시간(분)을 정수로 다듬는다. 비었거나 숫자가 아니거나 범위(1분~7일) 밖이면 fallback
+  function cleanMinutes(v, fallback = 60) {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) && n >= 1 && n <= Data.MAX_MINUTES ? n : fallback;
+  }
+
+  // 날짜 입력 검사: 달력에 있는 2000~2100년 날짜인가. 아니면 알리고 false
+  function checkDateInput(value, label = '날짜') {
+    if (Data.isDateStr(value)) return true;
+    alert(`${label}은(는) 2000년~2100년 사이의 올바른 날짜여야 합니다.`);
+    return false;
+  }
+
   function renderTabs(barId, current, tabs) {
     document.querySelectorAll(`#${barId} button`).forEach(btn => {
       const t = tabs.find(x => x.key === btn.dataset.tab);
       btn.textContent = `${t.label} (${t.count})`;
       btn.classList.toggle('active', btn.dataset.tab === current);
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', String(btn.dataset.tab === current));
     });
   }
 
@@ -218,7 +248,7 @@
     const swapStart = isHd ? 0 : cssMs(reverse ? '--modal-swap-start-close' : '--modal-swap-start'), swap = isHd ? 0.001 : cssMs(reverse ? '--modal-swap-close' : '--modal-swap');
     const ms = cssMs(reverse ? '--modal-anim-close-ms' : '--modal-anim-ms');
     const timing = { duration: ms, easing: cssVar(reverse ? '--modal-ease-close' : '--modal-ease'), fill: 'both' };
-    const landEase = cssVar('--modal-ease-land'), settleEase = cssVar('--modal-ease-settle');
+    const landEase = cssVar('--modal-ease-land'), settleEase = cssVar('--modal-ease-settle'), yEase = cssVar('--modal-y-ease');
     const bounce = cssMs('--modal-bounce'), bounceAt = cssMs('--modal-bounce-at');
     const closeMid = cssMs('--modal-close-mid');
     // 닫을 때는 키프레임을 직접 뒤집어 앞으로 재생한다. direction: 'reverse'로는 구간마다 다른 곡선을 줄 수 없다.
@@ -230,7 +260,7 @@
       // 두 구간이 같은 길이면 뒤 구간이 같은 거리를 더 짧게 가서 이음매에서 속도가 튄다
       const at = o => (o <= 0.5 ? o * closeMid / 0.5 : closeMid + (o - 0.5) * (1 - closeMid) / 0.5);
       const out = reverse ? f.map(k => ({ ...k, offset: at(1 - k.offset) })).reverse() : f;
-      return out.map(({ land, settle, ...k }) => (reverse && land ? { ...k, easing: landEase } : reverse && settle ? { ...k, easing: settleEase } : k));
+      return out.map(({ land, settle, yCurve, ...k }) => (yCurve ? { ...k, easing: yEase } : reverse && land ? { ...k, easing: landEase } : reverse && settle ? { ...k, easing: settleEase } : k));
     };
 
     // 앞면: 버튼 복제본. 버튼 크기 그대로 두고 변환만 준다
@@ -247,9 +277,9 @@
 
     // 변환 모양: 이동 → 기울기 → 확대 → 세로축 회전. 모든 키프레임이 같은 순서라야 부드럽게 이어진다.
     // 중간(0.5) 값은 양 끝의 평균이라 앞뒤 구간이 한 줄로 이어진다
-    // 헤더 아이콘(스프링이 아래)은 가로축으로, 화면 아래 버튼(스프링이 위)은 세로축으로 뒤집는다. 아이콘의 아래쪽 스프링이 팝업의 위쪽 스프링으로 이어지게 하려는 것이다
-    const axis = isHd ? 'rotateX' : 'rotateY';
-    const tf = (x, y, rot, sx, sy, ry) => `perspective(${persp}) translate(${x}px, ${y}px) rotate(${rot}deg) scale(${sx}, ${sy}) ${axis}(${ry}deg)`;
+    // 헤더 아이콘은 가로축(rotateX)과 세로축(rotateY) 두 축으로 뒤집는다(점대칭에 가깝다). 세로축은 아래 yAnims가 따로(composite: 'add') 돌려
+    // 가로축보다 먼저 시작하고 먼저 끝나게 한다. 화면 아래 버튼은 세로축 하나로만 뒤집는다. 어느 쪽이든 옆면(90도)에서는 완전히 납작해져 앞면·뒷면 교체가 보이지 않는다
+    const tf = (x, y, rot, sx, sy, ry) => `perspective(${persp}) translate(${x}px, ${y}px) rotate(${rot}deg) scale(${sx}, ${sy}) ${isHd ? 'rotateX' : 'rotateY'}(${ry}deg)`;
     const bg = getComputedStyle(modal).backgroundColor;
     const blur = cssVar('--modal-blur');
     const anims = [
@@ -281,14 +311,33 @@
       ]), timing),
       ...[...scroll.children, ...panel.querySelectorAll('.index-tabs')].map(el => el.animate(frames([{ opacity: 0 }, { opacity: 0, offset: delay }, { opacity: 1 }]), timing)),
     ];
+    // 헤더 아이콘의 세로축 회전: 가로축 회전(위 앞면·뒷면 애니메이션)에 composite: 'add'로 이어 붙이고, 각 구간에 처음이 빠른 곡선(--modal-y-ease)을 걸어 가로축보다 먼저 시작하고 먼저 끝나게 한다.
+    // 구간 양 끝(0도, 90도)은 가로축과 같아서 옆면 교체 시점에는 두 축이 함께 90도다. 닫을 때도 같은 곡선이 재생 방향으로 걸린다
+    if (isHd) {
+      anims.push(
+        front.animate(frames([
+          { transform: 'rotateY(0deg)', offset: 0 },
+          { transform: 'rotateY(0deg)', offset: swap, yCurve: true },
+          ...(reverse && bounce > 0 ? [{ transform: `rotateY(${-bounce * half}deg)`, offset: swap + (0.5 - swap) * (1 - bounceAt), yCurve: true }] : []),
+          { transform: `rotateY(${half}deg)`, offset: 0.5, yCurve: true },
+          { transform: `rotateY(${half}deg)`, offset: 1 },
+        ]), { ...timing, composite: 'add' }),
+        panel.animate(frames([
+          { transform: `rotateY(${-half}deg)`, offset: 0, yCurve: true },
+          { transform: `rotateY(${-half}deg)`, offset: 0.5, yCurve: true },
+          { transform: 'rotateY(0deg)', offset: 1 },
+        ]), { ...timing, composite: 'add' }),
+      );
+    }
     modalBusy = true;
-    Promise.all(anims.map(a => a.finished)).then(() => {
+    const finish = () => {
       modalBusy = false;
       anims.forEach(a => a.cancel()); // fill을 걷어 평소 상태로 돌린다
       front.remove();
       modal.classList.remove('flipping');
       done();
-    });
+    };
+    Promise.all(anims.map(a => a.finished)).then(finish, finish); // 애니메이션이 취소돼 거부돼도 같은 정리를 한다(modalBusy가 영원히 true로 남지 않게)
   }
 
   // 견출지로 팝업 안의 페이지를 바꿀 때: 위쪽이 스프링으로 묶인 메모장의 페이지를 넘기는 효과.
@@ -407,13 +456,16 @@
     clock.finished.then(cleanup).catch(() => { alive = false; });
   }
 
+  const pressedBtn = {}; // 팝업을 연 버튼(열린 동안 창 폭이 기준점을 넘어 보이는 버튼이 바뀌어도 그 버튼에서 dock-away를 뺀다)
+
   function openModal(target, btn) {
-    if (modalBusy) return;
+    if (modalBusy || Object.values(modals).some(m => m.classList.contains('open'))) return; // 이미 열려 있으면(키보드로 다른 버튼을 누른 경우) 겹쳐 열지 않는다
+    pressedBtn[target] = btn;
     if (target === 'goals') renderGoals();
     if (target === 'settings') showSettingsTab('current'); // 열 때는 항상 현재 일정부터
     document.body.style.overflow = 'hidden';
     modals[target].classList.add('open');
-    playModal(modals[target], btn, false, () => modals[target].classList.add('settled')); // 그림자는 자리 잡은 뒤에 나타난다
+    playModal(modals[target], btn, false, () => {});
     btn.classList.add('dock-away'); // 버튼은 팝업이 됐으니 그 자리에서 빠진다
     btn.blur(); // 닫을 때 키보드 포커스 테두리가 버튼에 남지 않게
   }
@@ -422,13 +474,14 @@
     if (modalBusy) return;
     const key = Object.keys(modals).find(k => modals[k].classList.contains('open'));
     if (!key) { document.body.style.overflow = ''; return; }
-    const btn = dockBtn(key);
-    modals[key].classList.remove('settled'); // 움직임이 시작되자마자 그림자가 서서히 사라진다
+    const pressed = pressedBtn[key];
+    const btn = pressed && pressed.getClientRects().length > 0 ? pressed : dockBtn(key); // 연 버튼이 아직 보이면 그 버튼으로, 아니면 지금 보이는 쪽으로 돌아간다
     playModal(modals[key], btn, true, () => {
       modals[key].classList.remove('open');
-      btn.classList.remove('dock-away'); // 제자리에 챡 맞춰 들어간 뒤 진짜 버튼이 돌아온다
+      document.querySelectorAll(`[data-screen="${key}"]`).forEach(b => b.classList.remove('dock-away')); // 제자리에 챡 맞춰 들어간 뒤 진짜 버튼이 돌아온다(어느 쪽 버튼이든)
       document.body.style.overflow = '';
       renderCarpet();
+      reloadIfStale();
     });
   }
 
@@ -448,4 +501,16 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModals();
+  });
+
+  // 같은 브라우저의 다른 탭이 데이터를 저장하면 이 탭의 메모리 상태는 낡은 것이 된다. 그대로 두면 나중에 저장하는 쪽이 앞의 변경을 덮어쓰므로,
+  // 팝업이 닫혀 있을 때 다시 불러온다(팝업에서 입력하던 중이면 닫을 때까지 기다린다)
+  let staleData = false;
+  function reloadIfStale() {
+    if (staleData && !Object.values(modals).some(m => m.classList.contains('open'))) location.reload();
+  }
+  window.addEventListener('storage', (e) => {
+    if (e.key !== null && e.key !== STORAGE_KEY) return;
+    staleData = true;
+    reloadIfStale();
   });

@@ -109,21 +109,6 @@ test('curve가 0이면 제어점이 끝점에 붙어 직선이 되고, 격자 �
   assert.equal(g.gridLines.length, 6); // 0,4,...,16 + 예산선
 });
 
-test('입력이 없으면(첫 사용) 짐 상자가 없다', () => {
-  const s = carpetShape({ ...base, loads: [3, 3, 3, 3, 3, 3, 3] });
-  assert.ok(s.overflowBoxes.every(b => b === null));
-});
-
-test('시간 초과: 초과인 날만 상자가 있고 칸 폭보다 넓다. 부하 초과와는 별개', () => {
-  const s = carpetShape({ ...base, safeRatio: 0.8, loads: [20, 0, 0, 0, 0, 0, 0], timeOver: [false, true, false, false, false, false, false], overflowBoxWidth: 1.5, overflowBoxHeight: 12 });
-  assert.equal(s.overflowBoxes[0], null); // 부하만 초과
-  const b = s.overflowBoxes[1];
-  assert.equal(b.width, 135); // 칸 폭 90 * 1.5
-  assert.equal(b.x, 145 - 135 / 2);
-  assert.ok(b.x < columns[1].left && b.x + b.width > columns[1].right);
-  assert.equal(b.y, 10 - 12);
-});
-
 test('카펫 곡선이 지나는 세로 범위(band)를 돌려준다', () => {
   const flat = carpetShape({ ...base, loads: [0, 0, 0, 0, 0, 0, 0] });
   assert.deepEqual(flat.band, { top: 10, bottom: 10 });
@@ -138,4 +123,14 @@ test('band 안에 곡선 경로의 모든 높이가 들어간다 (S자가 꼭짓
   const nums = s.linePath.match(/-?\d+(\.\d+)?/g).map(Number);
   // 경로는 M x y, C x1 y1 x2 y2 x y, L x y 순서라 짝수 번째 수가 y
   for (let i = 1; i < nums.length; i += 2) assert.ok(nums[i] >= s.band.top - 1e-6 && nums[i] <= s.band.bottom + 1e-6, `y=${nums[i]}`);
+});
+
+test('loads와 columns의 길이가 달라도 NaN이 나오지 않는다(모자란 날은 부하 0)', () => {
+  const s = carpetShape({ ...base, loads: [5] });
+  assert.ok(!/NaN/.test(s.linePath), s.linePath);
+  assert.equal(s.floors.length, columns.length);
+  assert.equal(s.sags[1], 0);
+  const longer = carpetShape({ ...base, loads: [1, 2, 3, 4, 5, 6, 7, 8, 9] });
+  assert.equal(longer.floors.length, columns.length);
+  assert.ok(!/NaN/.test(longer.linePath));
 });

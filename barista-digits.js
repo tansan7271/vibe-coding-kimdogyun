@@ -2,7 +2,7 @@
 // 폰트 파일 자체는 저장소에 없다. 글자를 윤곽선(SVG 경로)으로 바꿔 쓰는 방식이다(로고와 같다).
 // 출처: https://fontesk.com/barista-script/ ("Free for commercial use" 표기). 폰트 파일을 넣거나 웹폰트로 쓰려면 라이선스를 먼저 확인한다.
 // 좌표는 폰트 단위(unitsPerEm 기준)이고 y는 위로 자란다. 기준선이 y=0이다.
-// 이 파일은 폰트에서 뽑아 만든 생성물이다(숫자 글리프와 GPOS kern 쌍을 읽어 옴). 손으로 고치지 않는다.
+// 이 파일의 데이터(글리프 경로와 kern 쌍)는 폰트에서 뽑아 만든 생성물이다. 손으로 고치지 않는다. 아래 layout 함수만 손으로 쓴 것이라, 데이터를 다시 뽑을 때 이 함수는 남겨야 한다.
 // 순수 함수. DOM, localStorage, 현재 시각을 직접 읽지 않는다.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {

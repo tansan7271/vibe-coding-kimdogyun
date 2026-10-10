@@ -323,3 +323,25 @@ test('박스를 새로 넣으면 올라오기 모드가 꺼지고 평소처럼 �
   drop(w, 'b', 3, 2);
   assert.equal(w.lift[3], false);
 });
+
+test('예산이 0이어도 NaN이 되지 않고 정착한다', () => {
+  const w = P.createWorld({ columns, capacity: 0, maxSag, baseY });
+  P.addBox(w, { id: 'a', col: 1, x: 255, y: -100, w: 100, h: 40, load: 2 });
+  assert.equal(P.settle(w), true);
+  assert.ok(w.sag.every(v => Number.isFinite(v)), JSON.stringify(w.sag));
+});
+
+test('dt를 0으로 줘도 settle이 끝난다(기본 간격으로 대신한다)', () => {
+  const w = P.createWorld({ columns, capacity, maxSag, baseY, params: { dt: 0 } });
+  assert.ok(w.p.dt > 0);
+  P.addBox(w, { id: 'a', col: 0, x: 85, y: -50, w: 100, h: 40, load: 1 });
+  assert.equal(P.settle(w), true);
+});
+
+test('열보다 넓은 박스는 열 폭으로 줄여 넣고 정착한다', () => {
+  const w = world();
+  const b = P.addBox(w, { id: 'wide', col: 2, x: 425, y: -100, w: 400, h: 40, load: 1 });
+  assert.equal(b.w, colW);
+  assert.ok(b.x >= columns[2].left + b.w / 2 - 1e-9 && b.x <= columns[2].right - b.w / 2 + 1e-9);
+  assert.equal(P.settle(w), true);
+});

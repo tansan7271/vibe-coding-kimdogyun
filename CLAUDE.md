@@ -53,12 +53,13 @@
 
 ```
 index.html       화면 뼈대(마크업)와 script·link 태그만. 스타일과 코드를 직접 넣지 않는다
+favicon.svg, logo.svg  탭 아이콘과 헤더 로고(그림 파일)
 style.css        모든 스타일. 모양 값은 맨 위 :root 변수
 app-common.js    공통: 상태·저장, 날짜·문자열 도우미, 팝업과 헤더 버튼. 가장 먼저 읽는다
 app-goals.js     할 일 화면, AI "텍스트로 만들기"
 app-settings.js  일정과 설정 화면, 데이터 내보내기/가져오기
 app-carpet.js    카펫 화면: 눈금·박스 물리·막대·박스 누르기·끌어서 고정·주 넘기기, INTRO_STYLE·STAGE_STYLE·SHADOW_STYLE. 처음 그리는 쪽이라 마지막에 읽는다
-demo-data.js     테스트 데모 모드의 예시 데이터(모두 허구, 올해 9~11월). 앱 기능(지남·초과·반복·고정·완료)을 한 번에 보이게 짠다 (테스트 있음). 읽는 순서상 app-common보다 앞
+demo-data.js     테스트 데모 모드의 예시 데이터(모두 허구, 9~11월). 기준 오늘은 10월 7일로 고정(DEMO_TODAY). 앱 기능(지남·초과·반복·고정·완료)과 빽빽한/한산한 주를 한 번에 보이게 짠다 (테스트 있음). 읽는 순서상 app-common보다 앞
 placement.js     배치 규칙 (순수 함수, 테스트 있음)
 carpet.js        카펫 모양 계산 (순수 함수, 테스트 있음)
 carpet-shadow.js 카펫 아래 그림자: 카펫 곡선의 가로 높이와 아래로 옅어지는 정도 (순수 함수, 테스트 있음)

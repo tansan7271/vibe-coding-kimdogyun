@@ -16,11 +16,11 @@
 
   // 반복 일정은 시작 날짜부터 생긴다 (그 이전에는 없다). 매주의 시작 날짜는 옛 데이터에는 없을 수 있다
   function eventRepeatFieldsHtml(ev) {
-    const dateInput = chipField(`<input type="date" data-field="date" data-event-id="${ev.id}" value="${ev.date || ''}" required>`);
-    const until = `<span class="ev-label">종료</span> ${chipField(`<input type="date" data-field="repeatUntil" data-event-id="${ev.id}" value="${ev.repeatUntil || ''}" required>`)}`;
+    const dateInput = chipField(`<input type="date" data-field="date" data-event-id="${escapeAttr(ev.id)}" value="${escapeAttr(ev.date || '')}" min="2000-01-01" max="2100-12-31" required>`);
+    const until = `<span class="ev-label">종료</span> ${chipField(`<input type="date" data-field="repeatUntil" data-event-id="${escapeAttr(ev.id)}" min="2000-01-01" max="2100-12-31" value="${ev.repeatUntil || ''}" required>`)}`;
     if (ev.repeat === 'weekly') {
       const options = WEEKDAY_LABELS.map((label, i) => `<option value="${i}"${Number(ev.weekday) === i ? ' selected' : ''}>${label}</option>`).join('');
-      return `${chipField(`<select data-field="weekday" data-event-id="${ev.id}">${options}</select>`)} <span class="ev-label">시작</span> ${dateInput} ${until}`;
+      return `${chipField(`<select data-field="weekday" data-event-id="${escapeAttr(ev.id)}">${options}</select>`)} <span class="ev-label">시작</span> ${dateInput} ${until}`;
     }
     if (ev.repeat === 'biweekly') {
       const day = ev.date ? WEEKDAY_LABELS[Placement.weekdayOf(ev.date)] : '';
@@ -36,7 +36,7 @@
   // 뺀 날 목록과 되돌리기 (SPEC에는 없는 실수 복구용)
   function skippedDatesHtml(ev) {
     if (!ev.skipDates || ev.skipDates.length === 0) return '';
-    const items = ev.skipDates.map(d => `<span class="skip-item">${d.slice(5).replace('-', '/')} <button type="button" class="sbtn sbtn-sm" data-action="unskip-event-day" data-event-id="${ev.id}" data-date="${d}">되돌리기</button></span>`).join('');
+    const items = ev.skipDates.map(d => `<span class="skip-item">${d.slice(5).replace('-', '/')} <button type="button" class="sbtn sbtn-sm" data-action="unskip-event-day" data-event-id="${escapeAttr(ev.id)}" data-date="${d}">되돌리기</button></span>`).join('');
     return `<div class="skipped-dates"><span class="ev-label">뺀 날</span>${items}</div>`;
   }
 
@@ -52,20 +52,20 @@
 
   // 일정 카드: 할 일 카드와 같은 구조와 서식(머리 전체를 누르면 아코디언으로 펼침). 펼친 카드만 본문을 그린다
   function eventBodyHtml(ev) {
-    const repeatSelect = `<select data-field="repeat" data-event-id="${ev.id}">
+    const repeatSelect = `<select data-field="repeat" data-event-id="${escapeAttr(ev.id)}">
       <option value="none"${ev.repeat === 'none' ? ' selected' : ''}>반복 없음</option>
       ${['weekly', 'biweekly', 'monthly'].map(r => `<option value="${r}"${ev.repeat === r ? ' selected' : ''}>${REPEAT_LABELS[r]}</option>`).join('')}
     </select>`;
     return `
       <div class="goal-edit-row">
-        ${textField(`data-field="title" data-event-id="${ev.id}" value="${escapeAttr(ev.title)}" placeholder="일정 제목"`, 'goal-title-field')}
+        ${textField(`data-field="title" data-event-id="${escapeAttr(ev.id)}" value="${escapeAttr(ev.title)}" placeholder="일정 제목"`, 'goal-title-field')}
         ${chipField(repeatSelect)}
       </div>
       <div class="ev-fields">${eventRepeatFieldsHtml(ev)}</div>
       <div class="ev-fields">
-        ${chipField(`<input type="time" data-field="start" data-event-id="${ev.id}" value="${ev.start}">`)}
+        ${chipField(`<input type="time" data-field="start" data-event-id="${escapeAttr(ev.id)}" value="${escapeAttr(ev.start)}">`)}
         <span class="ev-label">~</span>
-        ${chipField(`<input type="time" data-field="end" data-event-id="${ev.id}" value="${ev.end}">`)}
+        ${chipField(`<input type="time" data-field="end" data-event-id="${escapeAttr(ev.id)}" value="${escapeAttr(ev.end)}">`)}
         ${loadPickerHtml(ev.id, ev.load)}
       </div>
       ${skippedDatesHtml(ev)}`;
@@ -77,15 +77,15 @@
     const expanded = expandedEvents.has(ev.id);
     return `
       <div class="goal-item">
-      <div class="goal-card${expanded ? ' expanded' : ''}" data-event-id="${ev.id}">
-        <div class="goal-header" data-action="toggle-event" data-event-id="${ev.id}" aria-expanded="${expanded}">
+      <div class="goal-card${expanded ? ' expanded' : ''}" data-event-id="${escapeAttr(ev.id)}">
+        <div class="goal-header" role="button" tabindex="0" data-action="toggle-event" data-event-id="${escapeAttr(ev.id)}" aria-expanded="${expanded}">
           <div class="goal-header-info">
             <span class="goal-title">${escapeHtml(ev.title)}</span>
             <span class="goal-deadline">${eventSummary(ev)}</span>
             ${CHEV_DOWN.replace('class="chev"', 'class="chev goal-chev"')}
           </div>
           <div class="goal-actions">
-            <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-event" data-event-id="${ev.id}">삭제</button>
+            <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-event" data-event-id="${escapeAttr(ev.id)}">삭제</button>
           </div>
         </div>
         <div class="goal-acc">
@@ -172,11 +172,16 @@
 
     const date = document.getElementById('new-event-date').value;
     if (!date) return;
+    if (!checkDateInput(date, '날짜')) return;
     const ev = { id: uid('event'), title, load: newEventDraft.load, start, end, repeat, date };
     if (repeat === 'weekly') ev.weekday = Number(document.getElementById('new-event-weekday').value);
     if (repeat !== 'none') {
       const repeatUntil = document.getElementById('new-event-repeat-until').value;
-      if (repeatUntil) ev.repeatUntil = repeatUntil;
+      if (repeatUntil) {
+        if (!checkDateInput(repeatUntil, '반복 종료일')) return;
+        if (repeatUntil < date) { alert('반복 종료일이 시작 날짜보다 앞섭니다.'); return; }
+        ev.repeatUntil = repeatUntil;
+      }
     }
 
     state.events.push(ev);
@@ -189,6 +194,11 @@
     newEventDraft.load = 3;
     renderNewEventLoadPicker();
     renderEvents();
+  });
+
+  // 카드 머리(role=button)는 키보드로도 펼치고 접는다
+  eventList.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.goal-header[role="button"]')) { e.preventDefault(); e.target.click(); }
   });
 
   eventList.addEventListener('click', (e) => {
@@ -270,15 +280,25 @@
     } else if (field === 'weekday') {
       ev.weekday = Number(e.target.value);
     } else if (field === 'date') {
-      if (e.target.value) ev.date = e.target.value;
+      if (e.target.value) {
+        if (!checkDateInput(e.target.value, '날짜')) { renderEvents(); return; }
+        if (ev.repeatUntil && e.target.value > ev.repeatUntil) { alert('시작 날짜가 반복 종료일보다 늦습니다.'); renderEvents(); return; }
+        ev.date = e.target.value;
+      }
       else if (ev.repeat === 'weekly') delete ev.date; // 매주만 시작 날짜 없이 둘 수 있다 (옛 데이터와 같음)
       else { renderEvents(); return; }
     } else if (field === 'repeatUntil') {
-      if (e.target.value) ev.repeatUntil = e.target.value; else delete ev.repeatUntil;
+      if (e.target.value) {
+        if (!checkDateInput(e.target.value, '반복 종료일')) { renderEvents(); return; }
+        if (ev.date && e.target.value < ev.date) { alert('반복 종료일이 시작 날짜보다 앞섭니다.'); renderEvents(); return; }
+        ev.repeatUntil = e.target.value;
+      } else delete ev.repeatUntil;
     } else if (field === 'start') {
+      if (!e.target.value) { renderEvents(); return; } // 비우면 되돌린다(빈 시각이 저장되면 내보낸 파일을 다시 가져올 수 없다)
       if (e.target.value >= ev.end) { alert('시작 시각은 종료 시각보다 빨라야 합니다.'); renderEvents(); return; }
       ev.start = e.target.value;
     } else if (field === 'end') {
+      if (!e.target.value) { renderEvents(); return; }
       if (ev.start >= e.target.value) { alert('시작 시각은 종료 시각보다 빨라야 합니다.'); renderEvents(); return; }
       ev.end = e.target.value;
     }

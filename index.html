@@ -46,7 +46,7 @@
 
   <div class="modal-backdrop" id="modal-goals" role="dialog" aria-modal="true" aria-label="할 일">
   <div class="modal-panel">
-  <div class="tab-bar index-tabs" id="goal-tabs">
+  <div class="tab-bar index-tabs" id="goal-tabs" role="tablist">
     <button type="button" data-tab="active"></button>
     <button type="button" data-tab="done"></button>
   </div>
@@ -58,7 +58,7 @@
     <div class="goal-compose">
       <div class="goal-add-form" id="goal-add-form">
         <span class="line-field"><input type="text" id="new-goal-title" class="line-input" placeholder="할 일 제목"></span>
-        <label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="date" id="new-goal-deadline" aria-label="마감일" required></label>
+        <label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="date" min="2000-01-01" max="2100-12-31" id="new-goal-deadline" aria-label="마감일" required></label>
         <button class="sbtn" id="ai-open-btn" type="button" hidden><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><span>AI와 추가</span></button>
         <button class="sbtn sbtn-accent" id="add-goal-btn" type="button"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><span>할 일 추가</span></button>
       </div>
@@ -83,7 +83,7 @@
 
   <div class="modal-backdrop" id="modal-settings" role="dialog" aria-modal="true" aria-label="일정과 설정">
   <div class="modal-panel">
-  <div class="tab-bar index-tabs" id="settings-tabs">
+  <div class="tab-bar index-tabs" id="settings-tabs" role="tablist">
     <button type="button" data-tab="current" class="active">현재 일정</button>
     <button type="button" data-tab="over">지난 일정</button>
     <button type="button" data-tab="prefs">전체 설정</button>
@@ -98,9 +98,9 @@
         <div class="ev-row">
           <span class="line-field ev-title"><input type="text" class="line-input" id="new-event-title" placeholder="일정 제목"></span>
           <label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><select id="new-event-repeat"><option value="none">반복 없음</option><option value="weekly">매주</option><option value="biweekly">격주</option><option value="monthly">매월</option></select></label>
-          <span id="new-event-date-wrap" class="ev-group"><span id="new-event-date-label" class="ev-label">날짜</span><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="date" id="new-event-date" required></label></span>
+          <span id="new-event-date-wrap" class="ev-group"><span id="new-event-date-label" class="ev-label">날짜</span><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="date" id="new-event-date" min="2000-01-01" max="2100-12-31" required></label></span>
           <span id="new-event-weekday-wrap" class="ev-group" style="display:none"><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><select id="new-event-weekday"><option value="0">월</option><option value="1">화</option><option value="2">수</option><option value="3">목</option><option value="4">금</option><option value="5">토</option><option value="6">일</option></select></label></span>
-          <span id="new-event-repeat-until-wrap" class="ev-group" style="display:none"><span class="ev-label">종료</span><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="date" id="new-event-repeat-until" required></label></span>
+          <span id="new-event-repeat-until-wrap" class="ev-group" style="display:none"><span class="ev-label">종료</span><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="date" id="new-event-repeat-until" min="2000-01-01" max="2100-12-31" required></label></span>
         </div>
         <div class="ev-row">
           <span class="ev-group"><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="time" id="new-event-start" value="09:00"></label><span class="ev-label">~</span><label class="sbtn sbtn-field"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><input type="time" id="new-event-end" value="10:00"></label></span>
@@ -121,7 +121,7 @@
       <section class="goal-card pref-card">
         <h3>기본값</h3>
         <div class="pref-grid">
-          <label class="pref-row"><span class="pref-label">하루 예산</span><span class="sbtn sbtn-sm sbtn-field"><input type="number" id="setting-capacity" min="1"></span></label>
+          <label class="pref-row"><span class="pref-label">하루 예산</span><span class="sbtn sbtn-sm sbtn-field"><input type="number" id="setting-capacity" min="1" max="100"></span></label>
           <label class="pref-row"><span class="pref-label">안전선(%)</span><span class="sbtn sbtn-sm sbtn-field"><input type="number" id="setting-safe-ratio" min="1" max="100"></span></label>
           <label class="pref-row"><span class="pref-label">수면(시간)</span><span class="sbtn sbtn-sm sbtn-field"><input type="number" id="setting-sleep-hours" min="0" max="24"></span></label>
           <label class="pref-row"><span class="pref-label">생활(시간)</span><span class="sbtn sbtn-sm sbtn-field"><input type="number" id="setting-life-hours" min="0" max="24"></span></label>

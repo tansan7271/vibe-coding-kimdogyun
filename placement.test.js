@@ -518,3 +518,37 @@ test('weekNumbers: 한 달의 주차는 1부터 5까지, 한 해의 주차는 1�
     prev = w;
   }
 });
+
+test('고정한 앞 단계가 있으면 뒤 단계는 그 날 이후에 깔린다(순서가 뒤집히지 않는다)', () => {
+  const goals = [goal('g1', '2026-10-30')];
+  const steps = [step({ id: 'a', order: 0, pinnedDate: '2026-10-18' }), step({ id: 'b', order: 1 })];
+  const r = placeSteps({ steps, goals, events: [], today: '2026-10-11', ...defaultSettings });
+  assert.equal(r[0].date, '2026-10-18');
+  assert.ok(r[1].date >= '2026-10-18', `b가 ${r[1].date}`);
+});
+
+test('고정한 뒤 단계는 앞 단계에 영향을 주지 않는다', () => {
+  const goals = [goal('g1', '2026-10-30')];
+  const steps = [step({ id: 'a', order: 0 }), step({ id: 'b', order: 1, pinnedDate: '2026-10-18' })];
+  const r = placeSteps({ steps, goals, events: [], today: '2026-10-11', ...defaultSettings });
+  assert.equal(r[0].date, '2026-10-11');
+});
+
+test('dateRange는 길이에 상한이 있어서 마감이 아주 먼 미래여도 멈추지 않는다', () => {
+  const r = dateRange('2026-01-01', '2100-12-31');
+  assert.ok(r.length <= 1100);
+  assert.equal(r[0], '2026-01-01');
+  assert.equal(dateRange('2026-10-01', '2026-09-01').length, 0);
+});
+
+test('연도가 0~99인 날짜도 그 해 그대로 계산한다(Date.UTC의 1900년대 해석 방지)', () => {
+  assert.equal(addDays('0050-01-01', 0), '0050-01-01');
+  assert.equal(addDays('0050-01-01', 1), '0050-01-02');
+  assert.equal(addDays('0099-12-31', 1), '0100-01-01');
+  assert.equal(weekdayOf('2026-10-05'), 0);
+});
+
+test('마감이 먼 미래인 할 일도 배치 계산이 끝난다', () => {
+  const r = placeSteps({ steps: [step({})], goals: [goal('g1', '2100-12-31')], events: [], today: '2026-10-11', ...defaultSettings });
+  assert.equal(r[0].date, '2026-10-11');
+});

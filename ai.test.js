@@ -91,3 +91,16 @@ test('HTTP 오류 안내', () => {
   assert.match(describeHttpError(529), /서버/);
   assert.match(describeHttpError(418), /418/);
 });
+
+test('초안 검증: 공백 제목·너무 긴 시간·너무 많은 단계를 걸러 낸다', () => {
+  const blank = parseDraft(reply({ ...good, steps: [{ title: '   ', load: 2, minutes: 60 }] }), today);
+  assert.equal(blank.ok, true);
+  assert.equal(blank.draft.steps[0].title, '');
+  assert.match(blank.draft.steps[0].warn, /제목/);
+  assert.equal(parseDraft(reply({ ...good, title: '  ' }), today).ok, false);
+  const huge = parseDraft(reply({ ...good, steps: [{ title: 'a', load: 2, minutes: 1e9 }] }), today);
+  assert.equal(huge.draft.steps[0].minutes, 60);
+  assert.match(huge.draft.steps[0].warn, /예상 시간/);
+  const many = Array.from({ length: 51 }, (_, i) => ({ title: `단계${i}`, load: 1, minutes: 30 }));
+  assert.equal(parseDraft(reply({ ...good, steps: many }), today).ok, false);
+});

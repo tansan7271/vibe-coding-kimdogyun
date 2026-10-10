@@ -22,18 +22,17 @@
    * @param {number} [input.safeRatio] 안전선 비율. 있으면 safeLine을 돌려준다
    * @param {number} [input.flatRatio] 카드 폭 중 평평한 바닥이 차지하는 비율 (기본 0.6, 카드 가운데 기준)
    * @param {number} [input.curve] 바닥 사이 곡선의 제어점 위치 (간격 대비 0~0.5, 기본 0.5. 0이면 직선, 0.5면 S자)
-   * @param {boolean[]} [input.timeOver] 날짜별 시간 초과 여부. true인 날만 짐 상자가 칸 폭 밖으로 삐져나온다
-   * @param {number} [input.overflowBoxWidth] 짐 상자 폭 / 칸 폭 (기본 1.3)
-   * @param {number} [input.overflowBoxHeight] 짐 상자 높이 (기본 14)
    * @param {number} [input.gridMaxLines] 가로 격자 선 최대 개수 (기본 10)
    * @param {number} [input.gridLabelEvery] 격자 몇 줄마다 숫자를 적을지 (기본 5)
-   * @returns {{overflowBoxes:Array<{x:number,y:number,width:number,height:number}|null>, points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, gridLines:Array<{value:number,y:number,isBudget:boolean,label:boolean}>, safeLine:{value:number,y:number}|null, sags:number[], linePath:string, dividers:number[]}}
+   * @returns {{points:Array<{x:number,y:number}>, floors:Array<{x1:number,x2:number,y:number}>, gridLines:Array<{value:number,y:number,isBudget:boolean,label:boolean}>, safeLine:{value:number,y:number}|null, sags:number[], linePath:string, dividers:number[]}}
    * 날짜마다 평평한 바닥, 바닥 사이는 S자 곡선으로 잇는다. 양 끝은 baseY에 묶인다.
    * 처짐은 예산에서 멈춘다 (카펫은 잘 늘어나지 않는다).
    */
-  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, safeRatio, flatRatio = 0.6, timeOver = [], overflowBoxWidth = 1.3, overflowBoxHeight = 14, curve = 0.5, gridMaxLines = 10, gridLabelEvery = 5 }) {
-    const sags = loads.map(load => {
+  function carpetShape({ loads, capacity, columns, width, baseY, maxSag, safeRatio, flatRatio = 0.6, curve = 0.5, gridMaxLines = 10, gridLabelEvery = 5 }) {
+    // loads가 columns보다 짧거나 길어도 칸 수에 맞춘다(모자란 날은 부하 0). 안 그러면 NaN이 곡선 경로에 들어간다
+    const sags = columns.map((_, i) => {
       if (!(capacity > 0)) return 0;
+      const load = Number.isFinite(loads[i]) ? loads[i] : 0;
       return Math.min(1, Math.max(0, load / capacity));
     });
     const points = [{ x: 0, y: baseY }];
@@ -59,14 +58,6 @@
     }
     const linePath = parts.join(' ');
 
-    // 시간 초과: 짐 상자가 칸 폭보다 넓어 양옆으로 삐져나온다 (부하 초과와 다른 표시)
-    const overflowBoxes = floors.map((f, i) => {
-      if (!timeOver[i]) return null;
-      const col = columns[i];
-      const w = (col.right - col.left) * overflowBoxWidth;
-      return { x: round((col.left + col.right) / 2 - w / 2), y: round(f.y - overflowBoxHeight), width: round(w), height: overflowBoxHeight };
-    });
-
     const dividers = [];
     for (let i = 1; i < columns.length; i++) {
       dividers.push((columns[i - 1].right + columns[i].left) / 2);
@@ -91,7 +82,7 @@
     const ys = nodes.map(n => n.y);
     const band = { top: Math.min(...ys), bottom: Math.max(...ys) };
 
-    return { overflowBoxes, points, floors, gridLines, safeLine, sags, linePath, dividers, band };
+    return { points, floors, gridLines, safeLine, sags, linePath, dividers, band };
   }
 
   return { carpetShape };

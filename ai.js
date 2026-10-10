@@ -11,6 +11,7 @@
   const MODEL = 'claude-haiku-4-5';
   const MAX_TOKENS = 2048;
   const MAX_TEXT_LENGTH = 20000;
+  const MAX_AI_STEPS = 50; // AI 초안 한 번에 받을 단계 수 상한
 
   // 구조화 출력은 숫자 범위 제약(minimum/maximum)을 지원하지 않아 범위는 parseDraft가 검사한다
   const SCHEMA = {
@@ -119,6 +120,9 @@
     }
     if (data.steps.length === 0) return fail('단계를 만들지 못했습니다.');
 
+    if (data.steps.length > MAX_AI_STEPS) return fail(`단계가 너무 많습니다(${data.steps.length}개). 요건을 나눠서 다시 시도하세요.`);
+    if (data.title.trim() === '') return fail('응답의 할 일 제목이 비어 있습니다.');
+
     const steps = [];
     for (const s of data.steps) {
       if (!s || typeof s !== 'object' || typeof s.title !== 'string') return fail('단계 형식이 맞지 않습니다.');
@@ -126,9 +130,11 @@
       let load = s.load;
       if (!(Number.isInteger(load) && load >= 1 && load <= 5)) { load = 3; warns.push('부하를 확인하세요'); }
       let minutes = s.minutes;
-      if (typeof minutes !== 'number' || !(minutes > 0) || !Number.isFinite(minutes)) { minutes = 60; warns.push('예상 시간을 확인하세요'); }
+      if (typeof minutes !== 'number' || !Number.isFinite(minutes) || !(minutes > 0) || minutes > Data.MAX_MINUTES) { minutes = 60; warns.push('예상 시간을 확인하세요'); }
       else minutes = roundMinutes(minutes);
-      steps.push({ title: s.title.trim(), load, minutes, warn: warns.join(', ') });
+      const title = s.title.trim();
+      if (title === '') warns.push('제목을 입력하세요');
+      steps.push({ title, load, minutes, warn: warns.join(', ') });
     }
 
     const deadlineOk = Data.isDateStr(data.deadline) && data.deadline >= today;

@@ -131,3 +131,40 @@ test('skipDates: 반복 일정의 날짜 목록만 허용, 중복은 정리해 �
   const r = parse(mod(() => {}));
   assert.equal('skipDates' in r.state.events[0], false); // 없으면 만들지 않는다
 });
+
+test('id에 따옴표·꺾쇠 같은 글자가 있으면 가져오지 않는다(HTML 속성에 들어가므로)', () => {
+  for (const bad of ['g1"><img src=x onerror=alert(1)>', 'a b', "a'b", 'a<b', '', 'x'.repeat(81)]) {
+    assert.equal(parse(mod(o => { o.goals[0].id = bad; o.steps[0].goalId = bad; })).ok, false, JSON.stringify(bad));
+    assert.equal(parse(mod(o => { o.steps[0].id = bad; })).ok, false, JSON.stringify(bad));
+    assert.equal(parse(mod(o => { o.events[0].id = bad; })).ok, false, JSON.stringify(bad));
+  }
+  assert.equal(parse(mod(o => { o.goals[0].id = 'goal_abc-12_Z9'; o.steps[0].goalId = 'goal_abc-12_Z9'; })).ok, true);
+});
+
+test('날짜 연도는 2000~2100 안이어야 한다(9999·0050 같은 오타 차단)', () => {
+  for (const bad of ['9999-12-31', '0050-01-01', '1999-12-31', '2101-01-01']) {
+    assert.equal(isDateStr(bad), false, bad);
+    assert.equal(parse(mod(o => { o.goals[0].deadline = bad; })).ok, false, bad);
+  }
+  assert.equal(isDateStr('2000-01-01'), true);
+  assert.equal(isDateStr('2100-12-31'), true);
+});
+
+test('예상 시간·예산은 유한하고 상한 안이어야 한다(Infinity, 너무 큰 값 차단)', () => {
+  assert.equal(parse('{"version":1,"goals":[{"id":"g","title":"t","deadline":"2026-10-12"}],"steps":[{"id":"s","goalId":"g","title":"t","load":1,"minutes":1e999,"order":0}],"events":[]}').ok, false);
+  assert.equal(parse(mod(o => { o.steps[0].minutes = 10081; })).ok, false);
+  assert.equal(parse(mod(o => { o.steps[0].minutes = 10080; })).ok, true);
+  assert.equal(parse('{"version":1,"goals":[],"steps":[],"events":[],"settings":{"capacity":1e999}}').ok, false);
+  assert.equal(parse(mod(o => { o.settings.capacity = 101; })).ok, false);
+  assert.equal(parse(mod(o => { o.settings.capacity = 100; })).ok, true);
+});
+
+test('수면 + 생활 시간의 합이 24시간을 넘으면 가져오지 않는다', () => {
+  assert.equal(parse(mod(o => { o.settings.sleepHours = 20; o.settings.lifeHours = 20; })).ok, false);
+  assert.equal(parse(mod(o => { o.settings.sleepHours = 12; o.settings.lifeHours = 12; })).ok, true);
+});
+
+test('반복 종료일이 시작 날짜보다 앞서면 가져오지 않는다', () => {
+  assert.equal(parse(mod(o => { Object.assign(o.events[0], { repeat: 'weekly', weekday: 1, date: '2026-10-05', repeatUntil: '2026-09-01' }); })).ok, false);
+  assert.equal(parse(mod(o => { Object.assign(o.events[0], { repeat: 'weekly', weekday: 1, date: '2026-10-05', repeatUntil: '2026-10-05' }); })).ok, true);
+});

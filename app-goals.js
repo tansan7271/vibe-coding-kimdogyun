@@ -20,27 +20,27 @@
 
   function stepRowHtml(step) {
     return `
-      <div class="step-row" data-step-id="${step.id}">
+      <div class="step-row" data-step-id="${escapeAttr(step.id)}">
         ${gripHtml}
-        ${textField(`data-field="title" data-step-id="${step.id}" value="${escapeAttr(step.title)}" placeholder="중간 단계 제목"`, 'step-title-field')}
+        ${textField(`data-field="title" data-step-id="${escapeAttr(step.id)}" value="${escapeAttr(step.title)}" placeholder="중간 단계 제목"`, 'step-title-field')}
         ${loadPickerHtml(step.id, step.load)}
-        ${chipField(`<input type="number" class="step-minutes-input" data-field="minutes" data-step-id="${step.id}" value="${step.minutes}" step="30" min="30">`)} 분
-        <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-step" data-step-id="${step.id}">삭제</button>
+        ${chipField(`<input type="number" class="step-minutes-input" data-field="minutes" data-step-id="${escapeAttr(step.id)}" value="${step.minutes}" step="30" min="30">`)} 분
+        <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-step" data-step-id="${escapeAttr(step.id)}">삭제</button>
       </div>`;
   }
 
   function stepAddFormHtml(goalId) {
-    const key = `new-${goalId}`;
+    const key = `new-${escapeAttr(goalId)}`;
     const draft = newStepDrafts[goalId] || {};
     const selected = draft.load || 3;
     const title = draft.title || '';
     const minutes = draft.minutes || 60;
     return `
-      <div class="step-add-form" data-goal-id="${goalId}">
-        ${textField(`id="new-step-title-${goalId}" data-draft="title" data-goal-id="${goalId}" value="${escapeAttr(title)}" placeholder="새 중간 단계 제목"`, 'step-title-field')}
+      <div class="step-add-form" data-goal-id="${escapeAttr(goalId)}">
+        ${textField(`id="new-step-title-${escapeAttr(goalId)}" data-draft="title" data-goal-id="${escapeAttr(goalId)}" value="${escapeAttr(title)}" placeholder="새 중간 단계 제목"`, 'step-title-field')}
         ${loadPickerHtml(key, selected)}
-        ${chipField(`<input type="number" class="step-minutes-input" id="new-step-minutes-${goalId}" data-draft="minutes" data-goal-id="${goalId}" value="${minutes}" step="30" min="30">`)} 분
-        <button type="button" class="sbtn sbtn-sm sbtn-accent" data-action="add-step" data-goal-id="${goalId}">단계 추가</button>
+        ${chipField(`<input type="number" class="step-minutes-input" id="new-step-minutes-${escapeAttr(goalId)}" data-draft="minutes" data-goal-id="${escapeAttr(goalId)}" value="${minutes}" step="30" min="30">`)} 분
+        <button type="button" class="sbtn sbtn-sm sbtn-accent" data-action="add-step" data-goal-id="${escapeAttr(goalId)}">단계 추가</button>
       </div>`;
   }
 
@@ -52,8 +52,8 @@
       : '<div class="empty-hint">아직 중간 단계가 없습니다.</div>';
     return `
       <div class="goal-edit-row">
-        ${textField(`data-field="title" data-goal-id="${goal.id}" value="${escapeAttr(goal.title)}" placeholder="제목"`, 'goal-title-field')}
-        ${chipField(`<input type="date" data-field="deadline" data-goal-id="${goal.id}" value="${goal.deadline}" required>`)}
+        ${textField(`data-field="title" data-goal-id="${escapeAttr(goal.id)}" value="${escapeAttr(goal.title)}" placeholder="제목"`, 'goal-title-field')}
+        ${chipField(`<input type="date" data-field="deadline" data-goal-id="${escapeAttr(goal.id)}" value="${escapeAttr(goal.deadline)}" min="2000-01-01" max="2100-12-31" required>`)}
       </div>
       ${stepsHtml}
       ${stepAddFormHtml(goal.id)}`;
@@ -66,16 +66,16 @@
     const steps = stepsForGoal(goal.id);
     return `
       <div class="goal-item">
-      <div class="goal-card${expanded ? ' expanded' : ''}" data-goal-id="${goal.id}">
-        <div class="goal-header" data-action="toggle-expand" data-goal-id="${goal.id}" aria-expanded="${expanded}">
+      <div class="goal-card${expanded ? ' expanded' : ''}" data-goal-id="${escapeAttr(goal.id)}">
+        <div class="goal-header" role="button" tabindex="0" data-action="toggle-expand" data-goal-id="${escapeAttr(goal.id)}" aria-expanded="${expanded}">
           <div class="goal-header-info">
             <span class="goal-title">${escapeHtml(goal.title)}</span>
             <span class="goal-deadline">마감 ${goal.deadline}</span>
             ${CHEV_DOWN.replace('class="chev"', 'class="chev goal-chev"')}
           </div>
           <div class="goal-actions">
-            ${steps.some(s => !s.done) ? `<button type="button" class="sbtn sbtn-sm sbtn-accent" data-action="complete-goal" data-goal-id="${goal.id}">완료</button>` : ''}
-            <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-goal" data-goal-id="${goal.id}">삭제</button>
+            ${steps.some(s => !s.done) ? `<button type="button" class="sbtn sbtn-sm sbtn-accent" data-action="complete-goal" data-goal-id="${escapeAttr(goal.id)}">완료</button>` : ''}
+            <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-goal" data-goal-id="${escapeAttr(goal.id)}">삭제</button>
           </div>
         </div>
         <div class="goal-acc">
@@ -176,6 +176,7 @@
     const title = titleInput.value.trim();
     const deadline = deadlineInput.value;
     if (!title || !deadline) return;
+    if (!checkDateInput(deadline, '마감일')) return;
 
     state.goals.push({ id: uid('goal'), title, deadline, createdAt: todayStr() });
     saveState();
@@ -188,11 +189,15 @@
     const grip = e.target.closest('.step-grip');
     if (!grip) return;
     const row = grip.closest('.step-row');
-    const goalId = row.closest('.goal-card').dataset.goalId;
     startRowDrag(e, row, (rows) => { // 끝났을 때 줄 순서대로 order를 다시 매긴다
       rows.forEach((r, i) => { const st = state.steps.find(x => x.id === r.dataset.stepId); if (st) st.order = i; });
       saveState();
     });
+  });
+
+  // 카드 머리(role=button)는 키보드로도 펼치고 접는다
+  goalList.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.goal-header[role="button"]')) { e.preventDefault(); e.target.click(); }
   });
 
   goalList.addEventListener('click', (e) => {
@@ -261,11 +266,11 @@
 
     if (action === 'add-step') {
       const goalId = target.dataset.goalId;
-      const titleInput = document.getElementById(`new-step-title-${goalId}`);
-      const minutesInput = document.getElementById(`new-step-minutes-${goalId}`);
+      const titleInput = document.getElementById(`new-step-title-${escapeAttr(goalId)}`);
+      const minutesInput = document.getElementById(`new-step-minutes-${escapeAttr(goalId)}`);
       const title = titleInput.value.trim();
       if (!title) return;
-      const minutes = Number(minutesInput.value) || 60;
+      const minutes = cleanMinutes(minutesInput.value);
       const load = (newStepDrafts[goalId] && newStepDrafts[goalId].load) || 3;
       const order = stepsForGoal(goalId).length;
       state.steps.push({
@@ -284,7 +289,7 @@
     if (!draftField) return;
     const goalId = e.target.dataset.goalId;
     const current = newStepDrafts[goalId] || {};
-    current[draftField] = draftField === 'minutes' ? Number(e.target.value) || 60 : e.target.value;
+    current[draftField] = draftField === 'minutes' ? cleanMinutes(e.target.value) : e.target.value;
     newStepDrafts[goalId] = current;
   });
 
@@ -300,7 +305,7 @@
         if (!v) { e.target.value = goal.title; return; }
         goal.title = v;
       } else if (field === 'deadline') {
-        if (!e.target.value) { e.target.value = goal.deadline; return; }
+        if (!e.target.value || !checkDateInput(e.target.value, '마감일')) { e.target.value = goal.deadline; return; }
         goal.deadline = e.target.value;
       }
       saveState();
@@ -316,7 +321,8 @@
         if (!v) { e.target.value = step.title; return; }
         step.title = v;
       } else if (field === 'minutes') {
-        step.minutes = Number(e.target.value) || 60;
+        step.minutes = cleanMinutes(e.target.value, step.minutes);
+        e.target.value = step.minutes; // 범위 밖이거나 소수였으면 다듬은 값을 다시 보여 준다
       }
       saveState();
     }
@@ -413,6 +419,7 @@
       try { json = await res.json(); } catch (e) { aiMessage.textContent = '응답을 읽지 못했습니다.' + manual; return; }
       const parsed = Ai.parseDraft(json, today);
       if (!parsed.ok) { aiMessage.textContent = parsed.error + manual; return; }
+      if (!hasAiKey()) return; // 응답을 기다리는 동안 키를 지웠으면 초안을 보이지 않는다(키가 없으면 AI 기능은 숨겨진다)
       aiMessage.textContent = '';
       aiDraft = parsed.draft;
       renderAiDraft();
@@ -503,13 +510,13 @@
     for (const [i, s] of d.steps.entries()) {
       if (!s.title.trim()) { err.textContent = `${i + 1}번 단계의 제목을 입력하세요.`; return; }
       if (!(Number.isInteger(s.load) && s.load >= 1 && s.load <= 5)) { err.textContent = `${i + 1}번 단계의 부하는 1~5여야 합니다.`; return; }
-      if (!(s.minutes > 0)) { err.textContent = `${i + 1}번 단계의 예상 시간은 0보다 커야 합니다.`; return; }
+      if (!(Number.isFinite(s.minutes) && Math.round(s.minutes) >= 1 && Math.round(s.minutes) <= Data.MAX_MINUTES)) { err.textContent = `${i + 1}번 단계의 예상 시간은 1분 이상 7일 이하여야 합니다.`; return; }
     }
 
     const goalId = uid('goal');
     state.goals.push({ id: goalId, title, deadline: d.deadline, createdAt: todayStr() });
     d.steps.forEach((s, i) => {
-      state.steps.push({ id: uid('step'), goalId, title: s.title.trim(), load: s.load, minutes: s.minutes, order: i, done: false });
+      state.steps.push({ id: uid('step'), goalId, title: s.title.trim(), load: s.load, minutes: Math.round(s.minutes), order: i, done: false });
     });
     saveState();
     expandedGoals.clear(); // 한 번에 하나만 펼친다

@@ -12,14 +12,17 @@
     return { y, m, d };
   }
 
+  // 그 날 0시(UTC)의 ms. Date.UTC는 0~99년을 1900년대로 읽으므로 setUTCFullYear로 연도를 그대로 넣는다
   function dateToUTCms(dateStr) {
     const { y, m, d } = parseDate(dateStr);
-    return Date.UTC(y, m - 1, d);
+    const t = new Date(0);
+    t.setUTCFullYear(y, m - 1, d);
+    return t.getTime();
   }
 
   function formatDate(ms) {
     const d = new Date(ms);
-    const y = d.getUTCFullYear();
+    const y = String(d.getUTCFullYear()).padStart(4, '0');
     const m = String(d.getUTCMonth() + 1).padStart(2, '0');
     const day = String(d.getUTCDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
@@ -35,11 +38,14 @@
     return (jsDay + 6) % 7;
   }
 
+  // 후보 날짜 목록의 길이 상한. 마감이 아주 먼 미래여도 계산이 멈추지 않게 한다(3년이면 넘치도록 충분하다)
+  const MAX_RANGE_DAYS = 1100;
+
   function dateRange(startStr, endStr) {
     if (startStr > endStr) return [];
     const dates = [];
     let cur = startStr;
-    while (cur <= endStr) {
+    while (cur <= endStr && dates.length < MAX_RANGE_DAYS) {
       dates.push(cur);
       cur = addDays(cur, 1);
     }
@@ -209,8 +215,9 @@
         return;
       }
 
-      // 3. 후보 날짜 = [시작 가능일, 마감일]
-      const startDate = maxDateStr(today, lastPlacedDateByGoal.get(step.goalId), step.earliestDate);
+      // 3. 후보 날짜 = [시작 가능일, 마감일]. 시작 가능일은 앞 단계가 깔린 날 이후다: 사용자가 고정한 앞 단계의 날짜도 그 날로 센다
+      const pinnedBefore = pinnedSteps.filter(x => x.goalId === step.goalId && x.order < step.order).map(x => x.pinnedDate);
+      const startDate = maxDateStr(today, lastPlacedDateByGoal.get(step.goalId), step.earliestDate, ...pinnedBefore);
       let candidates = dateRange(startDate, goal.deadline);
       if (candidates.length === 0) candidates = [goal.deadline];
 

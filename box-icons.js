@@ -2,7 +2,7 @@
 //
 // 아이콘: Google의 Material Symbols(둥근 모양)에서 가져온 경로 데이터(24×24 좌표). Apache License 2.0.
 //   저작권 Google LLC. 원본 https://github.com/google/material-design-icons  라이선스 https://www.apache.org/licenses/LICENSE-2.0
-//   쓴 것: bolt(부하), schedule(시간), snooze(밀림). 모양을 바꾸지 않고 그대로 옮겼다.
+//   쓴 것: bolt(부하, 키 load), schedule(시간, 키 time), snooze(알람 모양, 키 push: 박스의 지남 도장에 쓴다). 모양을 바꾸지 않고 그대로 옮겼다.
 // 이 파일의 paths는 위 아이콘을 내려받아 만든 생성물이다(손으로 고치지 않는다). sealPath는 우리가 만든 함수다.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
