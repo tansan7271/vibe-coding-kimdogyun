@@ -188,12 +188,16 @@
     const ms = cssMs(reverse ? '--modal-anim-close-ms' : '--modal-anim-ms');
     const timing = { duration: ms, easing: cssVar(reverse ? '--modal-ease-close' : '--modal-ease'), fill: 'both' };
     const landEase = cssVar('--modal-ease-land');
+    const closeMid = cssMs('--modal-close-mid');
     // 닫을 때는 키프레임을 직접 뒤집어 앞으로 재생한다. direction: 'reverse'로는 구간마다 다른 곡선을 줄 수 없다.
     // land 표시가 붙은 키프레임에서 시작하는 구간(복제본이 버튼 자리로 내려앉는 마지막 이동)에만 닫을 때 landEase를 건다
     const frames = list => {
       const n = list.length;
       const f = list.map((k, i) => ({ ...k, offset: k.offset ?? i / (n - 1) }));
-      const out = reverse ? f.map(k => ({ ...k, offset: 1 - k.offset })).reverse() : f;
+      // 닫을 때는 팝업이 줄어드는 앞 구간과 버튼이 내려앉는 뒤 구간의 이음매(0.5)를 closeMid로 옮겨, 뒤 구간이 더 긴 시간을 쓰게 한다.
+      // 두 구간이 같은 길이면 뒤 구간이 같은 거리를 더 짧게 가서 이음매에서 속도가 튄다
+      const at = o => (o <= 0.5 ? o * closeMid / 0.5 : closeMid + (o - 0.5) * (1 - closeMid) / 0.5);
+      const out = reverse ? f.map(k => ({ ...k, offset: at(1 - k.offset) })).reverse() : f;
       return out.map(({ land, ...k }) => (reverse && land ? { ...k, easing: landEase } : k));
     };
 
