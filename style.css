@@ -1143,7 +1143,7 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .cn-boxes { width: 100%; height: 100%; pointer-events: none; }
 
 /* 박스: div 몸통 + 안쪽 털실 점선(작은 SVG). 그림자는 box-shadow(SVG 필터는 Safari에서 느리다) */
-.cn-box { position: absolute; left: 0; top: 0; will-change: transform; background: var(--box-paper); box-shadow: var(--box-shadow); container-type: size; } /* 모서리 둥글기는 박스 크기에 맞춰 JS가 정한다. container-type: 박스 폭에 따라 안쪽 아이콘을 줄인다 */
+.cn-box { position: absolute; left: 0; top: 0; will-change: transform, translate, rotate; background: var(--box-paper); box-shadow: var(--box-shadow); container-type: size; } /* 모서리 둥글기는 박스 크기에 맞춰 JS가 정한다. container-type: 박스 폭에 따라 안쪽 아이콘을 줄인다 */
 .cn-box > .stitch { position: absolute; left: 0; top: 0; overflow: visible; }
 .cn-box > .stitch rect { fill: none; stroke: var(--box-stitch); stroke-width: var(--stitch-width); stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-linecap: round; }
 .cn-box.fixed { background: var(--box-fixed-bg); } /* 고정 일정: 완료한 단계보다 배경이 살짝 어둡다 */
@@ -1169,8 +1169,15 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 
 /* 완료 도장: 박스 오른쪽 위에 조금 튀어나가 붙는다. 박스 위층이라 위에 쌓인 박스에 가려지지 않는다 */
 .cn-seals { width: 100%; height: 100%; pointer-events: none; }
-.cn-seal-wrap { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
+.cn-seal-wrap { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform, translate, rotate; }
 .cn-seal { position: absolute; overflow: visible; }
+
+/* 예산 초과인 날의 박스 떨림(홈 화면 수정 모드). 위치는 translate, 기울기는 transform, 떨림은 rotate 속성이 맡아 곱해진다. 박스마다 빠르기·시작점은 JS가 --jig-dur, --jig-delay로 준다.
+   슬라이드·끌기·팝업이 떠 있는 동안은 JS가 #carpet-next에 cn-paused를 붙여 멈춘다 */
+@keyframes cn-jig { from { rotate: calc(var(--jig-deg) * -1); } to { rotate: var(--jig-deg); } }
+.cn-box.jig, .cn-seal-wrap.jig { animation: cn-jig var(--jig-dur) cubic-bezier(0.37, 0, 0.63, 1) var(--jig-delay) infinite alternate; }
+#carpet-next.cn-paused .jig { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .cn-box.jig, .cn-seal-wrap.jig { animation: none; } }
 
 /* 새 카펫(작업 중). ?carpet=next 일 때만 켜진다(app-carpet-next.js). 교체가 끝나면 이 블록과 옛 카펫 규칙을 정리한다 */
 #carpet-next { display: none; }

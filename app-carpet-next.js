@@ -54,6 +54,8 @@ const STAGE_STYLE = {
   jiggleHz: 5.5,               // 박스가 떠는 빠르기(초당 왕복). 박스마다 ±10% 다르고 시작점도 제각각이다
   jiggleCarpetPx: 1.8,         // 예산 초과인 날의 카펫(과 그 위 박스)이 위아래로 떠는 크기(px). 이웃 날짜와 이어진 곡선이 따라서 자연스럽게 이어진다
   jiggleCarpetHz: 6.5,         // 카펫이 떠는 빠르기
+  jiggleCarpetFps: 30,         // 카펫 선을 다시 그리는 초당 횟수. 카펫이 떠는 동안 매 프레임 SVG 선을 다시 그리는 비용을 줄인다(박스 떨림은 이 값과 무관하게 부드럽다). 화면 주사율보다 크면 매 프레임 그린다
+  resizeDebounceMs: 150,       // 창 크기를 바꿀 때 마지막 변화 뒤 이만큼 기다렸다가 한 번만 다시 놓는다(ms)
   rollTuckRatio: 0.4,          // 처음 롤 윗부분이 헤더 뒤로 들어가는 정도(롤 지름의 비율). 클수록 위쪽 여백이 줄어든다. 위쪽 여백 ≈ 롤 지름 × (1 − 이 값)
   gridMaxLines: 5,             // 가로 눈금선 최대 개수
   gridColor: '#e6e1da',        // 눈금선 색
@@ -121,6 +123,7 @@ const STAGE_STYLE = {
   const pagesEl = stage.querySelector('.cn-pages');
   const S = INTRO_STYLE;
   const G = STAGE_STYLE;
+  stage.style.setProperty('--jig-deg', `${G.jiggleDeg}deg`); // 박스 떨림 각도를 CSS 애니메이션에 넘긴다
   const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const weekLabelEl = document.getElementById('week-label');
 
@@ -444,7 +447,8 @@ const STAGE_STYLE = {
   }
 
   // 지금 세계 상태를 화면에 반영: 카펫 선(처짐)과 박스 위치
-  function renderSim(page, now = 0) {
+  // boxes: 위치를 다시 잡을 박스들(기본은 전부. 떨림 루프는 떠는 박스만 넘긴다)
+  function renderSim(page, now = 0, boxes = page.sim.world.boxes) {
     const sim = page.sim;
     const { world, els, width } = sim;
     const m = metrics(page, width);
@@ -463,20 +467,33 @@ const STAGE_STYLE = {
       if (page.laidEl) page.laidEl.style.display = 'none';
       if (page.coverEl) page.coverEl.style.display = 'none';
     }
-    world.boxes.forEach(b => {
+    boxes.forEach(b => {
       const el = els.get(b.id);
       if (!el) return;
       // 예산 초과인 날의 박스는 자리를 잡은 뒤 홈 화면 수정 모드의 아이콘처럼 벌벌 떤다(박스마다 빠르기와 시작점이 다르다)
       const jig = sim.fidget && b.landed && sim.over[b.col];
-      const y = b.y + (jig ? osc(b.col) : 0);
-      const rot = b.tilt + (jig ? G.jiggleDeg * Math.sin(2 * Math.PI * G.jiggleHz * (0.9 + 0.2 * b.jr) * t + b.jp) : 0);
-      const tr = `translate3d(${b.x.toFixed(1)}px,${y.toFixed(1)}px,0) rotate(${rot.toFixed(2)}deg)`;
-      if (jig || b.lastT !== tr) { // 움직인 박스만 바꾼다(떠는 박스는 매 프레임)
-        b.lastT = tr;
-        el.style.transform = tr;
-        const seal = sim.seals.get(b.id);
-        if (seal) seal.style.transform = tr;
+      const seal = sim.seals.get(b.id);
+      if (jig && !b.jigOn) startJig(b, el, seal); // 박스 떨림은 CSS 애니메이션(rotate)이 하므로 JS는 켜기만 한다
+      const y = b.y + (jig ? osc(b.col) : 0); // 카펫이 떠는 만큼은 위치로 따라간다
+      const pos = `${b.x.toFixed(1)}px ${y.toFixed(1)}px`;
+      if (b.lastT !== pos) { // 움직인 박스만 바꾼다. 위치는 translate, 기울기는 transform, 떨림은 rotate 속성이 따로 맡아 서로 곱해진다
+        b.lastT = pos;
+        el.style.translate = pos;
+        if (seal) seal.style.translate = pos;
       }
+    });
+  }
+
+  // 예산 초과인 날의 박스 떨림을 켠다: 박스마다 빠르기와 시작점이 다른 CSS 애니메이션(style.css .jig). 메인 스레드는 쓰지 않는다
+  function startJig(b, el, seal) {
+    b.jigOn = true;
+    const half = 1 / (2 * G.jiggleHz * (0.9 + 0.2 * b.jr)); // 한 방향으로 가는 시간(초). 왕복이 한 주기
+    const delay = -((b.jp + Math.PI / 2) / Math.PI) * half;   // 사인 곡선의 시작점(jp)에 맞춘다
+    [el, seal].forEach(e => {
+      if (!e) return;
+      e.style.setProperty('--jig-dur', `${half.toFixed(4)}s`);
+      e.style.setProperty('--jig-delay', `${delay.toFixed(4)}s`);
+      e.classList.add('jig');
     });
   }
 
@@ -502,8 +519,14 @@ const STAGE_STYLE = {
     box.tilt = isBottom ? 0 : (hash01(item.id, 't') - 0.5) * 2 * G.boxTiltDeg;
     box.jp = hash01(item.id, 'jp') * Math.PI * 2; // 예산 초과인 날의 떨림: 박스마다 시작점과 빠르기가 다르다
     box.jr = hash01(item.id, 'jr');
-    sim.els.set(item.id, makeBoxEl(page, box, item.kind === 'todo' ? 'todo' : item.kind === 'fixed' ? 'paper fixed' : 'paper', item));
-    if (item.kind === 'done') sim.seals.set(item.id, makeSealEl(page, box));
+    const boxEl = makeBoxEl(page, box, item.kind === 'todo' ? 'todo' : item.kind === 'fixed' ? 'paper fixed' : 'paper', item);
+    sim.els.set(item.id, boxEl);
+    boxEl.style.transform = `rotate(${box.tilt.toFixed(2)}deg)`; // 기울기는 한 번만 정한다(위치는 translate, 떨림은 rotate 속성)
+    if (item.kind === 'done') {
+      const seal = makeSealEl(page, box);
+      seal.style.transform = boxEl.style.transform;
+      sim.seals.set(item.id, seal);
+    }
   }
 
   // 날짜 칸들이 돌아가며 하나씩 떨어지도록 순서를 짜고(열마다 k번째 박스를 한 바퀴씩), 박스마다 떨어뜨릴 시각(at, ms)을 정한다.
@@ -536,12 +559,19 @@ const STAGE_STYLE = {
   }
 
   // 다 자리를 잡은 뒤에도, 예산 초과인 날이 있으면 떨림을 계속 그린다(물리 계산은 멈춰 있고 그리기만). 탭이 가려지면 브라우저가 알아서 멈춘다
+  // 카펫 선은 jiggleCarpetFps로 줄여 그리고, 떠는 열의 박스 위치만 바꾼다. 슬라이드·끌기·팝업이 떠 있는 동안은 그리지 않고 CSS 박스 떨림도 멈춘다
+  const openModals = document.getElementsByClassName('modal-backdrop open');
   function startFidget(page) {
     const sim = page.sim;
     if (!sim.fidget) return;
+    const jigBoxes = sim.world.boxes.filter(b => sim.over[b.col]);
+    const minGap = 1000 / G.jiggleCarpetFps - 2; // 프레임 간격이 조금 들쭉날쭉해도 건너뛰지 않게 여유를 둔다
+    let lastDraw = -Infinity;
     const tick = now => {
       if (page.sim !== sim) return; // 새로 놓았으면 옛 루프는 끝낸다
-      renderSim(page, now);
+      const paused = busy || !!drag || openModals.length > 0;
+      stage.classList.toggle('cn-paused', paused);
+      if (!paused && now - lastDraw >= minGap) { lastDraw = now; renderSim(page, now, jigBoxes); }
       sim.fidgetRaf = requestAnimationFrame(tick);
     };
     sim.fidgetRaf = requestAnimationFrame(tick);
@@ -719,11 +749,15 @@ const STAGE_STYLE = {
     stage.classList.add('intro-done');
     introDone = true;
     startBoxes(first, reduceMotion() ? 'instant' : 'drop'); // 첫 입장 때의 떨어지는 연출
-    window.addEventListener('resize', () => { // 폭·높이가 바뀌면 보이는 주의 선과 박스를 새 크기로 다시 놓는다(연출 없이)
-      if (busy || drag) return;
-      const width = active.el.clientWidth;
-      drawGrid(active, metrics(active, width), width);
-      startBoxes(active, 'instant');
+    let resizeTimer = 0;
+    window.addEventListener('resize', () => { // 폭·높이가 바뀌면 보이는 주의 선과 박스를 새 크기로 다시 놓는다(연출 없이). 창을 끄는 동안은 기다렸다가 멈추면 한 번만
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (busy || drag) return;
+        const width = active.el.clientWidth;
+        drawGrid(active, metrics(active, width), width);
+        startBoxes(active, 'instant');
+      }, G.resizeDebounceMs);
     });
   }
 
