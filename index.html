@@ -62,6 +62,14 @@
     --note-paper: #fffbea;       /* 메모지 색 */
     --note-ink: #3a2f2a;         /* 글자 색 */
     --note-font: 34px;
+    --note-margin-x: 56px;       /* 코넬식 세로선 위치(메모장 왼쪽에서) */
+    --note-margin-color: rgba(184, 32, 58, 0.22); /* 세로선 색. 연한 빨강 */
+    --note-line-color: rgba(0, 0, 0, 0.09);       /* 가로선 색. 흐린 회색 */
+    --note-line-gap: 26px;       /* 가로선 간격 */
+    --note-line-top: 38px;       /* 첫 가로선 시작 높이. 스프링 아래부터 */
+    --note-plus-size: 34px;      /* 글자 옆 + 원 크기 */
+    --note-plus-bg: #f3e6ae;     /* + 원 색. 메모지보다 조금 진하게 */
+    --note-plus-fg: #b8962f;     /* + 모양 색. 원보다 더 진하게 */
     --spring-pitch: 20px;        /* 스프링 알약 사이 간격(가로). 끝이 잘리지 않게 실제로는 칸 수가 맞게 살짝 늘어난다 */
     --spring-h: 22px;            /* 스프링 알약 길이. 절반이 메모지 위로 튀어나온다 */
     --cal-w: 224px;              /* 달력 크기 */
@@ -154,9 +162,25 @@
     font-size: var(--note-font);
     border-radius: 6px 6px 12px 12px;
     transform: rotate(var(--note-tilt));
-    background: var(--note-paper);
+    background:
+      linear-gradient(var(--note-margin-color), var(--note-margin-color)) var(--note-margin-x) 0 / 2px 100% no-repeat,
+      repeating-linear-gradient(to bottom, transparent 0 calc(var(--note-line-gap) - 1px), var(--note-line-color) calc(var(--note-line-gap) - 1px) var(--note-line-gap)) 0 var(--note-line-top) / 100% 100% no-repeat,
+      var(--note-paper);
     box-shadow: var(--dock-shadow);
     z-index: 1; /* 달력 위로 포갠다 */
+  }
+
+  .dock-note span::after { /* 글자 옆 + 표시: 할 일을 더할 수 있다는 안내 */
+    content: '';
+    flex: none;
+    width: var(--note-plus-size);
+    height: var(--note-plus-size);
+    margin-left: 12px;
+    border-radius: 50%;
+    background:
+      linear-gradient(var(--note-plus-fg), var(--note-plus-fg)) center / 44% 3px no-repeat,
+      linear-gradient(var(--note-plus-fg), var(--note-plus-fg)) center / 3px 44% no-repeat,
+      var(--note-plus-bg);
   }
 
   .dock-note::before { /* 스프링: 세로로 선 알약을 가로로 늘어놓는다 */
