@@ -21,15 +21,31 @@
     --header-pad-y: 12px;     /* 헤더 위아래 여백 */
     --header-height: calc(var(--logo-height) + var(--header-pad-y) * 2); /* 헤더 기본 높이 */
 
+    /* 털실 스티치 공용 값. 헤더 말고 다른 요소에도 가져다 쓴다.
+       점선: SVG 요소는 CSS로 stroke-dasharray: var(--stitch-dash) var(--stitch-gap); stroke-width: var(--stitch-width); stroke: var(--stitch-color);
+       그림자: box-shadow나 drop-shadow 자리에 var(--shadow-soft). 점선과 두께는 숫자만 쓴다(px 안 붙임) */
+    --stitch-color: #e0a030;     /* 털실 색(주황) */
+    --stitch-dash: 4;            /* 점 길이 */
+    --stitch-gap: 6;             /* 점 사이 간격. 둥근 끝이 두께만큼 먹으므로 눈에 보이는 틈은 간격 − 두께 */
+    --stitch-width: 2.4;         /* 털실 두께 */
+    --shadow-rgb: 184, 32, 58;   /* 그림자 색(붉은 기운) */
+    --shadow-alpha: 0.4;         /* 그림자 진하기 */
+    --shadow-y: 3px;             /* 그림자가 아래로 내려오는 거리 */
+    --shadow-blur: 7px;          /* 그림자 번짐 */
+    --shadow-soft: 0 var(--shadow-y) var(--shadow-blur) rgba(var(--shadow-rgb), var(--shadow-alpha));
+
     /* 털실 스티치 헤더 */
-    --header-bg: #b8203a;        /* 헤더 천 색. 아래 --edge-tile 안의 %23b8203a도 같이 바꿔야 한다 */
-    --header-tilt-deg: 0.6deg;    /* 기울기. 반시계 방향으로 이만큼 기운다 */
-    --header-shadow: 0 3px 5px rgba(184,32,58,0.3); /* 헤더 그림자(오프셋X 오프셋Y 번짐 색) */
-    --edge-h: 16px;              /* 울렁이는 아랫단 그림 높이. --edge-tile의 height와 같아야 한다 */
-    --edge-depth: 12px;          /* 아랫단이 헤더 밑으로 실제 내려오는 깊이. 본문이 이만큼 더 내려온다 */
-    /* 울렁임 한 주기 224px × 높이 16px(진폭 위아래 2px). 천 모양(%23b8203a)과 털실 점선(%23e0a030 주황, 두께 2.4, 점 길이 5 간격 5.4)이 들어 있다.
-       화면 폭이 달라도 이 조각을 가로로 반복할 뿐이라 울렁임 크기가 그대로다. 점 간격은 둥근 끝이 먹는 2.4px을 포함한 값이라 눈에 보이는 틈은 점 길이의 약 2/5다 */
-    --edge-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='224' height='16' viewBox='0 0 224 16'%3E%3Cpath d='M0 0H224V10Q168 14 112 10Q56 6 0 10Z' fill='%23b8203a'/%3E%3Cpath d='M224 4Q168 8 112 4Q56 0 0 4' fill='none' stroke='%23e0a030' stroke-width='2.4' stroke-linecap='round' stroke-dasharray='5 5.409' stroke-dashoffset='2.5' pathLength='229'/%3E%3C/svg%3E");
+    --header-bg: #b8203a;        /* 헤더 천 색 */
+    --header-tilt-deg: 0.75deg;  /* 기울기. 반시계 방향으로 이만큼 기운다 */
+    --edge-amp: 3;               /* 울렁이는 아랫단 진폭(위아래 px, 숫자만) */
+    --edge-wave: 128;            /* 울렁임 한 주기 길이(px, 숫자만). 화면 폭이 달라도 이 조각을 가로로 반복할 뿐이라 울렁임 크기는 그대로다 */
+    --edge-offset: 6;            /* 점선과 천 끝 사이 거리(px, 숫자만) */
+    /* 아래 값은 위 값에서 계산된다. 같은 식이 <head>의 스크립트에도 있다 */
+    --edge-sy: calc(var(--stitch-width) / 2 + var(--edge-amp) + 1);   /* 점선 곡선 가운데 높이 */
+    --edge-ey: calc(var(--edge-sy) + var(--edge-offset));             /* 천 끝 곡선 가운데 높이 */
+    --edge-h: calc((var(--edge-ey) + var(--edge-amp) + 1) * 1px);     /* 아랫단 그림 높이 */
+    --edge-depth: calc((var(--edge-ey) + var(--edge-amp)) * 1px);     /* 아랫단이 헤더 밑으로 내려오는 깊이. 본문이 이만큼 더 내려온다 */
+    /* --edge-tile(천 끝과 털실 점선 그림)은 <head>의 스크립트가 위 값으로 만들어 넣는다 */
     /* 기울이면 한쪽 위 모서리가 화면 안으로 내려오므로, 폭의 절반×sin(기울기)만큼 헤더를 화면 위로 더 늘려 가린다 */
     --header-bleed: calc(sin(var(--header-tilt-deg)) * 50vw + 4px);
 
@@ -76,9 +92,9 @@
     right: 0;
     bottom: calc(var(--edge-h) * -1);
     background:
-      var(--edge-tile) left bottom / 224px var(--edge-h) repeat-x,
+      var(--edge-tile) left bottom / calc(var(--edge-wave) * 1px) var(--edge-h) repeat-x,
       linear-gradient(var(--header-bg), var(--header-bg)) left top / 100% calc(100% - var(--edge-h) + 1px) no-repeat;
-    filter: drop-shadow(var(--header-shadow));
+    filter: drop-shadow(var(--shadow-soft));
   }
 
   nav {
@@ -553,6 +569,31 @@
   .step-menu input[type="date"] { width: 100%; font-size: 12px; }
   .step-menu .menu-hint { color: #777; font-size: 11px; }
 </style>
+<script>
+  // 헤더 아랫단 그림을 CSS 값(--stitch-*, --edge-*, --header-bg)으로 만들어 --edge-tile에 넣는다. 한 주기 조각을 가로로 반복한다
+  (function () {
+    const cs = getComputedStyle(document.documentElement);
+    const num = name => parseFloat(cs.getPropertyValue(name));
+    const bg = cs.getPropertyValue('--header-bg').trim();
+    const yarn = cs.getPropertyValue('--stitch-color').trim();
+    const w = num('--edge-wave'), amp = num('--edge-amp');
+    const dash = num('--stitch-dash'), gap = num('--stitch-gap'), width = num('--stitch-width');
+    const sy = width / 2 + amp + 1, ey = sy + num('--edge-offset'), h = ey + amp + 1;
+    const r = n => +n.toFixed(2);
+    // 오른쪽 끝에서 왼쪽 끝으로: 아래로 불룩 → 위로 불룩 (한 주기)
+    const wave = y => `Q${r(w * 0.75)} ${r(y + 2 * amp)} ${r(w / 2)} ${r(y)}Q${r(w * 0.25)} ${r(y - 2 * amp)} 0 ${r(y)}`;
+    // 점선이 이음새에서 끊기지 않게, 곡선 길이를 점 한 주기의 정수 배로 맞춘다
+    let len = 0;
+    for (let i = 1; i <= 200; i++) len += Math.hypot(w / 200, amp * (Math.sin(2 * Math.PI * i / 200) - Math.sin(2 * Math.PI * (i - 1) / 200)));
+    const period = dash + gap;
+    const pathLength = r(Math.max(1, Math.round(len / period)) * period);
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${r(h)}' viewBox='0 0 ${w} ${r(h)}'>`
+      + `<path d='M0 0H${w}V${r(ey)}${wave(ey)}Z' fill='${bg}'/>`
+      + `<path d='M${w} ${r(sy)}${wave(sy)}' fill='none' stroke='${yarn}' stroke-width='${width}' stroke-linecap='round' stroke-dasharray='${dash} ${gap}' stroke-dashoffset='${dash / 2}' pathLength='${pathLength}'/>`
+      + `</svg>`;
+    document.documentElement.style.setProperty('--edge-tile', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+  })();
+</script>
 </head>
 <body>
 
@@ -1886,7 +1927,6 @@
     if (e.key === 'Escape') closeModals();
   });
 </script>
-<script src="dev-tuner.js"></script> <!-- 임시: 헤더 조절 슬라이더. 값이 정해지면 지운다 -->
 
 </body>
 </html>
