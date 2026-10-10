@@ -12,12 +12,9 @@
 <meta property="og:type" content="website">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
-  /* 로고 버튼 모양 값. 바꾸고 새로고침하면 바로 보인다 */
+  /* 로고 모양 값. 바꾸고 새로고침하면 바로 보인다 */
   :root {
     --logo-height: 30px;      /* 로고 그림 높이. 가로는 비율대로 따라온다 */
-    --logo-pad-x: 10px;       /* 로고 버튼 좌우 안쪽 여백 */
-    --logo-pad-y: 2px;        /* 로고 버튼 위아래 안쪽 여백 */
-    --logo-active-bg: rgba(255,255,255,0.32); /* 카펫 화면일 때 로고 버튼 배경. 로고가 흰색이라 흰 배경을 못 쓴다 */
     --logo-nudge-y: 0px;      /* 글자 무게중심 미세 조정. 양수면 아래로 내려간다 */
   }
   * { box-sizing: border-box; }
@@ -52,13 +49,15 @@
     cursor: pointer;
   }
 
-  nav button.logo {
-    padding: var(--logo-pad-y) var(--logo-pad-x);
-    display: flex;
-    align-items: center;
+  .logo-link {
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    display: block;
   }
 
-  nav button.logo img {
+  .logo-link img {
     display: block;
     height: var(--logo-height);
     transform: translateY(var(--logo-nudge-y));
@@ -68,21 +67,6 @@
     background: #fff;
     color: #b8203a;
     font-weight: bold;
-  }
-
-  nav button.logo.active {
-    background: var(--logo-active-bg);
-  }
-
-  .place-mode-toggle {
-    font-size: 12px;
-    font-family: inherit;
-    color: #fff;
-    background: rgba(255,255,255,0.15);
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
   }
 
   main {
@@ -479,12 +463,11 @@
 <body>
 
 <header>
+  <button data-screen="carpet" class="logo-link" type="button" aria-label="Red Carpet, 카펫 화면"><img src="logo.svg" alt="Red Carpet"></button>
   <nav>
-    <button data-screen="carpet" class="logo active" aria-label="Red Carpet, 카펫 화면"><img src="logo.svg" alt="Red Carpet"></button>
     <button data-screen="goals">할 일</button>
     <button data-screen="settings">일정과 설정</button>
   </nav>
-  <button id="place-mode-toggle" class="place-mode-toggle" type="button">깔기 방식: 채우기 우선</button>
 </header>
 
 <main>
@@ -509,6 +492,7 @@
     <div class="goal-add-form">
       <input type="text" id="new-goal-title" placeholder="할 일 제목">
       <input type="date" id="new-goal-deadline">
+      <button class="btn btn-plain" id="place-mode-toggle" type="button">깔기 방식: 채우기 우선</button>
       <button class="btn" id="add-goal-btn" type="button">할 일 추가</button>
       <button class="btn btn-plain" id="ai-open-btn" type="button" style="display:none">텍스트로 만들기</button>
     </div>
@@ -1767,7 +1751,7 @@
 
   renderCarpet();
 
-  const navButtons = document.querySelectorAll('nav button');
+  const navButtons = document.querySelectorAll('header [data-screen]');
   const screens = document.querySelectorAll('.screen');
 
   navButtons.forEach(btn => {
