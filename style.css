@@ -959,6 +959,8 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 /* 새 카펫(작업 중). ?carpet=next 일 때만 켜진다(app-carpet-next.js). 교체가 끝나면 이 블록과 옛 카펫 규칙을 정리한다 */
 #carpet-next { display: none; }
 html.carpet-next-on #screen-carpet { display: none; }
+html.carpet-next-on main { padding-bottom: 0; } /* 눈금이 화면 바닥까지 닿으므로 아래 여백으로 스크롤이 생기지 않게 */
+html.carpet-next-on body { padding-bottom: 0; }
 html.carpet-next-on #carpet-next { display: block; min-height: 60vh; color: #999; font-size: 14px; }
 .carpet-intro { display: block; width: calc(100% + 32px); margin: 0 -16px; overflow: visible; } /* 롤과 카펫은 화면 너비 끝까지. main의 좌우 여백 16px을 되돌린다 */
 

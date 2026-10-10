@@ -36,8 +36,10 @@ const INTRO_STYLE = {
 
 // 눈금(카펫 아래 격자) 모양 값. 점선 모양(길이·간격·두께·둥근 끝)은 공용 스티치 값(style.css의 --stitch-*)을 쓴다
 const STAGE_STYLE = {
-  maxSag: 180,                 // 예산만큼 찼을 때 카펫이 처지는 깊이(px). 눈금 전체 높이가 된다
-  bottomMargin: 24,            // 예산선 아래 여백(px)
+  maxSag: 180,                 // 예산만큼 찼을 때 카펫이 처지는 깊이(px). 가로 눈금(예산선까지)의 높이가 된다
+  columnDepthRatio: 2.5,       // 날짜 구분 점선과 오늘 칸이 카펫 선 아래로 내려가는 깊이 = maxSag × 이 값. 화면 바닥까지 닿아야 하므로 더 모자라면 바닥까지 늘린다
+  topSpaceRatio: 0.75,         // 카펫 선 위쪽 여백을 이 비율로 줄인다(1이면 그대로). 롤이 헤더 밑으로 파고들지 않는 선까지만 줄어든다
+  mainPadTop: 24,              // 본문 위쪽 여백(px, style.css의 main padding). 롤이 이 안까지는 올라가도 된다
   gridMaxLines: 5,             // 가로 눈금선 최대 개수
   gridColor: '#e6e1da',        // 눈금선 색
   gridWidth: 2,                // 눈금선 두께(px)
@@ -90,10 +92,10 @@ const STAGE_STYLE = {
     });
     const todayIdx = dates.indexOf(today);
     gridG.innerHTML =
-      (todayIdx >= 0 ? `<rect x="${columns[todayIdx].left}" y="${groundY}" width="${colW}" height="${height - G.bottomMargin - groundY}" fill="${G.todayFill}"/>` : '')
+      (todayIdx >= 0 ? `<rect x="${columns[todayIdx].left}" y="${groundY}" width="${colW}" height="${height - groundY}" fill="${G.todayFill}"/>` : '')
       + shape.gridLines.map(g => `<line x1="0" y1="${g.y}" x2="${width}" y2="${g.y}" stroke="${g.isBudget ? G.budgetColor : G.gridColor}" stroke-width="${G.gridWidth}"/>`).join('')
       + (shape.safeLine ? `<line x1="0" y1="${shape.safeLine.y}" x2="${width}" y2="${shape.safeLine.y}" stroke="${yarn}" ${stitch}/>` : '')
-      + shape.dividers.map(x => `<line x1="${x}" y1="${groundY}" x2="${x}" y2="${height - G.bottomMargin}" stroke="${G.dividerColor}" ${stitch}/>`).join('');
+      + shape.dividers.map(x => `<line x1="${x}" y1="${groundY}" x2="${x}" y2="${height}" stroke="${G.dividerColor}" ${stitch}/>`).join('');
   }
 
   // 롤 그리기. eased는 0~1(곡선을 입힌 진행도)
@@ -103,7 +105,12 @@ const STAGE_STYLE = {
     const startMargin = S.entryGap + S.lineWidth / 2;
     const groundY = S.topMargin + 2 * CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0, startMargin }).radius; // 땅에서 롤 지름 + 위 여백
     const pose = CarpetRoll.rollPose({ progress: eased, width, ...P, groundY, startMargin });
-    const height = Math.ceil(groundY + G.maxSag + G.bottomMargin);
+    // 위 여백 줄이기: 그림은 그대로 두고 통째로 위로 끌어올린다. 롤 위쪽이 헤더 아랫단을 넘지 않는 만큼까지만
+    const lift = Math.min((1 - G.topSpaceRatio) * groundY, S.topMargin + G.mainPadTop - 4);
+    svg.style.marginTop = `${-lift}px`;
+    // 아래로는 화면 바닥까지: 구분 점선과 오늘 칸이 쭈욱 이어진다
+    const toBottom = Math.max(0, window.innerHeight - (svg.getBoundingClientRect().top + window.scrollY) - groundY);
+    const height = Math.floor(groundY + Math.max(G.columnDepthRatio * G.maxSag, toBottom)); // 내림: 올리면 1px 넘쳐 스크롤이 생긴다
     svg.setAttribute('height', height);
     drawGrid(width, groundY, height);
     // 눈금은 롤이 깔고 지나간 자리까지만 드러난다
