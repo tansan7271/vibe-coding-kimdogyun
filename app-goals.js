@@ -341,7 +341,7 @@
     const req = Ai.buildRequest({ text, today, apiKey: aiKey });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
-    const manual = ' 할 일은 위의 입력칸에서 직접 추가할 수 있습니다.';
+    const manual = " 할 일은 '직접 추가'를 눌러 입력줄에서 직접 추가할 수 있습니다."; // AI 입력기가 입력줄 자리를 대신하므로 안내도 그에 맞춘다
     try {
       const res = await fetch(req.url, { ...req.init, signal: controller.signal });
       if (!res.ok) { aiMessage.textContent = Ai.describeHttpError(res.status) + manual; return; }

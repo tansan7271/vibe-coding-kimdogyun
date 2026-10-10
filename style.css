@@ -538,7 +538,7 @@ main {
   flex-wrap: wrap;
 }
 
-.goal-add-form input[type="text"] {
+.goal-add-form .line-field {
   flex: 1;
   min-width: 160px;
 }
@@ -547,7 +547,8 @@ main {
 
 /* AI 입력기: 입력줄 자리를 대신한다 */
 #ai-panel .ai-lead { font-size: 14px; color: #444; }
-#ai-panel textarea { display: block; width: 100%; min-height: 96px; margin-top: 6px; resize: vertical; font-family: inherit; }
+#ai-panel .line-field { margin-top: 6px; }
+#ai-panel textarea { min-height: 96px; resize: vertical; font-family: inherit; }
 .ai-actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
 .ai-actions .ai-warn { flex: 1; min-width: 120px; }
 
@@ -844,7 +845,7 @@ button.btn-plain {
 /* 팝업의 스티치 버튼: 바탕이 팝업 종이와 같은 색이라 그림자로 떠 보이게 하고, 그림자 색은 팝업 종이를 진하게 한 색으로 은은하게 */
 #modal-goals { --paper-shadow-rgb: 150, 118, 40; }
 #modal-settings { --paper-shadow-rgb: 140, 112, 84; }
-.modal-scroll .sbtn { --wbtn-shadow: 0 2px 7px rgba(var(--paper-shadow-rgb), 0.34); --wbtn-font: 14px; --wbtn-pad: 8px 16px; }
+.modal-scroll .sbtn { --wbtn-shadow: 0 2px 7px rgba(var(--paper-shadow-rgb), 0.34); --wbtn-font: 14px; --wbtn-pad: 12px 24px; } /* 안쪽 여백(위아래 / 좌우). 점선과 글자 사이가 답답하지 않게 */
 .sbtn:disabled { opacity: 0.5; cursor: default; }
 .sbtn-accent { /* 강조 버튼: 붉은 바탕에 같은 털실 점선 */
   background: #b8203a;
@@ -863,39 +864,65 @@ button.btn-plain {
 }
 
 /* 윤곽선·배경 없이 아래쪽에만 스티치와 같은 두께·색의 실선을 긋는 입력기 */
-.line-input {
-  border: 0;
-  border-bottom: calc(var(--stitch-width) * 1px) solid var(--stitch-color);
-  border-radius: 0;
-  background: none;
-  padding: 8px 2px;
-  font-size: 16px;
-  outline: none;
+.line-field { /* 입력기 + 양끝이 둥근 밑줄. 밑줄은 테두리가 아니라 ::after라야 끝을 둥글게 할 수 있다 */
+  position: relative;
+  display: block;
 }
-.line-input:focus { border-bottom-color: #b8203a; }
-
-[hidden] { display: none !important; }
-
-/* 할 일 입력줄: 아래 목록을 스크롤해도 위로 딸려 나가지 않게 팝업 위쪽에 고정한다. 종이색 바탕이 목록을 가리고, 아래쪽은 은은하게 사라진다 */
-.goal-compose {
-  position: sticky;
-  top: calc(12px - var(--modal-top, 0px)); /* 팝업 위쪽 끝에서 12px(스프링 아래). 고정 위치는 스크롤 영역의 안쪽 여백(--modal-top)을 포함해서 재므로 그만큼 뺀다 */
-  z-index: 2;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  background: var(--note-paper);
-  box-shadow: 0 -14px 0 var(--note-paper); /* 위쪽 틈(스프링 아래)도 종이색으로 덮는다 */
-}
-.goal-compose::after {
+.line-field::after {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
-  top: 100%;
-  height: 12px;
-  background: linear-gradient(var(--note-paper), transparent);
+  bottom: 0;
+  height: calc(var(--stitch-width) * 1px);
+  border-radius: 999px;
+  background: var(--stitch-color);
+  transition: background-color 120ms;
+}
+.line-field:focus-within::after { background: #b8203a; }
+.line-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 8px 2px 10px;
+  font-size: 16px;
+  outline: none;
+}
+
+[hidden] { display: none !important; }
+
+/* 할 일 팝업 머리(닫기·제목·입력줄): 아래 목록을 스크롤해도 위로 딸려 나가지 않게 고정한다.
+   바탕은 종이색이고 팝업 안쪽 여백까지 좌우로 더 덮어서(::before) 지나가는 카드의 그림자가 양옆으로 비치지 않는다. 아래쪽은 은은하게 사라진다 */
+.goal-head {
+  position: sticky;
+  top: 0; /* 스크롤 영역의 안쪽 여백(--modal-top) 위쪽 끝에 붙으므로 처음 자리와 같은 곳이다 */
+  z-index: 3;
+  padding-bottom: 14px;
+  margin-bottom: 6px;
+}
+.goal-head::before, .goal-head::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--modal-pad) * -1); /* 안쪽 여백까지 좌우로 덮는다. 팝업 자체의 여백은 그대로 */
+  right: calc(var(--modal-pad) * -1);
   pointer-events: none;
 }
+.goal-head::before { /* 종이색 바탕: 팝업 위쪽 끝(스프링 아래)부터 머리 끝까지 */
+  z-index: -1;
+  top: calc(var(--modal-top, 0px) * -1);
+  bottom: 0;
+  background: var(--note-paper);
+}
+.goal-head::after { /* 아래쪽 은은한 페이드 */
+  top: 100%;
+  height: 16px;
+  background: linear-gradient(var(--note-paper), transparent);
+}
+.goal-head .modal-close { top: 0; right: 0; } /* 머리 안에서 제목 줄과 높이를 맞춘다 */
+.goal-compose { margin-bottom: 0; }
 
 .week-patch > :not(.patch-stitch) { position: relative; } /* 점선 위에 버튼이 오게 */
 

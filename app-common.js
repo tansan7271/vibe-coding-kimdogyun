@@ -284,9 +284,9 @@
     const panel = modal.querySelector('.modal-panel');
     const scroll = modal.querySelector('.modal-scroll');
     const H = scroll.clientHeight;
-    const cloneOf = () => { // 지금 화면의 복제본. 아이디가 겹치면 진짜 요소를 못 찾으니 걷어 낸다
+    const cloneOf = () => { // 지금 화면의 복제본. 아이디는 지우지 않는다: #ai-panel 같은 아이디로 거는 CSS가 풀려 서식이 깨진다.
+      // 복제본은 진짜 요소보다 문서 뒤쪽에 있어 getElementById는 늘 진짜를 먼저 찾는다
       const c = scroll.cloneNode(true);
-      c.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
       c.removeAttribute('id');
       c.classList.add('pc-page');
       c.scrollTop = scroll.scrollTop;
