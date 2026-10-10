@@ -55,7 +55,7 @@ const STAGE_STYLE = {
   jiggleCarpetPx: 1.8,         // 예산 초과인 날의 카펫(과 그 위 박스)이 위아래로 떠는 크기(px). 이웃 날짜와 이어진 곡선이 따라서 자연스럽게 이어진다
   jiggleCarpetHz: 6.5,         // 카펫이 떠는 빠르기
   jiggleCarpetFps: 20,         // 카펫 선을 다시 그리는 초당 횟수. 카펫이 떠는 동안 매 프레임 선과 그림자 캔버스를 다시 그리는 비용을 줄인다(박스 떨림은 이 값과 무관하게 부드럽다). 화면 주사율보다 크면 매 프레임 그린다
-  jiggleCarpetScaleMax: 1,     // 카펫이 떠는 동안 카펫 선 캔버스의 화면 배율 상한(1~2). 2로 두면 떠는 동안에도 또렷하지만 캔버스가 4배 커서 무겁다. 떨림이 없는 주는 항상 최대 2배
+  jiggleCarpetScaleMax: 2,     // 카펫이 떠는 동안 카펫 선 캔버스의 화면 배율 상한(1~2). 2는 또렷하고 1은 캔버스가 4배 작아 가볍지만 2배 화면에서 선이 흐려진다. 떨림이 없는 주는 항상 최대 2배
   scrollPauseMs: 150,          // 스크롤이 멈춘 뒤 이만큼 지나야 카펫 떨림을 다시 그린다(ms). 스크롤 중 끊김을 줄인다. 박스 떨림(CSS)은 계속된다
   resizeDebounceMs: 150,       // 창 크기를 바꿀 때 마지막 변화 뒤 이만큼 기다렸다가 한 번만 다시 놓는다(ms)
   rollTuckRatio: 0.4,          // 처음 롤 윗부분이 헤더 뒤로 들어가는 정도(롤 지름의 비율). 클수록 위쪽 여백이 줄어든다. 위쪽 여백 ≈ 롤 지름 × (1 − 이 값)
@@ -470,7 +470,8 @@ const STAGE_STYLE = {
 
   // 지금 세계 상태를 화면에 반영: 카펫 선(처짐)과 박스 위치
   // boxes: 위치를 다시 잡을 박스들(기본은 전부. 떨림 루프는 떠는 박스만 넘긴다)
-  function renderSim(page, now = 0, boxes = page.sim.world.boxes) {
+  // lineOnly: 카펫 선만 다시 그리고 그림자는 그대로 둔다(떨림 루프: 떨림은 작아서 그림자가 따라갈 필요가 없다)
+  function renderSim(page, now = 0, boxes = page.sim.world.boxes, lineOnly = false) {
     const sim = page.sim;
     const { world, els, width } = sim;
     const m = metrics(page, width);
@@ -483,7 +484,7 @@ const STAGE_STYLE = {
     const shape = Carpet.carpetShape({
       loads, capacity: cEff, columns: world.columns, width, baseY: m.groundY, maxSag: m.unit * cEff, flatRatio: G.carpetFlatRatio, curve: 0.5,
     });
-    drawCarpet(page, shape, width, m); // 카펫 선과 그림자를 같은 곡선으로 같은 프레임에 그린다
+    drawCarpet(page, shape, width, m, !lineOnly); // 카펫 선과 그림자를 같은 곡선으로 같은 프레임에 그린다(떨림 루프에서는 선만)
     if (!sim.carpetShown) {
       showShadow(page); // 카펫이 처음 그려질 때 그림자도 같이 서서히 나타난다. 이후로는 숨기지 않고 카펫을 따라 계속 그려진다 // 처음 한 번: 롤이 깔아 둔 직선과 가리개를 걷고 처지는 카펫으로 넘긴다(처음에는 같은 직선이라 티가 안 난다)
       sim.carpetShown = true;
@@ -612,7 +613,7 @@ const STAGE_STYLE = {
 
   // 카펫 선과 그 아래 그림자를 캔버스에 그린다. 선은 화면 배율(최대 2배)로 또렷하게, 그림자는 부드러워 절반 해상도로.
   // 박스가 눌러 처지는 동안과 예산 초과로 떠는 동안에도 같은 곡선으로 같은 프레임에 그려서 그림자가 카펫을 실시간으로 따라간다
-  function drawCarpet(page, shape, width, m) {
+  function drawCarpet(page, shape, width, m, withShadow = true) {
     const k = Math.min(page.sim && page.sim.fidget ? G.jiggleCarpetScaleMax : 2, window.devicePixelRatio || 1); // 떠는 주는 낮은 배율(큰 캔버스를 자주 그리지 않게)
     const el = page.carpetCanvas;
     const resized = sizeCanvas(el, width, m.height, k);
@@ -626,7 +627,7 @@ const STAGE_STYLE = {
     ctx.lineJoin = 'round';
     ctx.strokeStyle = S.lineColor;
     ctx.stroke(new Path2D(shape.linePath));
-    drawShadow(page, shape, width, m);
+    if (withShadow) drawShadow(page, shape, width, m);
   }
 
   // 그림자: 가로 한 줄마다 곡선 바로 아래에서 시작해 아래로 옅어지는 세로 그라데이션을 한 줄씩. 곡선을 따라가고 계단이 없다.
@@ -678,7 +679,7 @@ const STAGE_STYLE = {
   }
 
   // 다 자리를 잡은 뒤에도, 예산 초과인 날이 있으면 떨림을 계속 그린다(물리 계산은 멈춰 있고 그리기만). 탭이 가려지면 브라우저가 알아서 멈춘다
-  // 카펫 선은 jiggleCarpetFps로 줄여 그리고, 떠는 열의 박스 위치만 바꾼다. 슬라이드·끌기·팝업이 떠 있는 동안은 그리지 않고 CSS 박스 떨림도 멈춘다
+  // 카펫 선은 jiggleCarpetFps로 줄여 그리고(그림자는 다시 그리지 않는다), 떠는 열의 박스 위치만 바꾼다. 슬라이드·끌기·팝업이 떠 있는 동안은 그리지 않고 CSS 박스 떨림도 멈춘다
   const openModals = document.getElementsByClassName('modal-backdrop open');
   let lastScrollAt = -Infinity;
   window.addEventListener('scroll', () => { lastScrollAt = performance.now(); }, { passive: true });
@@ -693,7 +694,7 @@ const STAGE_STYLE = {
       const paused = busy || !!drag || openModals.length > 0;
       stage.classList.toggle('cn-paused', paused);
       const scrolling = now - lastScrollAt < G.scrollPauseMs; // 스크롤 중에는 카펫만 멈춘다(CSS 박스 떨림은 그대로)
-      if (!paused && !scrolling && now - lastDraw >= minGap) { lastDraw = now; renderSim(page, now, jigBoxes); }
+      if (!paused && !scrolling && now - lastDraw >= minGap) { lastDraw = now; renderSim(page, now, jigBoxes, true); }
       sim.fidgetRaf = requestAnimationFrame(tick);
     };
     sim.fidgetRaf = requestAnimationFrame(tick);
