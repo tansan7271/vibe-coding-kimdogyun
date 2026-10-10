@@ -188,7 +188,8 @@
     const swapStart = cssMs(reverse ? '--modal-swap-start-close' : '--modal-swap-start'), swap = cssMs(reverse ? '--modal-swap-close' : '--modal-swap');
     const ms = cssMs(reverse ? '--modal-anim-close-ms' : '--modal-anim-ms');
     const timing = { duration: ms, easing: cssVar(reverse ? '--modal-ease-close' : '--modal-ease'), fill: 'both' };
-    const landEase = cssVar('--modal-ease-land');
+    const landEase = cssVar('--modal-ease-land'), settleEase = cssVar('--modal-ease-settle');
+    const bounce = cssMs('--modal-bounce'), bounceAt = cssMs('--modal-bounce-at');
     const closeMid = cssMs('--modal-close-mid');
     // 닫을 때는 키프레임을 직접 뒤집어 앞으로 재생한다. direction: 'reverse'로는 구간마다 다른 곡선을 줄 수 없다.
     // land 표시가 붙은 키프레임에서 시작하는 구간(복제본이 버튼 자리로 내려앉는 마지막 이동)에만 닫을 때 landEase를 건다
@@ -199,7 +200,7 @@
       // 두 구간이 같은 길이면 뒤 구간이 같은 거리를 더 짧게 가서 이음매에서 속도가 튄다
       const at = o => (o <= 0.5 ? o * closeMid / 0.5 : closeMid + (o - 0.5) * (1 - closeMid) / 0.5);
       const out = reverse ? f.map(k => ({ ...k, offset: at(1 - k.offset) })).reverse() : f;
-      return out.map(({ land, ...k }) => (reverse && land ? { ...k, easing: landEase } : k));
+      return out.map(({ land, settle, ...k }) => (reverse && land ? { ...k, easing: landEase } : reverse && settle ? { ...k, easing: settleEase } : k));
     };
 
     // 앞면: 버튼 복제본. 버튼 크기 그대로 두고 변환만 준다
@@ -228,6 +229,9 @@
         { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 0, offset: 0 },
         { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 0, offset: swapStart },
         { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 1, offset: swap }, // 교차하는 동안은 원본 위에 가만히 있어서 글자가 두 겹으로 보이지 않는다
+        // 닫을 때만: 버튼 자리를 bounce만큼 지나쳐 눌렸다가(여기까지 landEase) 부드럽게 제자리로 올라온다(settle 구간 settleEase).
+        // 지나친 지점 = 도착 자리 + bounce × (도착 자리 − 중간 지점)
+        ...(reverse && bounce > 0 ? [{ transform: tf(-bounce * dx / 2, -bounce * dy / 2, tilt * (1 + bounce / 2), 1 - bounce * (kx - 1) / 2, 1 - bounce * (ky - 1) / 2, -bounce * half), opacity: 1, offset: swap + (0.5 - swap) * (1 - bounceAt), settle: true }] : []),
         { transform: tf(dx / 2, dy / 2, tilt / 2, (1 + kx) / 2, (1 + ky) / 2, half), opacity: 1, offset: 0.5, land: true },
         { transform: tf(dx / 2, dy / 2, tilt / 2, (1 + kx) / 2, (1 + ky) / 2, half), opacity: 0, offset: 0.5001 },
         { transform: tf(dx, dy, 0, kx, ky, half), opacity: 0, offset: 1 },
