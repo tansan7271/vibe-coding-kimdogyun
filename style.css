@@ -334,7 +334,7 @@ main {
   flex-direction: column;
   width: 100%;
   max-width: var(--modal-max-width);
-  max-height: 100%;
+  height: 100%; /* 내용이 적어도 화면 위아래 여백(--modal-gap)만 남기고 꽉 채운다. 탭을 바꿔도 팝업 크기가 변하지 않는다 */
   border-radius: var(--modal-radius);
   box-shadow: 0 3px 0 #eadfce, 0 6px 0 #dccfba, 0 10px 40px rgba(0, 0, 0, 0.35); /* 아래로 겹친 종이 두 장(뒷 페이지가 있는 느낌) + 그림자. 아래쪽 '일정과 설정' 버튼과 같다 */
 }
