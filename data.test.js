@@ -37,7 +37,7 @@ test('가져올 때 파일 안의 apiKey는 무시한다 (옛 파일 대비)', (
 test('빠진 설정은 기본값으로 채운다', () => {
   const o = full();
   delete o.settings;
-  assert.deepEqual(parse(o).state.settings, { capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 4, placeMode: 'fill' });
+  assert.deepEqual(parse(o).state.settings, { capacity: 15, safeRatio: 0.8, sleepHours: 8, lifeHours: 4, placeMode: 'fill' });
   const p = mod(x => { x.settings = { capacity: 5 }; });
   assert.equal(parse(p).state.settings.safeRatio, 0.8);
 });

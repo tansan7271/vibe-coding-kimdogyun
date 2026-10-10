@@ -7,7 +7,7 @@
   }
 })(typeof self !== 'undefined' ? self : this, function () {
 
-  const DEFAULT_SETTINGS = { capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 4, placeMode: 'fill' };
+  const DEFAULT_SETTINGS = { capacity: 15, safeRatio: 0.8, sleepHours: 8, lifeHours: 4, placeMode: 'fill' };
 
   function isPlainObject(v) {
     return v !== null && typeof v === 'object' && !Array.isArray(v);

@@ -49,7 +49,7 @@
       steps: [],
       events: [],
       settings: {
-        capacity: 10,
+        capacity: 15,
         safeRatio: 0.8,
         sleepHours: 8,
         lifeHours: 4,

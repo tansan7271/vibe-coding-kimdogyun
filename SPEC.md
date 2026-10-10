@@ -43,7 +43,7 @@
 - 부하 수준: 1 가벼움 · 2 조금 가벼움 · 3 보통 · 4 조금 무거움 · 5 무거움
     - 기본 UI는 1·3·5 세 개를 메인으로 보여주고, 애매한 부분을 위해 2·4를 뿌려둔다.
 - 일정(수업 등)도 부하를 갖는다. 기본 3. 3시간 실험은 5, 1시간 교양은 1처럼 사용자가 정한다
-- 하루 예산: 기본 10. 사용자가 바꿀 수 있다
+- 하루 예산: 기본 15. 사용자가 바꿀 수 있다
 - 안전선: 예산의 80%. 사용자가 바꿀 수 있다
 - 하루 부하 = 그날 일정 부하 합 + 그날에 속한 중간 단계 부하 합 ("그날에 속한"의 정의는 6장)
 - 여유 = 예산 − 하루 부하. 음수면 초과
@@ -147,7 +147,7 @@ Step     { id, goalId, title, load: 1..5, minutes: 60, order,
 Event    { id, title, load: 1..5, weekday?: 0..6, date?: "YYYY-MM-DD",
            start: "HH:MM", end: "HH:MM",
            repeat: "none"|"weekly", repeatUntil?: "YYYY-MM-DD" }
-Settings { capacity: 10, safeRatio: 0.8, sleepHours: 8, lifeHours: 4,
+Settings { capacity: 15, safeRatio: 0.8, sleepHours: 8, lifeHours: 4,
            placeMode: "fill"|"even" }
 ```
 
