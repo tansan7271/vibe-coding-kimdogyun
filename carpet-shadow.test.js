@@ -1,59 +1,53 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const Carpet = require('./carpet.js');
-const { bandShape } = require('./carpet-shadow.js');
+const { curveYs, falloffStops } = require('./carpet-shadow.js');
 
-const columns = Array.from({ length: 7 }, (_, i) => ({ left: i * 100, right: (i + 1) * 100 }));
-const shapeOf = loads => Carpet.carpetShape({ loads, capacity: 15, columns, width: 700, baseY: 40, maxSag: 300 });
-const make = (loads, extra = {}) => { const s = shapeOf(loads); return { s, b: bandShape({ points: s.points, linePath: s.linePath, width: 700, bottomY: 500, fadeLength: 160, alpha: 0.22, ...extra }) }; };
+const near = (a, b, eps = 0.01) => assert.ok(Math.abs(a - b) < eps, `${a} vs ${b}`);
 
-test('곡선 아래 영역은 곡선으로 시작해 오른쪽 아래, 왼쪽 아래를 지나 닫힌다', () => {
-  const { s, b } = make([3, 8, 12, 5, 0, 15, 9]);
-  assert.ok(b.clipD.startsWith(s.linePath));
-  assert.ok(b.clipD.endsWith('L 700 500 L 0 500 Z'));
+test('직선 조각은 그 구간의 높이를 그대로 돌려준다', () => {
+  const ys = curveYs({ linePath: 'M 0 10 L 20 10', width: 20, step: 5 });
+  assert.deepEqual(ys, [10, 10, 10, 10, 10]);
 });
 
-test('곡선 위쪽 영역은 곡선으로 시작해 가장 높은 곳보다 위에서 닫힌다', () => {
-  const { s, b } = make([3, 8, 12, 5, 0, 15, 9]);
-  assert.ok(b.aboveD.startsWith(s.linePath));
-  assert.ok(b.aboveD.endsWith('L 700 30 L 0 30 Z')); // 가장 높은 곳(양 끝 baseY 40)보다 10 위
-  assert.equal(b.top, 40);
+test('S자 곡선은 양 끝 높이에서 시작해 끝나고 가운데는 중간 높이다', () => {
+  const ys = curveYs({ linePath: 'M 0 10 C 5 10 5 20 10 20', width: 10, step: 5 });
+  near(ys[0], 10);
+  near(ys[1], 15); // 대칭이라 정확히 가운데
+  near(ys[2], 20);
 });
 
-test('사본은 곡선에서 fadeLength까지 고르게 아래로 옮긴다', () => {
-  const { b } = make([5, 5, 5, 5, 5, 5, 5], { layers: 4 });
-  assert.deepEqual(b.shifts, [40, 80, 120, 160]);
+test('S자 곡선 뒤에 이어진 직선(평평한 바닥)도 이어서 잰다', () => {
+  const ys = curveYs({ linePath: 'M 0 10 C 5 10 5 20 10 20 L 20 20', width: 20, step: 5 });
+  near(ys[0], 10); near(ys[1], 15); near(ys[2], 20); near(ys[3], 20); near(ys[4], 20);
 });
 
-test('겹쳐 칠한 곡선 바로 아래의 불투명도가 alpha와 같다', () => {
-  for (const layers of [1, 6, 18, 40]) {
-    const { b } = make([5, 5, 5, 5, 5, 5, 5], { layers });
-    const total = 1 - Math.pow(1 - b.layerAlpha, b.shifts.length); // 사본을 전부 겹친 불투명도
-    assert.ok(Math.abs(total - 0.22) < 0.001, `layers ${layers}: ${total}`);
-  }
+test('실제 카펫 곡선: 양 끝은 baseY, 부하 0인 날은 baseY, 예산만큼 찬 날 바닥은 baseY+maxSag', () => {
+  const columns = Array.from({ length: 7 }, (_, i) => ({ left: i * 100, right: (i + 1) * 100 }));
+  const s = Carpet.carpetShape({ loads: [0, 15, 0, 15, 0, 7.5, 0], capacity: 15, columns, width: 700, baseY: 40, maxSag: 300 });
+  const ys = curveYs({ linePath: s.linePath, width: 700, step: 2 });
+  assert.equal(ys.length, 351);
+  near(ys[0], 40); near(ys[350], 40);
+  near(ys[Math.round(150 / 2)], 340);   // 둘째 칸 가운데(예산만큼 참)
+  near(ys[Math.round(50 / 2)], 40);     // 첫째 칸 가운데(부하 0)
+  near(ys[Math.round(550 / 2)], 190);   // 여섯째 칸 가운데(절반)
+  for (const y of ys) assert.ok(y >= 39.99 && y <= 340.01); // 곡선 밖으로 튀지 않는다
 });
 
-test('깊이가 깊어질수록 겹치는 사본이 줄어 옅어진다', () => {
-  const { b } = make([5, 5, 5, 5, 5, 5, 5], { layers: 10 });
-  const coverAt = t => b.shifts.filter(sh => sh >= t).length; // 깊이 t에서 칠해지는 사본 수
-  assert.ok(coverAt(1) > coverAt(80));
-  assert.ok(coverAt(80) > coverAt(150));
-  assert.equal(coverAt(161), 0); // fadeLength보다 깊으면 칠해지지 않는다
+test('가로 범위가 간격으로 나누어떨어지지 않아도 마지막은 오른쪽 끝에서 잰다', () => {
+  const ys = curveYs({ linePath: 'M 0 0 L 10 10', width: 10, step: 4 });
+  assert.equal(ys.length, 4); // x = 0, 4, 8, 10
+  near(ys[3], 10);
 });
 
-test('맨 아래가 가장 깊은 카펫보다 위면 그 깊이까지 늘린다', () => {
-  const s = shapeOf([30, 30, 30, 30, 30, 30, 30]);
-  const deepest = Math.max(...s.points.map(p => p.y));
-  const b = bandShape({ points: s.points, linePath: s.linePath, width: 700, bottomY: 50, fadeLength: 160, alpha: 0.2 });
-  assert.equal(b.bottom, deepest);
-  assert.ok(b.clipD.endsWith(`L 700 ${deepest} L 0 ${deepest} Z`));
+test('감쇠 곡선: 맨 위가 alpha, 맨 아래가 0이고 아래로 갈수록 줄기만 한다', () => {
+  const st = falloffStops(0.22);
+  assert.deepEqual(st[0], [0, 0.22]);
+  assert.deepEqual(st[st.length - 1], [1, 0]);
+  for (let i = 1; i < st.length; i++) { assert.ok(st[i][0] > st[i - 1][0]); assert.ok(st[i][1] <= st[i - 1][1]); }
 });
 
-test('불투명도는 0~1로 자르고, fadeLength 0이면 모든 사본의 이동이 0이다', () => {
-  const { b: hi } = make([5, 5, 5, 5, 5, 5, 5], { alpha: 3 });
-  assert.ok(hi.layerAlpha > 0 && hi.layerAlpha <= 1);
-  const { b: lo } = make([5, 5, 5, 5, 5, 5, 5], { alpha: -1 });
-  assert.equal(lo.layerAlpha, 0);
-  const { b: zero } = make([5, 5, 5, 5, 5, 5, 5], { fadeLength: 0, layers: 3 });
-  assert.deepEqual(zero.shifts, [0, 0, 0]);
+test('감쇠 곡선의 불투명도는 0~1로 자른다', () => {
+  assert.equal(falloffStops(3)[0][1], 1);
+  assert.equal(falloffStops(-1)[0][1], 0);
 });

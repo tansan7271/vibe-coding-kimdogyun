@@ -250,7 +250,7 @@ const STAGE_STYLE = {
     // 움직이는 것은 층을 따로 둬서, 박스 하나가 움직일 때 눈금 점선이나 다른 박스까지 다시 그려지지 않게 한다(Safari 렉 방지).
     el.innerHTML = '<svg class="cn-grid" aria-hidden="true"><g class="grid"></g></svg>'
       + (intro ? '<div class="cn-cover"></div><div class="cn-laid"></div>' : '')
-      + '<svg class="cn-shadow" aria-hidden="true"></svg>'
+      + '<canvas class="cn-shadow" aria-hidden="true"></canvas>'
       + '<svg class="cn-carpet" aria-hidden="true"><path/></svg>'
       + '<div class="cn-boxes"></div><div class="cn-seals"></div>'
       + (intro ? '<svg class="cn-roll" aria-hidden="true"><path/></svg>' : '');
@@ -574,15 +574,14 @@ const STAGE_STYLE = {
     rgb: '0,0,0',        // 그림자 색(처음엔 검정)
     alpha: 0.22,         // 카펫 곡선 바로 아래의 진하기(0~1). 아래로 갈수록 곡선을 따라 옅어진다
     fadeLength: 160,     // 곡선에서 완전히 투명해지기까지의 깊이(px)
-    layers: 18,          // 곡선을 아래로 옮겨 겹치는 사본 수. 많을수록 그라데이션이 곱지만 그리는 도형이 늘어난다
+    resolution: 0.5,     // 그림자를 그리는 해상도(1이면 화면 픽셀 그대로). 부드러운 그림자라 절반으로 그려도 티가 나지 않고 메모리를 아낀다
     fadeInMs: 600,       // 정착한 뒤 나타나는 시간(ms)
     fadeInDelayMs: 120,  // 정착한 뒤 나타나기 시작하기까지 기다리는 시간(ms)
     fadeOutMs: 200,      // 바뀌기 시작할 때 사라지는 시간(ms)
   };
 
-  let shadowSeq = 0; // 페이지마다 clipPath id가 겹치지 않게
-
-  // 정착한 카펫 모양으로 그림자를 만들고 서서히 나타나게 한다. 카펫이 떠는(jiggle) 값은 넣지 않아 그림자는 움직임에 영향을 받지 않는다
+  // 정착한 카펫 모양으로 그림자를 만들고 서서히 나타나게 한다. 카펫이 떠는(jiggle) 값은 넣지 않아 그림자는 움직임에 영향을 받지 않는다.
+  // 그림자는 캔버스 한 장에 한 번만 그린다: 가로 한 칸마다 곡선 바로 아래에서 시작해 아래로 옅어지는 세로 그라데이션을 한 줄씩. 곡선을 따라가고 계단이 없다
   function showShadow(page) {
     const sim = page.sim;
     if (!sim || !page.shadowEl) return;
@@ -593,18 +592,26 @@ const STAGE_STYLE = {
     const shape = Carpet.carpetShape({
       loads, capacity: cEff, columns: world.columns, width, baseY: m.groundY, maxSag: m.unit * cEff, flatRatio: G.carpetFlatRatio, curve: 0.5,
     });
-    const band = CarpetShadow.bandShape({ points: shape.points, linePath: shape.linePath, width, bottomY: m.height, fadeLength: SHADOW_STYLE.fadeLength, alpha: SHADOW_STYLE.alpha, layers: SHADOW_STYLE.layers });
     const el = page.shadowEl;
-    const key = `${band.clipD}|${width}|${m.height}`;
-    if (page.shadowKey !== key) { // 모양이 달라졌을 때만 다시 만든다(안 보이는 동안). 곡선 아래 영역으로 자른 안에서, 곡선 위쪽 영역 사본을 아래로 조금씩 옮겨 겹친다
+    const key = `${shape.linePath}|${width}|${m.height}`;
+    if (page.shadowKey !== key) { // 모양이 달라졌을 때만 다시 그린다(안 보이는 동안)
       page.shadowKey = key;
-      page.shadowId = page.shadowId || `cn-shadow-${(shadowSeq += 1)}`;
-      el.setAttribute('width', width);
-      el.setAttribute('height', m.height);
-      el.innerHTML = `<defs><clipPath id="${page.shadowId}"><path d="${band.clipD}"/></clipPath></defs>`
-        + `<g clip-path="url(#${page.shadowId})" fill="rgb(${SHADOW_STYLE.rgb})" fill-opacity="${band.layerAlpha}">`
-        + band.shifts.map(dy => `<path d="${band.aboveD}" transform="translate(0 ${dy})"/>`).join('')
-        + '</g>';
+      const k = SHADOW_STYLE.resolution;
+      el.width = Math.ceil(width * k);
+      el.height = Math.ceil(m.height * k);
+      el.style.width = `${width}px`;
+      el.style.height = `${m.height}px`;
+      const ctx = el.getContext('2d');
+      const fade = SHADOW_STYLE.fadeLength;
+      const grad = ctx.createLinearGradient(0, 0, 0, fade); // 곡선 높이를 0으로 둔 그라데이션 하나를 줄마다 옮겨 재사용한다
+      CarpetShadow.falloffStops(SHADOW_STYLE.alpha).forEach(([t, a]) => grad.addColorStop(t, `rgba(${SHADOW_STYLE.rgb},${a})`));
+      ctx.fillStyle = grad;
+      const step = 1 / k; // 가로로 한 줄 폭(화면 픽셀). 해상도 절반이면 2px
+      const ys = CarpetShadow.curveYs({ linePath: shape.linePath, width, step });
+      ys.forEach((y, i) => {
+        ctx.setTransform(k, 0, 0, k, 0, y * k); // 이 줄의 곡선 높이가 그라데이션의 맨 위
+        ctx.fillRect(i * step, 0, step, fade); // 줄 폭이 캔버스 픽셀의 정수배라 줄 사이에 틈도 겹침도 없다(겹치면 줄 경계에 세로 줄무늬가 진해진다)
+      });
     }
     const still = reduceMotion();
     el.style.transition = still ? 'none' : `opacity ${SHADOW_STYLE.fadeInMs}ms ease ${SHADOW_STYLE.fadeInDelayMs}ms`;
