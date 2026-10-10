@@ -382,6 +382,16 @@
 const demoToggleBtn = document.getElementById('demo-toggle-btn');
 demoToggleBtn.textContent = demoOn ? '데모 모드 끄기 (내 데이터로 돌아가기)' : '데모 모드 켜기';
 
+// 데모 데이터 초기화: 데모를 보는 동안에만 보인다. 어지럽혀 둔 데모 데이터를 버리고 예시 처음 상태로 되돌린다. 내 데이터는 건드리지 않는다
+const demoResetBtn = document.getElementById('demo-reset-btn');
+demoResetBtn.hidden = !demoOn;
+demoResetBtn.addEventListener('click', () => {
+  if (!demoOn) return;
+  if (!confirm('데모 데이터를 처음 예시 상태로 되돌립니다. 데모에서 고친 내용은 사라지고, 내 데이터는 그대로입니다. 페이지를 다시 불러옵니다.')) return;
+  localStorage.removeItem(DEMO_STORAGE_KEY); // 저장 공간이 비면 다음에 읽을 때 예시 데이터에서 새로 시작한다
+  location.reload();
+});
+
 demoToggleBtn.addEventListener('click', () => {
   if (demoOn) {
     localStorage.removeItem(DEMO_FLAG_KEY);
