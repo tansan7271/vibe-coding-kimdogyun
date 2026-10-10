@@ -725,7 +725,7 @@ const STAGE_STYLE = {
   function focusHtml(item) {
     const icon = name => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${BoxIcons.paths[name]}"/></svg>`;
     const metric = (name, text) => `<span class="m">${icon(name)}<b>${text}</b></span>`;
-    const button = (action, label, accent) => `<button type="button" class="sbtn${accent ? ' sbtn-accent' : ''}" data-focus-action="${action}"><svg class="btn-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="4"/></svg><span>${label}</span></button>`;
+    const button = (action, label, accent) => `<button type="button" class="sbtn${accent ? ' sbtn-accent' : ''}" data-focus-action="${action}"><span>${label}</span></button>`; // 점선 없이 글자만, 오른쪽에 붙는다
     let sub = '', actions = '';
     if (item.kind === 'fixed') {
       const ev = state.events.find(e => e.id === item.eventId);
