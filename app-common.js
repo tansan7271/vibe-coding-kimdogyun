@@ -35,7 +35,12 @@
     });
   })();
 
-  const STORAGE_KEY = 'radcarpet-data';
+  // 데모 모드: 켜면 내 데이터(radcarpet-data)는 건드리지 않고 별도 저장 공간(radcarpet-demo-data)의 예시 데이터를 보여 준다.
+  // 켜고 끄는 일은 설정 화면에서 하고, 바꾼 뒤에는 페이지를 다시 불러온다
+  const DEMO_FLAG_KEY = 'radcarpet-demo-on';
+  const DEMO_STORAGE_KEY = 'radcarpet-demo-data';
+  const demoOn = localStorage.getItem(DEMO_FLAG_KEY) === '1' && typeof DEMO_DATA !== 'undefined';
+  const STORAGE_KEY = demoOn ? DEMO_STORAGE_KEY : 'radcarpet-data';
 
   function defaultState() {
     return {
@@ -55,7 +60,7 @@
 
   function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState();
+    if (!raw) return demoOn ? JSON.parse(JSON.stringify(DEMO_DATA)) : defaultState(); // 데모는 처음 켤 때 예시 데이터에서 시작한다
     try {
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || !parsed.version) return defaultState();
@@ -70,6 +75,13 @@
   }
 
   const state = loadState();
+
+  if (demoOn) { // 지금 보는 것이 내 데이터가 아님을 늘 알린다
+    const badge = document.createElement('div');
+    badge.className = 'demo-badge';
+    badge.textContent = '데모 모드 · 내 데이터 아님';
+    document.body.appendChild(badge);
+  }
 
   // 이전 버전이 localStorage에 남긴 API 키는 앱을 열 때 지운다 (SPEC 9장: 키는 저장하지 않는다)
   if (state.settings && 'apiKey' in state.settings) {

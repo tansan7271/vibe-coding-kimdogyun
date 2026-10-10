@@ -962,3 +962,18 @@ html.carpet-next-on #screen-carpet { display: none; }
 html.carpet-next-on #carpet-next { display: block; min-height: 60vh; color: #999; font-size: 14px; }
 .carpet-intro { display: block; width: calc(100% + 32px); margin: 0 -16px; overflow: visible; } /* 롤과 카펫은 화면 너비 끝까지. main의 좌우 여백 16px을 되돌린다 */
 .carpet-next-note { margin: 0; }
+
+/* 데모 모드 표시: 내 데이터가 아니라 예시 데이터를 보고 있다는 알림. 아래쪽 버튼 묶음 왼쪽 구석, 팝업(200)보다 아래 */
+.demo-badge {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: var(--dock-z);
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: #3a2f2a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+  pointer-events: none;
+}

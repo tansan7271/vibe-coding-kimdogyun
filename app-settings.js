@@ -305,3 +305,20 @@
     renderCarpet();
     setDataMessage(`가져왔습니다: 할 일 ${state.goals.length}개, 단계 ${state.steps.length}개, 일정 ${state.events.length}개`, false);
   });
+
+// ---- 테스트 데모 켜기/끄기: 저장 공간을 바꾸므로 페이지를 다시 불러와 처음부터 읽는다 ----
+
+const demoToggleBtn = document.getElementById('demo-toggle-btn');
+demoToggleBtn.textContent = demoOn ? '데모 모드 끄기 (내 데이터로 돌아가기)' : '데모 모드 켜기';
+
+demoToggleBtn.addEventListener('click', () => {
+  if (demoOn) {
+    localStorage.removeItem(DEMO_FLAG_KEY);
+    localStorage.removeItem(DEMO_STORAGE_KEY); // 데모에서 고친 내용은 버린다
+  } else {
+    if (!confirm('데모 모드를 켭니다. 내 데이터는 그대로 보관됩니다. 페이지를 다시 불러옵니다.')) return;
+    localStorage.removeItem(DEMO_STORAGE_KEY); // 켤 때마다 예시 데이터에서 새로 시작한다
+    localStorage.setItem(DEMO_FLAG_KEY, '1');
+  }
+  location.reload();
+});

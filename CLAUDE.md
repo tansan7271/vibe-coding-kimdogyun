@@ -59,6 +59,7 @@ app-goals.js     할 일 화면, AI "텍스트로 만들기"
 app-settings.js  일정과 설정 화면, 데이터 내보내기/가져오기
 app-carpet.js    카펫 화면, 단계 드래그 고정, CARPET_STYLE. 처음 그리는 쪽이라 마지막에 읽는다
 app-carpet-next.js 새 카펫 화면(작업 중). ?carpet=next 로 열 때만 켜진다. 이관 체크리스트가 맨 위에 있고, 다 채우면 옛 app-carpet.js를 지우고 이름을 되돌린다
+demo-data.js     테스트 데모 모드의 예시 데이터(모두 허구, 올해 9~11월). 읽는 순서상 app-common보다 앞
 placement.js     배치 규칙 (순수 함수, 테스트 있음)
 carpet.js        카펫 모양 계산 (순수 함수, 테스트 있음)
 carpet-roll.js   첫 입장 롤 펼침 계산: 나선 롤의 굴림·크기, 진행도 (순수 함수, 테스트 있음)
