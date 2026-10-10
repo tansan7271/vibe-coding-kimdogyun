@@ -52,7 +52,8 @@
     /* 아래쪽 버튼: 스프링 메모장(할 일)과 일마다 찢는 달력(일정과 설정). 크기·기울기·색은 여기서 바꾼다.
        화면 아래로 일부러 잘려 나가고, 두 버튼이 서로 겹친다 */
     --dock-bottom: -30px;        /* 화면 아래에서 띄우는 거리. 음수면 그만큼 화면 밖으로 잘려 나간다 */
-    --dock-gap: 8px;             /* 두 버튼 사이 간격. 음수로 줄이면 더 겹친다 */
+    --dock-gap: -40px;           /* 두 버튼 사이 간격. 음수면 할 일이 일정과 설정 위에 포개진다 */
+    --dock-label-zone: 0.6667;   /* 글자가 놓이는 영역: 화면에 보이는 높이의 이만큼(위에서부터) 안에 둔다 */
     --dock-z: 150;               /* 본문 위, 팝업(200) 아래 */
     --dock-shadow: 0 8px 16px rgba(0, 0, 0, 0.18); /* 두 버튼 공통 그림자. 연한 회색 */
     --note-w: 334px;             /* 메모장 크기. 자주 쓰는 버튼이라 달력보다 크게 */
@@ -61,8 +62,8 @@
     --note-paper: #fffbea;       /* 메모지 색 */
     --note-ink: #3a2f2a;         /* 글자 색 */
     --note-font: 34px;
-    --spring-pitch: 28px;        /* 스프링 알약 사이 간격(가로) */
-    --spring-h: 30px;            /* 스프링 알약 길이. 절반이 메모지 위로 튀어나온다 */
+    --spring-pitch: 16px;        /* 스프링 알약 사이 간격(가로). 끝이 잘리지 않게 실제로는 칸 수가 맞게 살짝 늘어난다 */
+    --spring-h: 22px;            /* 스프링 알약 길이. 절반이 메모지 위로 튀어나온다 */
     --cal-w: 224px;              /* 달력 크기 */
     --cal-h: 138px;
     --cal-tilt: 2.5deg;          /* 달력 기울기. 양수는 시계 방향 */
@@ -70,6 +71,7 @@
     --cal-band: #b8203a;         /* 달력 윗줄 색 */
     --cal-band-h: 30px;          /* 달력 윗줄 높이 */
     --cal-font: 24px;
+    --cal-band-shadow: 0 3px 5px rgba(0, 0, 0, 0.3); /* 달력 붉은 윗줄 그림자 */
 
     /* 팝업(할 일, 일정과 설정) 모양 값 */
     --modal-dim: rgba(30, 20, 20, 0.45); /* 뒤 화면을 덮는 어두운 막 */
@@ -152,6 +154,7 @@
     transform: rotate(var(--note-tilt));
     background: var(--note-paper);
     box-shadow: var(--dock-shadow);
+    z-index: 1; /* 달력 위로 포갠다 */
   }
 
   .dock-note::before { /* 스프링: 세로로 선 알약을 가로로 늘어놓는다 */
@@ -161,7 +164,7 @@
     left: 20px;
     right: 20px;
     height: var(--spring-h);
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='30' viewBox='0 0 28 30'%3E%3Crect x='9' y='0' width='10' height='30' rx='5' fill='%23666'/%3E%3C/svg%3E") left top / var(--spring-pitch) var(--spring-h) repeat-x;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='22' viewBox='0 0 16 22'%3E%3Crect x='5' y='0' width='6' height='22' rx='3' fill='%23666'/%3E%3C/svg%3E") left top / var(--spring-pitch) var(--spring-h) round no-repeat;
   }
 
   /* 일정과 설정: 일마다 찢는 달력 */
@@ -188,24 +191,20 @@
       radial-gradient(circle at 22% 50%, var(--cal-paper) 0 calc(var(--cal-band-h) * 0.15), transparent calc(var(--cal-band-h) * 0.15 + 0.5px)),
       radial-gradient(circle at 78% 50%, var(--cal-paper) 0 calc(var(--cal-band-h) * 0.15), transparent calc(var(--cal-band-h) * 0.15 + 0.5px)),
       var(--cal-band);
+    box-shadow: var(--cal-band-shadow);
   }
 
-  .dock-cal::after { /* 찢는 선 */
-    content: '';
-    position: absolute;
-    top: var(--cal-band-h);
-    left: 0;
-    right: 0;
-    border-top: 1px solid #d4c6aa;
-  }
 
   .dock-note span, .dock-cal span {
     position: relative; /* 장식 위에 글자가 오게 */
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
   }
+
+  /* 아래가 화면 밖으로 잘려 나가므로, 보이는 높이의 위쪽 2/3 안에 글자를 놓는다 */
+  .dock-note span { height: calc((var(--note-h) + var(--dock-bottom)) * var(--dock-label-zone) - var(--spring-h) / 2); }
+  .dock-cal span { height: calc((var(--cal-h) + var(--dock-bottom)) * var(--dock-label-zone) - var(--cal-band-h)); }
 
   .logo-link {
     border: none;
