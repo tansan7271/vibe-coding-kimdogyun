@@ -153,7 +153,7 @@
   // 열고 닫는 연출: 아래쪽 버튼이 그 자리에서 180도 뒤집혀(앞면 = 버튼, 뒷면 = 팝업) 팝업이 된다. 닫을 때는 거꾸로 줄어들며 버튼 자리에 맞춰 들어간다.
   // 팝업은 늘 최종 크기로 두고 transform(이동·기울기·확대·회전)만 움직인다. 크기를 실제로 바꾸면 줄바꿈이 다시 계산되기 때문이다.
   // 늘어나며 생기는 찌그러짐은 옆면(90도)일 때 가장 커서 거의 안 보이고, 그 순간 앞면(버튼 복제본)과 뒷면(팝업)이 서로 바뀐다.
-  // 열 때: 복제본이 원본 버튼 위에 서서히 나타나 덮은 뒤 원본이 빠진다. 닫을 때: 원본이 먼저 켜지고 그 위의 복제본이 서서히 사라진다.
+  // 열 때: 복제본이 원본 버튼 위에 서서히 나타나 덮은 뒤 원본이 빠진다(시작 직후는 잠깐 가만히 둔다). 닫을 때: 원본이 먼저 켜지고 그 위의 복제본이 서서히 사라진다.
   // 모양 값은 style.css 맨 위 --modal-*
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let modalBusy = false; // 연출이 도는 동안은 열기·닫기를 받지 않는다
@@ -184,7 +184,7 @@
     const persp = cssVar('--modal-perspective');
     const half = parseFloat(cssVar('--modal-flip-deg')) / 2; // 앞면이 이만큼 돌아 옆면이 되고, 거기서 뒷면이 이어받는다
     const delay = cssMs('--modal-content-delay');
-    const swap = cssMs('--modal-swap'); // 원본 버튼과 복제본이 서로 바뀌는 데 쓰는 시간 비율(0~1)
+    const swapStart = cssMs('--modal-swap-start'), swap = cssMs('--modal-swap'); // 원본 버튼과 복제본이 서로 바뀌는 구간(시간 비율 0~1)
     const dir = reverse ? 'reverse' : 'normal';
     const timing = { duration: cssMs('--modal-anim-ms'), easing: cssVar('--modal-ease'), direction: dir, fill: 'both' };
 
@@ -208,11 +208,12 @@
       modal.animate([
         { backgroundColor: bg.replace(/[\d.]+\)$/, '0)'), backdropFilter: 'blur(0px)', webkitBackdropFilter: 'blur(0px)' },
         { backgroundColor: bg, backdropFilter: `blur(${blur})`, webkitBackdropFilter: `blur(${blur})` },
-      ], { duration: cssMs('--modal-fade-ms'), easing: 'ease', direction: dir, fill: 'both' }),
+      ], { duration: cssMs('--modal-anim-ms') * cssMs('--modal-fade-ratio'), easing: 'ease-in-out', direction: dir, fill: 'both' }),
       // 앞면(버튼 복제본): 서서히 나타나 원본을 덮고, 팝업 쪽으로 이동하며 늘어나 옆면까지 돈 뒤 사라진다
       front.animate([
         { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 0, offset: 0 },
-        { transform: tf(dx * swap, dy * swap, tilt * (1 - swap), 1 + (kx - 1) * swap, 1 + (ky - 1) * swap, half * swap * 2), opacity: 1, offset: swap },
+        { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 0, offset: swapStart },
+        { transform: tf(0, 0, tilt, 1, 1, 0), opacity: 1, offset: swap }, // 교차하는 동안은 원본 위에 가만히 있어서 글자가 두 겹으로 보이지 않는다
         { transform: tf(dx / 2, dy / 2, tilt / 2, (1 + kx) / 2, (1 + ky) / 2, half), opacity: 1, offset: 0.5 },
         { transform: tf(dx / 2, dy / 2, tilt / 2, (1 + kx) / 2, (1 + ky) / 2, half), opacity: 0, offset: 0.5001 },
         { transform: tf(dx, dy, 0, kx, ky, half), opacity: 0, offset: 1 },
