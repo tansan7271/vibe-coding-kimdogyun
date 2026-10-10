@@ -240,6 +240,18 @@
     return steps.map(s => results.get(s.id));
   }
 
+  /**
+   * 주차 표시용 번호. weekStartStr는 월요일 시작 주의 첫 날. 그 주의 목요일이 속한 해·달을 그 주의 해·달로 본다(ISO 8601 주차와 같다).
+   * yearWeek: 그 해의 몇 번째 주, monthWeek: 그 달의 몇 번째 주(목요일이 그 달의 1~7일이면 1주차)
+   * @returns {{year:number, yearWeek:number, month:number, monthWeek:number}}
+   */
+  function weekNumbers(weekStartStr) {
+    const thu = addDays(weekStartStr, 3);
+    const { y, m, d } = parseDate(thu);
+    const dayOfYear = Math.round((dateToUTCms(thu) - Date.UTC(y, 0, 1)) / 86400000) + 1;
+    return { year: y, yearWeek: Math.ceil(dayOfYear / 7), month: m, monthWeek: Math.ceil(d / 7) };
+  }
+
   // 월요일 시작 주의 첫 날
   function weekStart(dateStr) {
     return addDays(dateStr, -weekdayOf(dateStr));
@@ -340,6 +352,7 @@
     autoPush,
     dayStats,
     weekStart,
+    weekNumbers,
     canDropPin,
     addDays,
     weekdayOf,

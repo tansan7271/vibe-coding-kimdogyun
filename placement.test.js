@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { autoPush, placeSteps, dayStats, weekStart, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange, canDropPin, isGoalDone, isEventOver } = require('./placement.js');
+const { autoPush, placeSteps, dayStats, weekStart, weekNumbers, addDays, weekdayOf, eventsOnDate, nextWeekday, dateRange, canDropPin, isGoalDone, isEventOver } = require('./placement.js');
 
 const defaultSettings = {
   capacity: 10,
@@ -492,5 +492,29 @@ test('isEventOver: 반복 일정은 반복 종료일이 지났을 때만. 종료
     assert.equal(isEventOver({ repeat, date: '2026-01-01', repeatUntil: '2026-10-09' }, '2026-10-10'), true);
     assert.equal(isEventOver({ repeat, date: '2026-01-01', repeatUntil: '2026-10-10' }, '2026-10-10'), false);
     assert.equal(isEventOver({ repeat, date: '2026-01-01' }, '2026-10-10'), false);
+  }
+});
+
+test('weekNumbers: 목요일이 속한 해·달 기준의 몇 주차', () => {
+  assert.deepEqual(weekNumbers('2026-10-05'), { year: 2026, yearWeek: 41, month: 10, monthWeek: 2 });
+  assert.deepEqual(weekNumbers('2026-09-28'), { year: 2026, yearWeek: 40, month: 10, monthWeek: 1 }); // 목요일이 10/1이라 10월 1주차
+  assert.deepEqual(weekNumbers('2026-09-21'), { year: 2026, yearWeek: 39, month: 9, monthWeek: 4 });
+});
+
+test('weekNumbers: 연말·연초는 목요일의 해를 따른다(ISO 8601과 같다)', () => {
+  assert.deepEqual(weekNumbers('2025-12-29'), { year: 2026, yearWeek: 1, month: 1, monthWeek: 1 });
+  assert.deepEqual(weekNumbers('2024-12-30'), { year: 2025, yearWeek: 1, month: 1, monthWeek: 1 });
+  assert.deepEqual(weekNumbers('2027-01-04'), { year: 2027, yearWeek: 1, month: 1, monthWeek: 1 });
+  assert.deepEqual(weekNumbers('2020-12-28'), { year: 2020, yearWeek: 53, month: 12, monthWeek: 5 }); // 53주까지 있는 해
+});
+
+test('weekNumbers: 한 달의 주차는 1부터 5까지, 한 해의 주차는 1부터 53까지이고 주마다 하나씩 늘어난다', () => {
+  let prev = null;
+  for (let d = '2026-01-05'; d < '2027-01-04'; d = addDays(d, 7)) {
+    const w = weekNumbers(d);
+    assert.ok(w.monthWeek >= 1 && w.monthWeek <= 5, d);
+    assert.ok(w.yearWeek >= 1 && w.yearWeek <= 53, d);
+    if (prev) assert.equal(w.yearWeek, prev.yearWeek + 1, d);
+    prev = w;
   }
 });
