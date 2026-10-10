@@ -1178,7 +1178,8 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .cn-boxes .cn-box { pointer-events: auto; cursor: pointer; }
 .cn-focus { width: 100%; height: 100%; pointer-events: none; }
 .cn-focus.open { pointer-events: auto; }
-.cn-fbox { cursor: default; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3); }
+.cn-fbox { cursor: default; transition: box-shadow var(--fx-ms, 260ms) ease-out; } /* 처음엔 원래 박스와 같은 그림자, 커지는 동안 서서히 진해진다(.lifted) */
+.cn-fbox.lifted { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3); }
 .cn-fbox .fx { box-sizing: border-box; padding: var(--fx-pad); display: flex; flex-direction: column; gap: 8px; color: var(--box-ink); font-size: var(--fx-font); line-height: 1.35; opacity: 0; transition: opacity 0.16s ease-out; }
 .cn-fbox.placed .fx { position: absolute; left: 0; top: 0; overflow-y: auto; }
 .cn-fbox .fx.in { opacity: 1; }

@@ -98,6 +98,7 @@ const STAGE_STYLE = {
   focusWidth: 250,             // 누르면 커지는 박스의 폭(px). 보이는 영역보다 넓으면 영역에 맞춘다
   focusPad: 16,                // 커진 박스 안쪽 여백(px)
   focusMargin: 12,             // 커진 박스가 화면 가장자리(양옆·헤더 아래·아래 메모지 위)에서 띄우는 거리(px)
+  focusCoverPad: 3,            // 커진 박스가 원래 박스보다 사방으로 이만큼 더 덮는다(px). 기울어 있던 박스의 모서리가 삐져나오지 않게
   focusMs: 260,                // 커지고 줄어드는 시간(ms)
   focusTitleFont: 17,          // 커진 박스의 제목 글자 크기(px)
   focusFont: 13,               // 그 밖의 글자 크기(px)
@@ -784,7 +785,7 @@ const STAGE_STYLE = {
     // 커진 뒤 크기: 정해진 폭에서 내용이 차지하는 높이를 미리 잰다
     const f = document.createElement('div');
     f.className = `${el.className.replace(/\bjig\b/, '').trim()} cn-fbox`;
-    f.style.cssText = `--fx-pad:${G.focusPad}px;--fx-title-font:${G.focusTitleFont}px;--fx-font:${G.focusFont}px`;
+    f.style.cssText = `--fx-ms:${reduceMotion() ? 0 : G.focusMs}ms;--fx-pad:${G.focusPad}px;--fx-title-font:${G.focusTitleFont}px;--fx-font:${G.focusFont}px`;
     const compact = el.querySelector('.bx').cloneNode(true);
     const fx = document.createElement('div');
     fx.className = 'fx';
@@ -803,11 +804,14 @@ const STAGE_STYLE = {
     fx.style.width = `${width}px`;
     page.focusEl.appendChild(f);
     const naturalH = fx.offsetHeight; // fx는 글 흐름대로 높이가 정해진 채 재진다(아직 absolute 아님)
-    const rect = BoxFocus.focusRect({ box: { x: cx, y: cy }, size: { w: width, h: naturalH }, bounds, margin: G.focusMargin });
-    const to = { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, w: rect.width, h: rect.height, rot: 0 };
+    const rect = BoxFocus.focusRect({ box: { x: cx, y: cy }, size: { w: width, h: naturalH }, bounds, margin: G.focusMargin, cover: { w: box.w + 2 * G.focusCoverPad, h: box.h + 2 * G.focusCoverPad } });
+    const to = { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, w: rect.width, h: rect.height, rot: 0 }; // 바탕: 내용 자리와 원래 박스 자리를 함께 덮는다
     f.classList.add('placed'); // 이제부터 fx는 박스 안에 얹힌다(스크롤은 넘칠 때만)
-    fx.style.width = `${rect.width}px`;
-    fx.style.height = `${rect.height}px`;
+    const c = rect.content; // 글자와 버튼은 항상 보이는 영역 안. 바탕 안에서의 자리로 놓는다
+    fx.style.left = `${(c.left - rect.left).toFixed(1)}px`;
+    fx.style.top = `${(c.top - rect.top).toFixed(1)}px`;
+    fx.style.width = `${c.width}px`;
+    fx.style.height = `${c.height}px`;
     // 완료 도장은 그대로 모서리에 붙는다
     const seal = sim.seals.get(id);
     if (seal) {
@@ -818,6 +822,8 @@ const STAGE_STYLE = {
     el.style.visibility = 'hidden';
     if (seal) seal.style.visibility = 'hidden';
     page.focusEl.classList.add('open');
+    void f.offsetWidth; // 지금 모양(원래 박스와 같은 작은 그림자)을 확정한 뒤에 그림자를 키워야 서서히 변한다
+    f.classList.add('lifted');
     focus = { page, item, f, fx, compact, el, seal, from, to, raf: 0, closing: false, scrollY: window.scrollY };
     runFocusTween(from, to, G.focusMs, (r, raw) => {
       applyFocus(f, r);
@@ -842,6 +848,8 @@ const STAGE_STYLE = {
     c.closing = true;
     c.page.focusEl.classList.remove('open'); // 줄어드는 동안은 다른 곳을 누를 수 있다
     c.fx.classList.remove('in');
+    c.f.style.setProperty('--fx-ms', `${reduceMotion() ? 0 : G.focusMs * 0.8}ms`);
+    c.f.classList.remove('lifted'); // 줄어드는 동안 그림자도 원래 박스 것으로 돌아온다
     const now = { cx: c.to.cx, cy: c.to.cy, w: c.to.w, h: c.to.h, rot: 0 };
     runFocusTween(now, c.from, G.focusMs * 0.8, (r, raw) => {
       applyFocus(c.f, r);
