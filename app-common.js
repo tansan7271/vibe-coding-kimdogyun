@@ -79,7 +79,7 @@
   if (demoOn) { // 지금 보는 것이 내 데이터가 아님을 늘 알린다
     const badge = document.createElement('div');
     badge.className = 'demo-badge';
-    badge.textContent = '데모 모드 · 내 데이터 아님';
+    badge.textContent = '데모 모드';
     document.body.appendChild(badge);
   }
 
