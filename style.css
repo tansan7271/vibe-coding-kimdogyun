@@ -1195,7 +1195,9 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 
 /* 박스 끌기(app-carpet-next.js): 끄는 동안 화면 가장자리에 나타나는 안내 구역, 마우스를 따라오는 복사본, 놓을 날짜칸 강조. 색과 크기는 아래 변수 */
 :root {
-  --dz-red: 184, 32, 58;     /* 주 이동 구역·날짜칸 강조의 붉은색(RGB) */
+  --dz-red: 184, 32, 58;     /* 날짜칸 강조와 주 이동 구역 아이콘의 붉은색(RGB) */
+  --dz-light: 255, 250, 242; /* 주 이동 구역(왼쪽·오른쪽) 그라데이션의 흰색 계열(RGB) */
+  --dz-edge-ink: #5a2a33;    /* 주 이동 구역 글자 색 */
   --dz-dark: 38, 12, 18;     /* 취소 구역의 어두운 색(RGB). 붉은 헤더 위라서 붉은색이 아니라 어둡게 덮는다 */
   --dz-ink: #fff6e8;         /* 안내 글자와 아이콘 색(종이색) */
   --dz-glow: 190px;          /* 왼쪽·오른쪽 그라데이션이 퍼지는 폭. 실제로 반응하는 폭은 JS의 dragEdgeWidth */
@@ -1206,8 +1208,8 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .dz { position: absolute; color: var(--dz-ink); opacity: 0; transition: opacity 0.2s ease-out; }
 .cn-dz.on .dz { opacity: 0.8; }
 .cn-dz.on .dz.active { opacity: 1; }
-.dz-prev { left: 0; top: 0; bottom: 0; width: var(--dz-glow); background: linear-gradient(to right, rgba(var(--dz-red), 0.94), rgba(var(--dz-red), 0.52) 45%, rgba(var(--dz-red), 0)); }
-.dz-next { right: 0; top: 0; bottom: 0; width: var(--dz-glow); background: linear-gradient(to left, rgba(var(--dz-red), 0.94), rgba(var(--dz-red), 0.52) 45%, rgba(var(--dz-red), 0)); }
+.dz-prev { left: 0; top: 0; bottom: 0; width: var(--dz-glow); color: var(--dz-edge-ink); text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8); background: linear-gradient(to right, rgba(var(--dz-light), 0.97), rgba(var(--dz-light), 0.62) 45%, rgba(var(--dz-light), 0)); }
+.dz-next { right: 0; top: 0; bottom: 0; width: var(--dz-glow); color: var(--dz-edge-ink); text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8); background: linear-gradient(to left, rgba(var(--dz-light), 0.97), rgba(var(--dz-light), 0.62) 45%, rgba(var(--dz-light), 0)); }
 .dz-cancel { left: 0; right: 0; top: 0; height: var(--dz-top); background: linear-gradient(to bottom, rgba(var(--dz-dark), 0.95), rgba(var(--dz-dark), 0.6) 55%, rgba(var(--dz-dark), 0)); }
 .dz-body { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; word-break: keep-all; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); }
 .dz-prev .dz-body, .dz-next .dz-body { top: 50%; width: var(--dz-edge); translate: 0 -50%; }
@@ -1219,8 +1221,10 @@ body.dragging-step, body.dragging-step * { user-select: none; -webkit-user-selec
 .dz-ic { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 246, 232, 0.16); border: 2px dashed var(--dz-ink); transition: transform 0.15s ease-out, background-color 0.15s, color 0.15s; } /* 털실 점선 테두리 */
 .dz-ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .dz.active .dz-ic { transform: scale(1.18); background: var(--dz-ink); color: rgb(var(--dz-red)); }
+.dz-prev .dz-ic, .dz-next .dz-ic { border-color: rgb(var(--dz-red)); background: rgba(var(--dz-red), 0.08); color: rgb(var(--dz-red)); } /* 흰 바탕 위: 붉은 점선 테두리 */
+.dz-prev.active .dz-ic, .dz-next.active .dz-ic { background: rgb(var(--dz-red)); color: var(--dz-ink); }
 .dz-cancel.active .dz-ic { color: rgb(var(--dz-dark)); }
-.dz-fill { position: absolute; top: 12%; bottom: 12%; width: 4px; border-radius: 2px; background: var(--dz-ink); transform: scaleY(var(--dz-progress, 0)); opacity: 0; } /* 머문 시간만큼 차오른다 */
+.dz-fill { position: absolute; top: 12%; bottom: 12%; width: 4px; border-radius: 2px; background: rgb(var(--dz-red)); transform: scaleY(var(--dz-progress, 0)); opacity: 0; } /* 머문 시간만큼 차오른다 */
 .dz-prev .dz-fill { left: var(--dz-edge); }
 .dz-next .dz-fill { right: var(--dz-edge); }
 .dz.active .dz-fill { opacity: 0.9; }

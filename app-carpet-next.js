@@ -1231,7 +1231,7 @@ const STAGE_STYLE = {
     busy = false;
     navTarget = next.offset;
     applyQueuedRefresh(next);
-    startBoxes(next, reduceMotion() ? 'instant' : 'drop');
+    startBoxes(next, reduceMotion() || (boxDrag && boxDrag.started) ? 'instant' : 'drop'); // 박스를 끌어 옮기는 중에 넘어온 주는 떨어지는 연출 없이 바로 정착한 모습
     if (queued !== null) { const q = queued; queued = null; goTo(q); }
   }
 
