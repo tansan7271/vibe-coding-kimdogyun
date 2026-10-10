@@ -32,6 +32,15 @@
     --edge-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='224' height='16' viewBox='0 0 224 16'%3E%3Cpath d='M0 0H224V10Q168 14 112 10Q56 6 0 10Z' fill='%23b8203a'/%3E%3Cpath d='M224 4Q168 8 112 4Q56 0 0 4' fill='none' stroke='%23e0a030' stroke-width='2.4' stroke-linecap='round' stroke-dasharray='5 5.409' stroke-dashoffset='2.5' pathLength='229'/%3E%3C/svg%3E");
     /* 기울이면 한쪽 위 모서리가 화면 안으로 내려오므로, 폭의 절반×sin(기울기)만큼 헤더를 화면 위로 더 늘려 가린다 */
     --header-bleed: calc(sin(var(--header-tilt-deg)) * 50vw + 4px);
+
+    /* 팝업(할 일, 일정과 설정) 모양 값 */
+    --modal-dim: rgba(30, 20, 20, 0.45); /* 뒤 화면을 덮는 어두운 막 */
+    --modal-blur: 6px;                   /* 뒤 화면 흐림 정도 */
+    --modal-gap: 32px;                   /* 패널 상하좌우 바깥 여백. 클수록 뒤 카펫이 더 보인다 */
+    --modal-max-width: 880px;            /* 패널 최대 가로 */
+    --modal-radius: 14px;                /* 패널 모서리 둥글기 */
+    --modal-pad: 24px;                   /* 패널 안쪽 여백 */
+    --modal-z: 200;                      /* 헤더(100)보다 위 */
   }
   * { box-sizing: border-box; }
   body {
@@ -118,6 +127,53 @@
   .screen.active {
     display: block;
   }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--modal-z);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: var(--modal-gap);
+    background: var(--modal-dim);
+    -webkit-backdrop-filter: blur(var(--modal-blur));
+    backdrop-filter: blur(var(--modal-blur));
+  }
+
+  .modal-backdrop.open { display: flex; }
+
+  .modal-panel {
+    position: relative;
+    width: 100%;
+    max-width: var(--modal-max-width);
+    max-height: 100%;
+    overflow-y: auto;
+    padding: var(--modal-pad);
+    background: #f5f2ee;
+    border-radius: var(--modal-radius);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  }
+
+  .modal-panel .screen { display: block; }
+  .modal-panel .screen h1 { margin-top: 0; padding-left: 40px; line-height: 32px; }
+
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: #e6e2dc;
+    color: #444;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .modal-close:hover { background: #d8d2c9; }
 
   .screen h1 {
     font-size: 18px;
@@ -525,6 +581,9 @@
     <div class="overdue-box" id="overdue-box"></div>
   </section>
 
+  <div class="modal-backdrop" id="modal-goals" role="dialog" aria-modal="true" aria-label="할 일">
+  <div class="modal-panel">
+  <button class="modal-close" type="button" aria-label="닫기">×</button>
   <section id="screen-goals" class="screen">
     <h1>할 일</h1>
     <div class="goal-add-form">
@@ -545,7 +604,12 @@
     <div id="ai-draft" style="display:none"></div>
     <div id="goal-list"></div>
   </section>
+  </div>
+  </div>
 
+  <div class="modal-backdrop" id="modal-settings" role="dialog" aria-modal="true" aria-label="일정과 설정">
+  <div class="modal-panel">
+  <button class="modal-close" type="button" aria-label="닫기">×</button>
   <section id="screen-settings" class="screen">
     <h1>일정과 설정</h1>
 
@@ -610,6 +674,8 @@
       <div id="data-message" style="font-size:13px;color:#555"></div>
     </div>
   </section>
+  </div>
+  </div>
 </main>
 
 <script src="placement.js"></script>
@@ -1789,17 +1855,35 @@
 
   renderCarpet();
 
-  const navButtons = document.querySelectorAll('header [data-screen]');
-  const screens = document.querySelectorAll('.screen');
+  // 팝업은 헤더 위에 뜬다. 닫는 길: 바깥 배경, 왼쪽 위 x, Esc
+  const modals = { goals: document.getElementById('modal-goals'), settings: document.getElementById('modal-settings') };
 
-  navButtons.forEach(btn => {
+  function closeModals() {
+    const wasOpen = Object.values(modals).some(m => m.classList.contains('open'));
+    Object.values(modals).forEach(m => m.classList.remove('open'));
+    document.body.style.overflow = '';
+    if (wasOpen) renderCarpet();
+  }
+
+  document.querySelectorAll('header [data-screen]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.screen;
-
-      navButtons.forEach(b => b.classList.toggle('active', b === btn));
-      screens.forEach(s => s.classList.toggle('active', s.id === `screen-${target}`));
-      if (target === 'carpet') renderCarpet();
+      closeModals();
+      if (modals[target]) {
+        modals[target].classList.add('open');
+        document.body.style.overflow = 'hidden';
+      }
     });
+  });
+
+  Object.values(modals).forEach(m => {
+    m.addEventListener('click', (e) => {
+      if (e.target === m || e.target.classList.contains('modal-close')) closeModals();
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModals();
   });
 </script>
 
