@@ -24,9 +24,10 @@
     iterations: 6,          // 한 프레임에 겹침을 푸는 반복 횟수
     springK: 190,           // 카펫 용수철 세기(1/s²). 클수록 빨리 출렁인다
     springC: 8.5,           // 카펫 용수철 감쇠(1/s). 작을수록 오래 출렁인다
-    impactKick: 0.9,        // 박스가 떨어진 충격이 카펫을 얼마나 흔드는지(클수록 더 깊이 출렁)
+    impactKick: 0.00215,    // 박스가 떨어진 충격이 카펫을 얼마나 흔드는지(클수록 더 깊이 출렁). 박스가 카펫을 누르는 깊이(부하 × 부하 1당 높이)에 비례한다 — 예산 설정이 달라도 같은 박스는 같게 흔든다
     settleSpeed: 10,        // 이 속도(px/s)보다 느리면 가만히 있는 것으로 본다
     settleSeconds: 0.35,    // 위 상태가 이만큼 이어지면 정착(settled)으로 본다
+    capSag: true,           // true: 카펫은 예산(maxSag)에서 더 처지지 않는다. false: 부하만큼 계속 처진다(예산을 넘으면 예산선 밑으로 쭉 내려간다)
     dt: 1 / 120,            // 고정 계산 간격(초)
   };
 
@@ -63,6 +64,12 @@
     world.boxes.push(box);
     world.settled = false; world.quiet = 0;
     return box;
+  }
+
+  // 카펫이 처지려는 목표 깊이: 쌓인 부하 / 예산 × maxSag(= 부하 1당 maxSag/예산 px). capSag면 maxSag에서 멈춘다
+  function targetSag(world, weight) {
+    const t = (weight / world.capacity) * world.maxSag;
+    return world.p.capSag ? Math.min(world.maxSag, t) : t;
   }
 
   function floorY(world, col) {
@@ -108,7 +115,7 @@
             if (rel > p.restSpeed) {
               b.vy = fv - rel * p.restitution;
               // 부딪힌 반복에서 속도가 줄어드니(튕김) 이 충격은 한 번만 세어진다. 마지막 반복에서만 세면 이미 튕긴 뒤라 한 번도 안 센다
-              world.kick[b.col] += rel * (b.load / world.capacity) * p.impactKick;
+              world.kick[b.col] += rel * (b.load * world.maxSag / world.capacity) * p.impactKick;
             } else {
               b.vy = fv;
             }
@@ -140,7 +147,7 @@
               const jv = (1 + e) * rn / (1 / upper.mass + 1 / lower.mass);
               upper.vy -= jv / upper.mass;
               lower.vy += jv / lower.mass;
-              if (rn > p.restSpeed) world.kick[upper.col] += rn * (upper.load / world.capacity) * p.impactKick * 0.5;
+              if (rn > p.restSpeed) world.kick[upper.col] += rn * (upper.load * world.maxSag / world.capacity) * p.impactKick * 0.5;
             }
             // 받침이 모자라면 옆으로 미끄러진다(한 프레임에 한 번만 가속한다)
             if (last && ox / upper.w < p.slideSupportRatio) {
@@ -195,7 +202,7 @@
     // 4. 카펫 용수철: 쌓인 무게만큼 처지려 하고, 충격을 받으면 출렁인다
     const wts = weights(world);
     for (let c = 0; c < world.columns.length; c++) {
-      const target = Math.min(world.maxSag, (wts[c] / world.capacity) * world.maxSag);
+      const target = targetSag(world, wts[c]);
       world.sagVel[c] += world.kick[c];
       const acc = p.springK * (target - world.sag[c]) - p.springC * world.sagVel[c];
       world.sagVel[c] += acc * dt;
@@ -206,7 +213,7 @@
     let calm = true;
     boxes.forEach(b => { if (Math.abs(b.vx) > p.settleSpeed || Math.abs(b.vy) > p.settleSpeed || !b.landed) calm = false; });
     for (let c = 0; c < world.columns.length; c++) {
-      const target = Math.min(world.maxSag, (wts[c] / world.capacity) * world.maxSag);
+      const target = targetSag(world, wts[c]);
       if (Math.abs(world.sagVel[c]) > p.settleSpeed || Math.abs(target - world.sag[c]) > 0.5) calm = false;
     }
     world.quiet = calm ? world.quiet + dt : 0;
@@ -235,5 +242,5 @@
     return world.settled;
   }
 
-  return { DEFAULTS, createWorld, addBox, floorY, weights, step, advance, settle };
+  return { DEFAULTS, createWorld, addBox, floorY, weights, targetSag, step, advance, settle };
 });

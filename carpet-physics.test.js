@@ -67,6 +67,18 @@ test('예산을 넘으면 카펫은 maxSag에서 멈추고 더미가 처음 카�
   assert.ok(Math.abs(top - (baseY + maxSag - 12 * unit)) < 3 && top < baseY - 50, `꼭대기 ${top}`);
 });
 
+test('capSag를 끄면 카펫이 예산선 밑으로 부하만큼 계속 처지고, 더미 꼭대기는 늘 처음 카펫 선에 맞는다', () => {
+  const w = world({ params: { capSag: false } });
+  drop(w, 'a', 4, 6);
+  drop(w, 'b', 4, 6, { y: -900 });
+  P.settle(w, 20);
+  assert.ok(w.settled);
+  assert.ok(Math.abs(w.sag[4] - 12 * unit) < 2, `처짐 ${w.sag[4]} vs ${12 * unit}`); // 예산 10을 넘는 부하 12 -> 예산선(400)보다 깊다
+  assert.ok(w.sag[4] > maxSag + 50);
+  const top = Math.min(...w.boxes.map(b => b.y - b.h / 2));
+  assert.ok(Math.abs(top - baseY) < 3, `꼭대기 ${top}`);
+});
+
 test('박스는 자기 날짜 칸을 벗어나지 않고, 열끼리는 서로 영향이 없다', () => {
   const w = world();
   const a = drop(w, 'a', 0, 1, { dx: -500, width: 150 }); // 칸 밖에서 시작해도 안으로 들어온다
@@ -139,7 +151,20 @@ test('박스가 떨어진 충격이 카펫을 흔든다(impactKick). 충격을 �
     for (let i = 0; i < 4 * 120; i++) { P.step(w, w.p.dt); m = Math.max(m, w.sag[2]); }
     return m;
   };
-  assert.ok(maxSagWith(0.9) > maxSagWith(0) + 2, `충격 있음 ${maxSagWith(0.9)} vs 없음 ${maxSagWith(0)}`);
+  const dflt = P.DEFAULTS.impactKick;
+  assert.ok(maxSagWith(dflt) > maxSagWith(0) + 2, `충격 있음 ${maxSagWith(dflt)} vs 없음 ${maxSagWith(0)}`);
+});
+
+test('같은 박스는 예산 설정이 달라도(부하 1당 높이가 같으면) 카펫을 같게 흔든다', () => {
+  const peak = cap => {
+    // 부하 1당 높이 unit을 같게 두고 예산만 바꾼다: maxSag = unit × 예산
+    const w = P.createWorld({ columns, capacity: cap, maxSag: unit * cap, baseY });
+    drop(w, 'a', 2, 3, { y: -800 });
+    let m = 0;
+    for (let i = 0; i < 4 * 120; i++) { P.step(w, w.p.dt); m = Math.max(m, w.sag[2]); }
+    return m;
+  };
+  assert.ok(Math.abs(peak(10) - peak(15)) < 1.5 && Math.abs(peak(15) - peak(30)) < 1.5, `${peak(10)} ${peak(15)} ${peak(30)}`);
 });
 
 test('advance는 고정 간격으로 진행하고, 정착하면 멈춘다', () => {

@@ -25,7 +25,9 @@
 //
 // 새 연출 체크리스트
 //  [x] 첫 입장 롤 펼침: 페이지를 열 때마다 한 번. 주 이동이나 수정으로 다시 그릴 때는 없다. 모션 줄이기 설정이면 건너뛴다
-//  [ ] 주 넘기기 슬라이드(버튼·스와이프)  [ ] 박스 낙하·충돌·카펫 눌림  [ ] 끌어 놓으면 낙하  [ ] 전체 보기
+//  [ ] 주 넘기기 슬라이드(버튼·스와이프)  [ ] 끌어 놓으면 낙하   (전체 보기는 기각, 밀린 단계 주름도 기각: 밀림은 박스의 알람 아이콘으로 한다)
+//  [x] 세로축: 부하 1당 높이는 일정하고(예산 15일 때의 눈금 간격), 예산 설정에 따라 예산선 깊이가 늘고 줄어 아래로 스크롤이 생긴다
+//  [x] 예산 초과: 카펫이 예산선 밑으로 부하만큼 계속 처지고, 그 날의 박스와 카펫이 아이폰 홈 화면 수정 모드처럼 떤다(예산 설정은 새로 읽어야 반영됨: 다시 그리기 연결은 아직)
 
 // 첫 입장 롤 펼침 모양 값. 숫자나 색을 바꾸고 새로고침하면 바로 보인다
 const INTRO_STYLE = {
@@ -41,10 +43,17 @@ const INTRO_STYLE = {
 
 // 눈금(카펫 아래 격자) 모양 값. 점선 모양(길이·간격·두께·둥근 끝)은 공용 스티치 값(style.css의 --stitch-*)을 쓴다
 const STAGE_STYLE = {
-  // 예산 깊이(예산선이 카펫 선에서 내려가는 깊이)는 값으로 두지 않는다. 맨 아래 가로선(예산선)이 아래쪽 '할 일' 메모지의
-  // 왼쪽 위 꼭짓점보다 budgetBelowCorner만큼 아래에 오도록 화면에서 계산한다. 그 선 밑으로는 세로선도 오늘 칸도 없다
-  budgetBelowCorner: 24,       // 예산선이 메모지 왼쪽 위 꼭짓점보다 얼마나 아래에 걸치는지(px)
-  minSag: 120,                 // 화면이 아주 낮을 때 예산 깊이가 이보다 줄지 않게 하는 최소값(px)
+  // 세로 눈금: 부하 1당 높이(unit)를 먼저 정하고, 예산선 깊이 = unit × 예산 이다.
+  // unit은 기준 예산(refCapacity)일 때 맨 아래 가로선(예산선)이 아래쪽 '할 일' 메모지의 왼쪽 위 꼭짓점보다 budgetBelowCorner만큼 아래에 오도록 화면에서 계산한다.
+  // 예산 설정을 바꾸면 unit은 그대로이고 예산선 깊이만 늘고 줄어, 화면보다 깊어지면 아래로 스크롤이 생긴다. 예산선 밑으로는 세로선도 오늘 칸도 없다
+  refCapacity: 15,             // 기준 예산. 이 예산일 때가 지금의 눈금 간격이다
+  budgetBelowCorner: 24,       // 기준 예산일 때 예산선이 메모지 왼쪽 위 꼭짓점보다 얼마나 아래에 걸치는지(px)
+  minSag: 120,                 // 화면이 아주 낮을 때 기준 예산의 예산선 깊이가 이보다 줄지 않게 하는 최소값(px)
+  scrollTail: 70,              // 가장 깊이 처진 카펫 아래에 남기는 여백(px). 출렁여도 잘리지 않게
+  jiggleDeg: 1.8,              // 예산 초과인 날의 박스가 떠는 각도(±도). 아이폰 홈 화면 수정 모드처럼
+  jiggleHz: 5.5,               // 박스가 떠는 빠르기(초당 왕복). 박스마다 ±10% 다르고 시작점도 제각각이다
+  jiggleCarpetPx: 1.8,         // 예산 초과인 날의 카펫(과 그 위 박스)이 위아래로 떠는 크기(px). 이웃 날짜와 이어진 곡선이 따라서 자연스럽게 이어진다
+  jiggleCarpetHz: 6.5,         // 카펫이 떠는 빠르기
   rollTuckRatio: 0.4,          // 처음 롤 윗부분이 헤더 뒤로 들어가는 정도(롤 지름의 비율). 클수록 위쪽 여백이 줄어든다. 위쪽 여백 ≈ 롤 지름 × (1 − 이 값)
   gridMaxLines: 5,             // 가로 눈금선 최대 개수
   gridColor: '#e6e1da',        // 눈금선 색
@@ -190,7 +199,9 @@ const STAGE_STYLE = {
   // 세로 배치. 화면 폭과 높이가 바뀔 때만 다시 잰다
   let layoutKey = '', L = null;
   function layout(width) {
-    const key = `${width},${window.innerHeight}`;
+    const capacity = state.settings.capacity;
+    const maxLoad = Math.max(0, ...(work.weekStats || []).map(st => st.load)); // 가장 무거운 날(예산을 넘을 수 있다)
+    const key = `${width},${window.innerHeight},${capacity},${maxLoad}`;
     if (key === layoutKey) return L;
     layoutKey = key;
     const P = { spacing: S.spacing, coreRadius: S.coreRadius };
@@ -209,12 +220,17 @@ const STAGE_STYLE = {
     // 예산선(맨 아래 가로선): 아래쪽 '할 일' 메모지의 왼쪽 위 꼭짓점보다 조금 아래. 메모지를 못 찾으면 위쪽 여백과 같은 아래 여백
     const corner = noteCornerY();
     const budgetY = corner === null ? window.innerHeight - topSpace : corner + G.budgetBelowCorner;
-    const sag = Math.max(G.minSag, budgetY - lineY);
-    const height = Math.ceil(groundY + sag + 2);   // 그림 높이는 예산선까지(선 두께 여유 2px)
+    const refSag = Math.max(G.minSag, budgetY - lineY);   // 기준 예산(refCapacity)일 때의 예산선 깊이
+    const unit = refSag / G.refCapacity;                  // 부하 1당 높이(px). 예산 설정이 바뀌어도 그대로다
+    const sag = unit * capacity;                          // 예산선 깊이
+    const deepest = unit * Math.max(capacity, maxLoad);   // 가장 깊이 처지는 날(예산을 넘으면 예산선 밑)
+    const height = Math.ceil(groundY + deepest + G.scrollTail + 2);
     const radius0 = CarpetRoll.rollPose({ progress: 0, width, ...P, groundY: 0, startMargin }).radius;
-    L = { P, startMargin, groundY, lift, sag, height, topSpace, svgTop, radius0 };
+    L = { P, startMargin, groundY, lift, sag, unit, deepest, height, topSpace, svgTop, radius0 };
     // 층 크기: 모든 층이 같은 좌표계(왼쪽 위가 (0,0))를 쓴다
     world_el.style.height = `${height}px`;
+    // 화면보다 길어지면 아래로 스크롤된다. 맨 아래까지 내려도 고정된 아래 두 버튼에 카펫이 가리지 않게 그 높이만큼 아래 여백을 둔다
+    world_el.style.marginBottom = svgTop + height > window.innerHeight ? `${Math.max(0, window.innerHeight - (corner === null ? window.innerHeight - 170 : corner)) + 16}px` : '0px';
     [gridSvg, carpetSvg].forEach(el => { el.setAttribute('width', width); el.setAttribute('height', height); });
     laidEl.style.top = `${groundY - S.lineWidth / 2}px`;
     laidEl.style.width = `${width}px`;
@@ -394,12 +410,17 @@ const STAGE_STYLE = {
   }
 
   // 지금 세계 상태를 화면에 반영: 카펫 선(처짐)과 박스 위치
-  function renderSim() {
+  function renderSim(now = 0) {
     const { world, els, width } = sim;
     const Lr = layout(width);
+    const t = now / 1000;
+    // 예산 초과인 날의 카펫은 위아래로 떤다(박스는 그 위에 얹혀 같이 움직인다). 곡선은 이웃 날짜와 이어져 있어 가운데로 갈수록 크게 떨리는 것처럼 보인다
+    const osc = c => (sim.fidget && sim.over[c] ? G.jiggleCarpetPx * Math.sin(2 * Math.PI * G.jiggleCarpetHz * t + c * 1.7) : 0);
+    // 카펫 모양 계산은 부하가 예산을 넘으면 더 처지지 않으므로, 가장 깊은 날 기준으로 '예산'을 키워 넘기고 깊이도 같은 비율로 키운다(부하 1당 높이 unit은 그대로)
+    const loads = world.sag.map((s, c) => (s + osc(c)) / Lr.unit);
+    const cEff = Math.max(world.capacity, ...loads) + 1e-6;
     const shape = Carpet.carpetShape({
-      loads: world.sag.map(s => (s / Lr.sag) * world.capacity), capacity: world.capacity, safeRatio: state.settings.safeRatio,
-      columns: world.columns, width, baseY: Lr.groundY, maxSag: Lr.sag, flatRatio: G.carpetFlatRatio, curve: 0.5,
+      loads, capacity: cEff, columns: world.columns, width, baseY: Lr.groundY, maxSag: Lr.unit * cEff, flatRatio: G.carpetFlatRatio, curve: 0.5,
     });
     carpetPath.setAttribute('d', shape.linePath);
     if (!sim.carpetShown) { // 처음 한 번: 롤이 깔아 둔 직선과 가리개를 걷고 처지는 카펫으로 넘긴다(처음에는 같은 직선이라 티가 안 난다)
@@ -410,12 +431,16 @@ const STAGE_STYLE = {
     world.boxes.forEach(b => {
       const el = els.get(b.id);
       if (!el) return;
-      const t = `translate3d(${b.x.toFixed(1)}px,${b.y.toFixed(1)}px,0) rotate(${b.tilt.toFixed(2)}deg)`;
-      if (b.lastT !== t) { // 움직인 박스만 바꾼다
-        b.lastT = t;
-        el.style.transform = t;
+      // 예산 초과인 날의 박스는 자리를 잡은 뒤 홈 화면 수정 모드의 아이콘처럼 벌벌 떤다(박스마다 빠르기와 시작점이 다르다)
+      const jig = sim.fidget && b.landed && sim.over[b.col];
+      const y = b.y + (jig ? osc(b.col) : 0);
+      const rot = b.tilt + (jig ? G.jiggleDeg * Math.sin(2 * Math.PI * G.jiggleHz * (0.9 + 0.2 * b.jr) * t + b.jp) : 0);
+      const tr = `translate3d(${b.x.toFixed(1)}px,${y.toFixed(1)}px,0) rotate(${rot.toFixed(2)}deg)`;
+      if (jig || b.lastT !== tr) { // 움직인 박스만 바꾼다(떠는 박스는 매 프레임)
+        b.lastT = tr;
+        el.style.transform = tr;
         const seal = sim.seals.get(b.id);
-        if (seal) seal.style.transform = t;
+        if (seal) seal.style.transform = tr;
       }
     });
   }
@@ -439,6 +464,8 @@ const STAGE_STYLE = {
       lockX: isBottom,
     });
     box.tilt = isBottom ? 0 : (hash01(item.id, 't') - 0.5) * 2 * G.boxTiltDeg;
+    box.jp = hash01(item.id, 'jp') * Math.PI * 2; // 예산 초과인 날의 떨림: 박스마다 시작점과 빠르기가 다르다
+    box.jr = hash01(item.id, 'jr');
     sim.els.set(item.id, makeBoxEl(box, item.kind === 'todo' ? 'todo' : item.kind === 'fixed' ? 'paper fixed' : 'paper', item));
     if (item.kind === 'done') sim.seals.set(item.id, makeSealEl(box));
   }
@@ -464,7 +491,23 @@ const STAGE_STYLE = {
     return order.sort((a, b) => a.at - b.at);
   }
 
-  function stopSim() { if (sim && sim.raf) cancelAnimationFrame(sim.raf); }
+  function stopSim() {
+    if (!sim) return;
+    if (sim.raf) cancelAnimationFrame(sim.raf);
+    if (sim.fidgetRaf) cancelAnimationFrame(sim.fidgetRaf);
+  }
+
+  // 다 자리를 잡은 뒤에도, 예산 초과인 날이 있으면 떨림을 계속 그린다(물리 계산은 멈춰 있고 그리기만). 탭이 가려지면 브라우저가 알아서 멈춘다
+  function startFidget() {
+    if (!sim.fidget) return;
+    const mySim = sim;
+    const tick = now => {
+      if (sim !== mySim) return; // 새로 놓았으면 옛 루프는 끝낸다
+      renderSim(now);
+      mySim.fidgetRaf = requestAnimationFrame(tick);
+    };
+    mySim.fidgetRaf = requestAnimationFrame(tick);
+  }
 
   // animate=true: 하나씩 떨어지는 연출. false: 보이지 않게 끝까지 계산해 정착한 모습만 보여 준다(창 크기가 바뀐 때, 모션 줄이기)
   function startBoxes(animate) {
@@ -478,9 +521,11 @@ const STAGE_STYLE = {
     const columns = Array.from({ length: 7 }, (_, i) => ({ left: i * colW, right: (i + 1) * colW }));
     const world = CarpetPhysics.createWorld({
       columns, capacity, maxSag: Lr.sag, baseY: Lr.groundY - S.lineWidth / 2, // 박스는 카펫 선의 윗면에 얹힌다
-      params: { restitution: G.boxBounce, ...G.physics },
+      params: { restitution: G.boxBounce, capSag: false, ...G.physics }, // capSag false: 예산을 넘으면 카펫이 예산선 밑으로 계속 처진다
     });
-    sim = { world, width, colW, unit: Lr.sag / capacity, els: new Map(), seals: new Map(), pending: releaseOrder(boxItems()), raf: 0, start: 0, last: 0, released: 0, carpetShown: false };
+    const over = (work.weekStats || []).map(st => st.overBudget);
+    const fidget = over.some(Boolean) && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    sim = { world, width, colW, unit: Lr.unit, over, fidget, els: new Map(), seals: new Map(), pending: releaseOrder(boxItems()), raf: 0, fidgetRaf: 0, start: 0, last: 0, released: 0, carpetShown: false };
     stage.dataset.boxes = String(sim.pending.length);
     if (!animate) {
       sim.pending.forEach(spawn);
@@ -488,6 +533,7 @@ const STAGE_STYLE = {
       CarpetPhysics.settle(world, 15);
       renderSim();
       stage.dataset.boxState = 'settled';
+      startFidget();
       return;
     }
     stage.dataset.boxState = 'falling';
@@ -498,9 +544,9 @@ const STAGE_STYLE = {
       CarpetPhysics.advance(world, Math.min(50, now - sim.last));
       sim.last = now;
       if (!sim.pending.length && now - sim.lastSpawnAt > G.maxSettleMs) world.settled = true; // 안전장치
-      renderSim();
+      renderSim(now);
       if (sim.pending.length || !world.settled) sim.raf = requestAnimationFrame(frame);
-      else { sim.raf = 0; stage.dataset.boxState = 'settled'; }
+      else { sim.raf = 0; stage.dataset.boxState = 'settled'; startFidget(); }
     }
     sim.raf = requestAnimationFrame(frame);
   }
