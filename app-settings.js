@@ -58,19 +58,22 @@
       </div>`;
   }
 
-  let eventTab = 'current'; // 'current'(현재) | 'over'(지난 일정)
+  // 팝업 왼쪽 견출지 탭: 'current'(현재 일정) | 'over'(지난 일정) | 'prefs'(전체 설정)
+  let settingsTab = 'current';
+  const settingsPanes = { events: document.getElementById('settings-pane-events'), prefs: document.getElementById('settings-pane-prefs') };
 
   function renderEvents() {
     const sorted = [...state.events].sort((a, b) => eventSortKey(a).localeCompare(eventSortKey(b)));
     const today = todayStr();
     const overEvents = sorted.filter(ev => Placement.isEventOver(ev, today));
     const currentEvents = sorted.filter(ev => !Placement.isEventOver(ev, today));
-    renderTabs('event-tabs', eventTab, [
-      { key: 'current', label: '현재', count: currentEvents.length },
-      { key: 'over', label: '지난 일정', count: overEvents.length },
-    ]);
-    const shown = eventTab === 'over' ? overEvents : currentEvents;
-    const empty = eventTab === 'over'
+    const labels = { current: `현재 일정 (${currentEvents.length})`, over: `지난 일정 (${overEvents.length})`, prefs: '전체 설정' };
+    document.querySelectorAll('#settings-tabs button').forEach(b => {
+      b.textContent = labels[b.dataset.tab];
+      b.classList.toggle('active', b.dataset.tab === settingsTab);
+    });
+    const shown = settingsTab === 'over' ? overEvents : currentEvents;
+    const empty = settingsTab === 'over'
       ? '지난 일정이 없습니다.'
       : (state.events.length ? '현재 일정이 없습니다.' : '아직 일정이 없습니다.');
     eventList.innerHTML = shown.length
@@ -78,11 +81,16 @@
       : `<div class="empty-hint">${empty}</div>`;
   }
 
-  document.getElementById('event-tabs').addEventListener('click', (e) => {
+  function showSettingsTab(key) {
+    settingsTab = key;
+    settingsPanes.events.hidden = key === 'prefs';
+    settingsPanes.prefs.hidden = key !== 'prefs';
+    renderEvents(); // 탭 글자·선택 표시와 일정 목록을 다시 그린다
+  }
+
+  document.getElementById('settings-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
-    if (!btn) return;
-    eventTab = btn.dataset.tab;
-    renderEvents();
+    if (btn) showSettingsTab(btn.dataset.tab);
   });
 
   function renderNewEventLoadPicker() {

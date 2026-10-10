@@ -108,6 +108,16 @@
   --modal-pad: 24px;                   /* 패널 안쪽 여백 */
   --modal-z: 200;                      /* 헤더(100)와 아래쪽 버튼(150)보다 위 */
 
+  /* 팝업 왼쪽 견출지 탭 */
+  --tab-top: 64px;                     /* 팝업 위쪽 끝에서 첫 탭까지 거리 */
+  --tab-w: 32px;                       /* 선택 안 된 탭 폭(팝업 밖으로 튀어나온 길이) */
+  --tab-w-active: 40px;                /* 선택된 탭 폭. 더 튀어나온다 */
+  --tab-pad: 18px;                     /* 탭 안쪽 위아래 여백(글자 방향 기준 앞뒤) */
+  --tab-gap: 6px;                      /* 탭 사이 간격 */
+  --tab-radius: 10px;                  /* 탭 왼쪽 모서리 둥글기 */
+  --tab-overlap: 2px;                  /* 탭이 팝업 가장자리 안쪽으로 파고드는 폭. 이음새가 안 보이게 한다 */
+  --tab-ms: 140ms;                     /* 탭 호버·선택 변화 시간 */
+
   /* 아래쪽 버튼 호버와 팝업 열고 닫는 연출 */
   --dock-hover-lift: 14px;             /* 마우스를 올리면 위로 올라오는 거리 */
   --dock-hover-ms: 160ms;              /* 올라오고 내려가는 시간 */
@@ -417,22 +427,44 @@ main {
 
 .modal-close:hover { background: #d8d2c9; }
 
-/* 탭: 할 일은 제목 줄 x 버튼 옆, 일정은 '일정' 소제목 줄 오른쪽 */
-.tab-bar { display: flex; gap: 4px; }
-.tab-bar button {
-  height: 32px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 16px;
-  background: transparent;
-  color: #666;
-  font-size: 13px;
-  cursor: pointer;
+/* 팝업 왼쪽에 튀어나온 인덱스 견출지. 글자는 시계 방향으로 90도 눕힌다. 선택된 탭은 종이 색과 같아 팝업과 이어져 보이고 조금 더 튀어나온다 */
+.index-tabs {
+  position: absolute;
+  top: var(--tab-top);
+  right: 100%;
+  margin-right: calc(var(--tab-overlap) * -1);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; /* 오른쪽(팝업 쪽) 끝을 맞춘다 */
+  gap: var(--tab-gap);
 }
-.tab-bar button:hover { background: #e6e2dc; }
-.tab-bar button.active { background: #b8203a; color: #fff; font-weight: bold; }
-.modal-panel .tab-bar.title-tabs { position: absolute; top: var(--modal-top, var(--modal-pad)); right: calc(var(--modal-pad) + 40px); }
-.section-head { display: flex; align-items: center; justify-content: space-between; }
+
+.index-tabs button {
+  writing-mode: vertical-rl;
+  text-orientation: sideways-right; /* 구형 브라우저 */
+  text-orientation: sideways;       /* 한글도 세워 두지 않고 시계 방향으로 눕힌다 */
+  width: var(--tab-w);
+  padding: var(--tab-pad) 0;
+  border: 0;
+  border-radius: var(--tab-radius) 0 0 var(--tab-radius);
+  background: var(--tab-bg);
+  color: var(--tab-ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: -2px 2px 4px rgba(0, 0, 0, 0.16);
+  transition: width var(--tab-ms) ease-out, background var(--tab-ms), color var(--tab-ms);
+}
+
+.index-tabs button:hover { width: calc(var(--tab-w) + 4px); }
+.index-tabs button.active { width: var(--tab-w-active); background: var(--tab-active-bg); color: var(--tab-active-ink); }
+
+#modal-goals .index-tabs { --tab-bg: #efe3b0; --tab-ink: #7a6a38; --tab-active-bg: var(--note-paper); --tab-active-ink: #b8203a; }
+#modal-settings .index-tabs { --tab-bg: #eadfce; --tab-ink: #7d705c; --tab-active-bg: var(--cal-paper); --tab-active-ink: #b8203a; }
 
 .screen h1 {
   font-size: 18px;

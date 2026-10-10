@@ -48,14 +48,14 @@
 
   <div class="modal-backdrop" id="modal-goals" role="dialog" aria-modal="true" aria-label="할 일">
   <div class="modal-panel">
+  <div class="tab-bar index-tabs" id="goal-tabs">
+    <button type="button" data-tab="active"></button>
+    <button type="button" data-tab="done"></button>
+  </div>
   <div class="modal-scroll">
   <button class="modal-close" type="button" aria-label="닫기">×</button>
   <section id="screen-goals" class="screen">
     <h1>할 일</h1>
-    <div class="tab-bar title-tabs" id="goal-tabs">
-      <button type="button" data-tab="active"></button>
-      <button type="button" data-tab="done"></button>
-    </div>
     <div class="goal-add-form">
       <input type="text" id="new-goal-title" placeholder="할 일 제목">
       <input type="date" id="new-goal-deadline">
@@ -80,23 +80,18 @@
 
   <div class="modal-backdrop" id="modal-settings" role="dialog" aria-modal="true" aria-label="일정과 설정">
   <div class="modal-panel">
+  <div class="tab-bar index-tabs" id="settings-tabs">
+    <button type="button" data-tab="current" class="active">현재 일정</button>
+    <button type="button" data-tab="over">지난 일정</button>
+    <button type="button" data-tab="prefs">전체 설정</button>
+  </div>
   <div class="modal-scroll">
   <button class="modal-close" type="button" aria-label="닫기">×</button>
   <section id="screen-settings" class="screen">
     <h1>일정과 설정</h1>
-    <div class="tab-bar title-tabs" id="settings-tabs">
-      <button type="button" data-tab="events" class="active">일정</button>
-      <button type="button" data-tab="prefs">설정</button>
-    </div>
 
     <div id="settings-pane-events">
-    <div class="section-head">
-      <h2>일정</h2>
-      <div class="tab-bar" id="event-tabs">
-        <button type="button" data-tab="current"></button>
-        <button type="button" data-tab="over"></button>
-      </div>
-    </div>
+    <h2>일정</h2>
     <div class="event-add-form">
       <input type="text" id="new-event-title" placeholder="일정 제목">
       <select id="new-event-repeat">

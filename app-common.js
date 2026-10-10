@@ -245,7 +245,7 @@
         { transform: tf(-dx / 2, -dy / 2, tilt / 2, (1 + 1 / kx) / 2, (1 + 1 / ky) / 2, -half), opacity: 1, offset: 0.5 },
         { transform: tf(0, 0, 0, 1, 1, 0), opacity: 1, offset: 1 },
       ]), timing),
-      ...[...scroll.children].map(el => el.animate(frames([{ opacity: 0 }, { opacity: 0, offset: delay }, { opacity: 1 }]), timing)),
+      ...[...scroll.children, ...panel.querySelectorAll('.index-tabs')].map(el => el.animate(frames([{ opacity: 0 }, { opacity: 0, offset: delay }, { opacity: 1 }]), timing)),
     ];
     modalBusy = true;
     Promise.all(anims.map(a => a.finished)).then(() => {
@@ -260,7 +260,7 @@
   function openModal(target, btn) {
     if (modalBusy) return;
     if (target === 'goals') renderGoals();
-    if (target === 'settings') { renderEvents(); showSettingsTab('events'); }
+    if (target === 'settings') showSettingsTab('current'); // 열 때는 항상 현재 일정부터
     document.body.style.overflow = 'hidden';
     modals[target].classList.add('open');
     playModal(modals[target], btn, false, () => {});
@@ -287,19 +287,6 @@
       if (modals[target]) openModal(target, btn);
       else closeModals();
     });
-  });
-
-  // 일정과 설정 팝업 안의 탭. 팝업을 열 때는 항상 일정부터 보인다
-  const settingsPanes = { events: document.getElementById('settings-pane-events'), prefs: document.getElementById('settings-pane-prefs') };
-
-  function showSettingsTab(key) {
-    Object.entries(settingsPanes).forEach(([k, pane]) => { pane.hidden = k !== key; });
-    document.querySelectorAll('#settings-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === key));
-  }
-
-  document.getElementById('settings-tabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-tab]');
-    if (btn) showSettingsTab(btn.dataset.tab);
   });
 
   Object.values(modals).forEach(m => {
