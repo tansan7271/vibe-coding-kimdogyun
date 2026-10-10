@@ -216,3 +216,44 @@ test('박스가 많아도(40개) 시간 안에 정착하고, 겹치거나 튀어
     }
   }
 });
+
+// 무거운 날이 여럿 붙어 있고 박스가 많을 때: 카펫이 출렁이며 밀어 올린 박스가 다시 떨어지며 또 카펫을 흔들어 끝없이 튀던 문제(kickMinSpeed로 막음).
+// 박스를 시간차로 떨어뜨리고 프레임 간격을 불규칙하게 해서(실제 화면처럼) 여러 번 돌린다
+function heavyRun(seed, params) {
+  const w = P.createWorld({ columns, capacity, maxSag, baseY, params: { restitution: 0.5, capSag: false, ...params } });
+  let s = seed;
+  const rnd = () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
+  const stacks = { 3: [4, 3, 3, 3, 3, 3, 2, 2], 4: [4, 3, 3, 3, 3, 3, 2, 2], 5: [3, 3, 3, 3, 3, 3, 3, 3] }; // 붙어 있는 세 날이 무거움
+  const queue = [];
+  Object.entries(stacks).forEach(([col, loads]) => loads.forEach((load, k) => queue.push({ col: +col, load, k, at: k * 7 * 130 + (+col) * 130 + rnd() * 110 })));
+  queue.sort((a, b) => a.at - b.at);
+  let now = 0, lastSpawn = 0, last = 0;
+  while (now < 40000) {
+    now += 12 + rnd() * 10;
+    while (queue.length && now >= queue[0].at) {
+      const q = queue.shift();
+      const c = columns[q.col];
+      const h = q.load * unit;
+      let bottom = -200 - rnd() * 220;
+      w.boxes.forEach(b => { if (b.col === q.col) bottom = Math.min(bottom, b.y - b.h / 2 - 80); });
+      P.addBox(w, { id: `${q.col}-${q.k}`, col: q.col, x: (c.left + c.right) / 2 + (q.k === 0 ? 0 : (rnd() - 0.5) * 40), y: bottom - h / 2, w: q.k === 0 ? 110 : 90 + rnd() * 50, h, load: q.load, lockX: q.k === 0, vx: q.k === 0 ? 0 : (rnd() - 0.5) * 300 });
+      lastSpawn = now;
+    }
+    P.advance(w, Math.min(50, now - last)); last = now;
+    if (!queue.length && w.settled) break;
+  }
+  return { settled: w.settled, after: now - lastSpawn };
+}
+
+test('무거운 날이 붙어 있고 박스가 많아도 프레임 간격이 불규칙해도 끝없이 튀지 않고 정착한다', () => {
+  for (let seed = 1; seed <= 12; seed++) {
+    const r = heavyRun(seed, {});
+    assert.ok(r.settled && r.after < 8000, `시드 ${seed}: 마지막 박스 뒤 ${Math.round(r.after)}ms`);
+  }
+});
+
+test('충격 기준 속도(kickMinSpeed)를 0으로 하면 위 문제가 다시 생긴다(이 테스트가 문제를 잡는지 확인)', () => {
+  let bad = 0;
+  for (let seed = 1; seed <= 12; seed++) { const r = heavyRun(seed, { kickMinSpeed: 0 }); if (!r.settled || r.after >= 8000) bad++; }
+  assert.ok(bad >= 1, `기준 속도 0에서도 문제가 안 생겼다(${bad}/12). 위 테스트가 문제를 잡지 못할 수 있다`);
+});

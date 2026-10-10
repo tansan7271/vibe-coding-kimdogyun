@@ -24,6 +24,7 @@
     iterations: 6,          // 한 프레임에 겹침을 푸는 반복 횟수
     springK: 190,           // 카펫 용수철 세기(1/s²). 클수록 빨리 출렁인다
     springC: 8.5,           // 카펫 용수철 감쇠(1/s). 작을수록 오래 출렁인다
+    kickMinSpeed: 300,      // 부딪히는 속도가 이보다 느리면 카펫을 흔들지 않는다(px/s). 카펫이 출렁이며 밀어 올린 박스가 다시 떨어질 때 또 카펫을 흔들어 끝없이 튀는 되먹임을 막는다. 이 속도를 넘은 만큼만 센다
     impactKick: 0.00215,    // 박스가 떨어진 충격이 카펫을 얼마나 흔드는지(클수록 더 깊이 출렁). 박스가 카펫을 누르는 깊이(부하 × 부하 1당 높이)에 비례한다 — 예산 설정이 달라도 같은 박스는 같게 흔든다
     settleSpeed: 10,        // 이 속도(px/s)보다 느리면 가만히 있는 것으로 본다
     settleSeconds: 0.35,    // 위 상태가 이만큼 이어지면 정착(settled)으로 본다
@@ -115,7 +116,7 @@
             if (rel > p.restSpeed) {
               b.vy = fv - rel * p.restitution;
               // 부딪힌 반복에서 속도가 줄어드니(튕김) 이 충격은 한 번만 세어진다. 마지막 반복에서만 세면 이미 튕긴 뒤라 한 번도 안 센다
-              world.kick[b.col] += rel * (b.load * world.maxSag / world.capacity) * p.impactKick;
+              world.kick[b.col] += Math.max(0, rel - p.kickMinSpeed) * (b.load * world.maxSag / world.capacity) * p.impactKick;
             } else {
               b.vy = fv;
             }
@@ -147,7 +148,7 @@
               const jv = (1 + e) * rn / (1 / upper.mass + 1 / lower.mass);
               upper.vy -= jv / upper.mass;
               lower.vy += jv / lower.mass;
-              if (rn > p.restSpeed) world.kick[upper.col] += rn * (upper.load * world.maxSag / world.capacity) * p.impactKick * 0.5;
+              if (rn > p.restSpeed) world.kick[upper.col] += Math.max(0, rn - p.kickMinSpeed) * (upper.load * world.maxSag / world.capacity) * p.impactKick * 0.5;
             }
             // 받침이 모자라면 옆으로 미끄러진다(한 프레임에 한 번만 가속한다)
             if (last && ox / upper.w < p.slideSupportRatio) {
