@@ -35,12 +35,12 @@
 
   /* 주 이동 패치: 헤더에 꿰맨 듯 걸린 둥근 사각형. 이전 주·날짜·다음 주·이번 주 버튼이 올라간다 */
   --patch-bg: #a51d34;         /* 패치 천 색. 헤더(--header-bg)보다 약간 어둡게 */
-  --patch-top: -10px;          /* 패치 오른쪽 위 꼭짓점의 위치(화면 위에서). 음수면 위쪽 경계가 화면 밖으로 잘린다 */
-  --patch-right: -10px;        /* 패치 오른쪽 위 꼭짓점의 위치(화면 오른쪽에서). 음수면 오른쪽 경계가 화면 밖으로 잘린다 */
-  --patch-pad: 40px 42px 40px 30px; /* 안쪽 여백(위 오른쪽 아래 왼쪽). 위·오른쪽은 화면 밖으로 잘린 만큼을 포함한다. 아래를 넉넉히 둬서 패치가 헤더 아랫단 밑으로 삐져나오게 한다 */
+  --patch-top: -14px;          /* 패치 오른쪽 위 꼭짓점의 위치(화면 위에서). 음수면 위쪽 경계가 화면 밖으로 잘린다 */
+  --patch-right: -14px;        /* 패치 오른쪽 위 꼭짓점의 위치(화면 오른쪽에서). 음수면 오른쪽 경계가 화면 밖으로 잘린다 */
+  --patch-pad: 34px;           /* 버튼 묶음과 패치 눈에 보이는 가장자리 사이 여백. 상하좌우 같다. 화면 밖으로 잘린 만큼은 아래 padding 식이 자동으로 더한다 */
   --patch-radius: 18px;        /* 모서리 둥글기 */
-  --patch-tilt-deg: 2deg;      /* 기울기. 시계 방향으로 이만큼 기운다 */
-  --patch-stitch-inset: 12px;  /* 털실 점선이 가장자리에서 안쪽으로 들어간 거리. 꼭짓점 위치(-10px)보다 약간 커서 위·오른쪽 점선이 화면 가장자리에 걸쳐 잘려 보인다. 점선 모서리 둥글기는 HTML의 rx(= 둥글기 − 이 값)로 맞춘다 */
+  --patch-tilt-deg: 1.2deg;    /* 기울기. 시계 방향으로 이만큼 기운다 */
+  --patch-stitch-inset: 8px;   /* 털실 점선이 가장자리에서 안쪽으로 들어간 거리. 꼭짓점이 화면 밖으로 나간 만큼(14px)보다 작으면 위·오른쪽 점선이 화면 밖으로 완전히 잘린다. 점선 모서리 둥글기는 HTML의 rx(= 둥글기 − 이 값)로 맞춘다 */
   --patch-z: 110;              /* 헤더(100) 바로 위 */
 
   /* 아래쪽 버튼: 스프링 메모장(할 일)과 일마다 찢는 달력(일정과 설정). 크기·기울기·색은 여기서 바꾼다.
@@ -83,6 +83,16 @@
   --modal-radius: 14px;                /* 패널 모서리 둥글기 */
   --modal-pad: 24px;                   /* 패널 안쪽 여백 */
   --modal-z: 200;                      /* 헤더(100)와 아래쪽 버튼(150)보다 위 */
+
+  /* 아래쪽 버튼 호버와 팝업 열고 닫는 연출 */
+  --dock-hover-lift: 14px;             /* 마우스를 올리면 위로 올라오는 거리 */
+  --dock-hover-ms: 160ms;              /* 올라오고 내려가는 시간 */
+  --modal-anim-ms: 700ms;              /* 팝업이 버튼에서 돌며 커지는 시간. 닫을 때도 같다 */
+  --modal-ease: cubic-bezier(0.3, 0.7, 0.2, 1); /* 팝업 움직임의 빠르기 곡선 */
+  --modal-spin-deg: 360deg;            /* 세로축(Y축)으로 도는 각도. 360deg면 한 바퀴 */
+  --modal-perspective: 1600px;         /* 도는 원근감. 작을수록 도는 맛이 과장된다 */
+  --modal-content-delay: 0.6;          /* 글자와 버튼이 나타나기 시작하는 시점(연출 시간의 비율 0~1). 도는 중 찌그러지는 글자를 가린다 */
+  --modal-fade-ms: 400ms;              /* 뒤 화면의 어두워짐·흐려짐이 나타나고 사라지는 시간 */
 }
 * { box-sizing: border-box; }
 body {
@@ -146,6 +156,7 @@ nav button {
   font-family: inherit;
   font-weight: bold;
   color: var(--note-ink);
+  transition: transform var(--dock-hover-ms) ease-out;
 }
 
 /* 할 일: 위에 스프링이 달린 메모장 */
@@ -229,6 +240,10 @@ nav button {
 .dock-note span { height: calc((var(--note-h) + var(--dock-bottom)) * var(--dock-label-zone) - var(--spring-h) / 2); }
 .dock-cal span { height: calc((var(--cal-h) + var(--dock-bottom)) * var(--dock-label-zone) - var(--cal-band-h)); }
 
+/* 호버: 기울기는 그대로 두고 위로 올라온다 */
+.dock-note:hover, .dock-note:focus-visible { transform: translateY(calc(var(--dock-hover-lift) * -1)) rotate(var(--note-tilt)); }
+.dock-cal:hover, .dock-cal:focus-visible { transform: translateY(calc(var(--dock-hover-lift) * -1)) rotate(var(--cal-tilt)); }
+
 .logo-link {
   border: none;
   background: none;
@@ -272,14 +287,72 @@ main {
 
 .modal-panel {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: var(--modal-max-width);
   max-height: 100%;
-  overflow-y: auto;
-  padding: var(--modal-pad);
-  background: #f5f2ee;
   border-radius: var(--modal-radius);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* 스크롤은 안쪽 영역이 맡고, 바깥 패널은 스프링·접합부처럼 튀어나오는 장식을 맡는다 */
+.modal-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--modal-pad);
+  border-radius: var(--modal-radius);
+  background: #f5f2ee;
+}
+
+/* 할 일 팝업: 아래쪽 '할 일' 버튼과 같은 스프링 메모장 + 코넬식 선 */
+#modal-goals .modal-scroll {
+  padding-top: calc(var(--modal-pad) + var(--spring-h) / 2);
+  background:
+    linear-gradient(var(--note-margin-color), var(--note-margin-color)) var(--note-margin-x) calc(var(--note-line-top) + var(--note-line-gap) - 1px) / 2px 100% no-repeat local,
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--note-line-gap) - 1px), var(--note-line-color) calc(var(--note-line-gap) - 1px) var(--note-line-gap)) 0 var(--note-line-top) / 100% 100% no-repeat local,
+    var(--note-paper);
+}
+
+#modal-goals .modal-panel::before { /* 스프링: '할 일' 버튼과 같은 모양 */
+  content: '';
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--spring-h) / -2);
+  left: 20px;
+  right: 20px;
+  height: var(--spring-h);
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='22' viewBox='0 0 16 22'%3E%3Crect x='5' y='0' width='6' height='22' rx='3' fill='%23666'/%3E%3C/svg%3E") left top / var(--spring-pitch) var(--spring-h) round no-repeat;
+}
+
+/* 일정과 설정 팝업: 아래쪽 '일정과 설정' 버튼과 같은 달력 종이 + 붉은 윗줄(종이 접합부) */
+#modal-settings .modal-panel {
+  box-shadow: 0 3px 0 #eadfce, 0 6px 0 #dccfba, 0 10px 40px rgba(0, 0, 0, 0.35); /* 아래로 겹친 종이 두 장 */
+}
+
+#modal-settings .modal-scroll {
+  padding-top: calc(var(--modal-pad) + var(--cal-band-h));
+  background: var(--cal-paper);
+}
+
+#modal-settings .modal-panel::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--cal-band-h);
+  pointer-events: none;
+  border-radius: var(--modal-radius) var(--modal-radius) 0 0;
+  background:
+    radial-gradient(circle at 22% 50%, var(--cal-paper) 0 calc(var(--cal-band-h) * 0.15), transparent calc(var(--cal-band-h) * 0.15 + 0.5px)),
+    radial-gradient(circle at 78% 50%, var(--cal-paper) 0 calc(var(--cal-band-h) * 0.15), transparent calc(var(--cal-band-h) * 0.15 + 0.5px)),
+    var(--cal-band);
+  box-shadow: var(--cal-band-shadow);
 }
 
 .modal-panel .screen { display: block; }
@@ -548,7 +621,7 @@ button.btn-plain {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: var(--patch-pad);
+  padding: calc(var(--patch-pad) - var(--patch-top)) calc(var(--patch-pad) - var(--patch-right)) var(--patch-pad) var(--patch-pad); /* 위·오른쪽은 화면 밖으로 잘린 만큼 더한다 */
   border-radius: var(--patch-radius);
   background: var(--patch-bg);
   color: #fff;

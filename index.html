@@ -22,7 +22,7 @@
 </header>
 
 <div class="week-patch">
-  <svg class="patch-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="6"/></svg>
+  <svg class="patch-stitch" aria-hidden="true"><rect x="0" y="0" width="100%" height="100%" rx="10"/></svg>
   <button class="btn btn-plain" id="week-prev" type="button">◀ 이전 주</button>
   <span class="week-label" id="week-label"></span>
   <button class="btn btn-plain" id="week-next" type="button">다음 주 ▶</button>
@@ -46,6 +46,7 @@
 
   <div class="modal-backdrop" id="modal-goals" role="dialog" aria-modal="true" aria-label="할 일">
   <div class="modal-panel">
+  <div class="modal-scroll">
   <button class="modal-close" type="button" aria-label="닫기">×</button>
   <section id="screen-goals" class="screen">
     <h1>할 일</h1>
@@ -73,9 +74,11 @@
   </section>
   </div>
   </div>
+  </div>
 
   <div class="modal-backdrop" id="modal-settings" role="dialog" aria-modal="true" aria-label="일정과 설정">
   <div class="modal-panel">
+  <div class="modal-scroll">
   <button class="modal-close" type="button" aria-label="닫기">×</button>
   <section id="screen-settings" class="screen">
     <h1>일정과 설정</h1>
@@ -155,6 +158,7 @@
     </div>
     </div>
   </section>
+  </div>
   </div>
   </div>
 </main>
