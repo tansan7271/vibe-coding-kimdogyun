@@ -11,15 +11,23 @@
       .sort((a, b) => a.order - b.order);
   }
 
+  // 공통 서식 조각: 입력칸과 버튼은 사이트의 다른 부분과 같은 클래스를 쓴다 (style.css의 .sbtn, .line-field)
+  const CHEV_UP = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15l7-7 7 7"/></svg>';
+  const CHEV_DOWN = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l7 7 7-7"/></svg>';
+  const textField = (attrs, extraCls = '') => `<span class="line-field ${extraCls}"><input type="text" class="line-input" ${attrs}></span>`; // 아래 실선(양끝 둥근) 칸
+  const chipField = (inputHtml, extraCls = '') => `<label class="sbtn sbtn-field ${extraCls}">${inputHtml}</label>`; // 스티치 버튼 모양에서 점선만 뺀 칸(날짜·숫자·선택)
+
   function stepRowHtml(step) {
     return `
       <div class="step-row" data-step-id="${step.id}">
-        <button type="button" class="btn-plain" data-action="move-step-up" data-step-id="${step.id}">▲</button>
-        <button type="button" class="btn-plain" data-action="move-step-down" data-step-id="${step.id}">▼</button>
-        <input type="text" class="step-title-input" data-field="title" data-step-id="${step.id}" value="${escapeAttr(step.title)}" placeholder="중간 단계 제목">
+        <span class="step-move">
+          <button type="button" class="sbtn sbtn-icon" aria-label="위로" data-action="move-step-up" data-step-id="${step.id}">${CHEV_UP}</button>
+          <button type="button" class="sbtn sbtn-icon" aria-label="아래로" data-action="move-step-down" data-step-id="${step.id}">${CHEV_DOWN}</button>
+        </span>
+        ${textField(`data-field="title" data-step-id="${step.id}" value="${escapeAttr(step.title)}" placeholder="중간 단계 제목"`, 'step-title-field')}
         ${loadPickerHtml(step.id, step.load)}
-        <input type="number" class="step-minutes-input" data-field="minutes" data-step-id="${step.id}" value="${step.minutes}" step="30" min="30"> 분
-        <button type="button" class="btn btn-danger" data-action="delete-step" data-step-id="${step.id}">삭제</button>
+        ${chipField(`<input type="number" class="step-minutes-input" data-field="minutes" data-step-id="${step.id}" value="${step.minutes}" step="30" min="30">`)} 분
+        <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-step" data-step-id="${step.id}">삭제</button>
       </div>`;
   }
 
@@ -31,13 +39,14 @@
     const minutes = draft.minutes || 60;
     return `
       <div class="step-add-form" data-goal-id="${goalId}">
-        <input type="text" class="step-title-input" id="new-step-title-${goalId}" data-draft="title" data-goal-id="${goalId}" value="${escapeAttr(title)}" placeholder="새 중간 단계 제목">
+        ${textField(`id="new-step-title-${goalId}" data-draft="title" data-goal-id="${goalId}" value="${escapeAttr(title)}" placeholder="새 중간 단계 제목"`, 'step-title-field')}
         ${loadPickerHtml(key, selected)}
-        <input type="number" class="step-minutes-input" id="new-step-minutes-${goalId}" data-draft="minutes" data-goal-id="${goalId}" value="${minutes}" step="30" min="30"> 분
-        <button type="button" class="btn" data-action="add-step" data-goal-id="${goalId}">단계 추가</button>
+        ${chipField(`<input type="number" class="step-minutes-input" id="new-step-minutes-${goalId}" data-draft="minutes" data-goal-id="${goalId}" value="${minutes}" step="30" min="30">`)} 분
+        <button type="button" class="sbtn sbtn-sm sbtn-accent" data-action="add-step" data-goal-id="${goalId}">단계 추가</button>
       </div>`;
   }
 
+  // 카드 머리 전체(제목·마감·빈 곳)를 누르면 펼침/접힘. 버튼은 자기 동작이 먼저다. 본문은 항상 그려 두고 높이만 바꿔서 아코디언 애니메이션이 된다
   function goalCardHtml(goal) {
     const expanded = expandedGoals.has(goal.id);
     const steps = stepsForGoal(goal.id);
@@ -46,27 +55,28 @@
       : '<div class="empty-hint">아직 중간 단계가 없습니다.</div>';
 
     return `
-      <div class="goal-card" data-goal-id="${goal.id}">
-        <div class="goal-header">
-          <div class="goal-header-info" data-action="toggle-expand" data-goal-id="${goal.id}">
+      <div class="goal-card${expanded ? ' expanded' : ''}" data-goal-id="${goal.id}">
+        <div class="goal-header" data-action="toggle-expand" data-goal-id="${goal.id}" aria-expanded="${expanded}">
+          <div class="goal-header-info">
             <span class="goal-title">${escapeHtml(goal.title)}</span>
             <span class="goal-deadline">마감 ${goal.deadline}</span>
-            <span>${expanded ? '▲' : '▼'}</span>
+            ${CHEV_DOWN.replace('class="chev"', 'class="chev goal-chev"')}
           </div>
           <div class="goal-actions">
-            ${steps.some(s => !s.done) ? `<button type="button" class="btn" data-action="complete-goal" data-goal-id="${goal.id}">완료</button>` : ''}
-            <button type="button" class="btn btn-danger" data-action="delete-goal" data-goal-id="${goal.id}">삭제</button>
+            ${steps.some(s => !s.done) ? `<button type="button" class="sbtn sbtn-sm sbtn-accent" data-action="complete-goal" data-goal-id="${goal.id}">완료</button>` : ''}
+            <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-goal" data-goal-id="${goal.id}">삭제</button>
           </div>
         </div>
-        ${expanded ? `
+        <div class="goal-acc">
           <div class="goal-body">
             <div class="goal-edit-row">
-              <input type="text" data-field="title" data-goal-id="${goal.id}" value="${escapeAttr(goal.title)}" placeholder="제목">
-              <input type="date" data-field="deadline" data-goal-id="${goal.id}" value="${goal.deadline}">
+              ${textField(`data-field="title" data-goal-id="${goal.id}" value="${escapeAttr(goal.title)}" placeholder="제목"`, 'goal-title-field')}
+              ${chipField(`<input type="date" data-field="deadline" data-goal-id="${goal.id}" value="${goal.deadline}">`)}
             </div>
             ${stepsHtml}
             ${stepAddFormHtml(goal.id)}
-          </div>` : ''}
+          </div>
+        </div>
       </div>`;
   }
 
@@ -126,8 +136,10 @@
 
     if (action === 'toggle-expand') {
       const goalId = target.dataset.goalId;
-      expandedGoals.has(goalId) ? expandedGoals.delete(goalId) : expandedGoals.add(goalId);
-      renderGoals();
+      const open = !expandedGoals.has(goalId);
+      open ? expandedGoals.add(goalId) : expandedGoals.delete(goalId);
+      target.closest('.goal-card').classList.toggle('expanded', open); // 다시 그리지 않고 클래스만 바꿔야 아코디언 애니메이션이 돈다
+      target.setAttribute('aria-expanded', open);
       return;
     }
 
@@ -365,25 +377,28 @@
     const d = aiDraft;
     aiDraftBox.style.display = '';
     aiDraftBox.innerHTML = `
-      <div><strong>초안 (고쳐서 확정하면 저장됩니다)</strong></div>
-      <div class="ai-step-row" style="margin-top:8px">
-        <input type="text" id="ai-draft-title" value="${escapeAttr(d.title)}" placeholder="할 일 제목">
-        <input type="date" id="ai-draft-deadline" value="${escapeAttr(d.deadline)}">
+      <div class="ai-draft-title"><strong>초안 (고쳐서 확정하면 저장됩니다)</strong></div>
+      <div class="ai-step-row">
+        ${textField(`id="ai-draft-title" value="${escapeAttr(d.title)}" placeholder="할 일 제목"`, 'goal-title-field')}
+        ${chipField(`<input type="date" id="ai-draft-deadline" value="${escapeAttr(d.deadline)}">`)}
         ${d.deadlineWarn ? '<span class="ai-warn">마감일을 정해 주세요</span>' : ''}
       </div>
       ${d.steps.map((s, i) => `
         <div class="ai-step-row">
-          <span>${i + 1}.</span>
-          <input type="text" data-ai-step="${i}" data-ai-field="title" value="${escapeAttr(s.title)}" placeholder="단계 제목">
-          <select data-ai-step="${i}" data-ai-field="load">${[1, 2, 3, 4, 5].map(l => `<option value="${l}"${s.load === l ? ' selected' : ''}>부하 ${l}</option>`).join('')}</select>
-          <input type="number" data-ai-step="${i}" data-ai-field="minutes" value="${s.minutes}" min="30" step="30"> 분
-          <button class="btn btn-plain" type="button" data-ai-del="${i}">지우기</button>
+          <span class="ai-step-no">${i + 1}.</span>
+          ${textField(`data-ai-step="${i}" data-ai-field="title" value="${escapeAttr(s.title)}" placeholder="단계 제목"`, 'step-title-field')}
+          ${chipField(`<select data-ai-step="${i}" data-ai-field="load">${[1, 2, 3, 4, 5].map(l => `<option value="${l}"${s.load === l ? ' selected' : ''}>부하 ${l}</option>`).join('')}</select>`)}
+          ${chipField(`<input type="number" class="step-minutes-input" data-ai-step="${i}" data-ai-field="minutes" value="${s.minutes}" min="30" step="30">`)} 분
+          <button class="sbtn sbtn-sm" type="button" data-ai-del="${i}">지우기</button>
           ${s.warn ? `<span class="ai-warn">${escapeHtml(s.warn)}</span>` : ''}
         </div>`).join('')}
       <div id="ai-draft-error" class="ai-warn"></div>
-      <button class="btn" id="ai-confirm-btn" type="button">확정해서 저장</button>
-      <button class="btn btn-plain" id="ai-discard-btn" type="button">버리기</button>`;
+      <div class="ai-draft-actions">
+        <button class="sbtn sbtn-sm" id="ai-discard-btn" type="button">버리기</button>
+        <button class="sbtn sbtn-sm sbtn-accent" id="ai-confirm-btn" type="button">확정해서 저장</button>
+      </div>`;
   }
+
 
   aiDraftBox.addEventListener('input', (e) => {
     if (!aiDraft) return;
