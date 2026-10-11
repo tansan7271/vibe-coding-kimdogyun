@@ -16,6 +16,7 @@
   const CHEV_DOWN = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l7 7 7-7"/></svg>';
   const textField = (attrs, extraCls = '') => `<span class="line-field ${extraCls}"><input type="text" class="line-input" ${attrs}></span>`; // 아래 실선(양끝 둥근) 칸
   const chipField = (inputHtml) => `<label class="sbtn sbtn-sm sbtn-field">${inputHtml}</label>`; // 스티치 버튼 모양에서 점선만 뺀 칸(날짜·숫자·선택). 카드 안 버튼(.sbtn-sm)과 높이가 같다
+  const minutesField = (inputHtml) => `<span class="min-group">${chipField(inputHtml)}분</span>`; // 시간 입력칸과 '분'을 한 덩어리로 묶어 줄이 바뀌어도 떨어지지 않게
   const gripHtml = `<span class="step-grip" aria-label="끌어서 순서 바꾸기" title="끌어서 순서 바꾸기">${GRIP}</span>`;
 
   function stepRowHtml(step) {
@@ -24,7 +25,7 @@
         ${gripHtml}
         ${textField(`data-field="title" data-step-id="${escapeAttr(step.id)}" value="${escapeAttr(step.title)}" placeholder="중간 단계 제목"`, 'step-title-field')}
         ${loadPickerHtml(step.id, step.load)}
-        ${chipField(`<input type="number" class="step-minutes-input" data-field="minutes" data-step-id="${escapeAttr(step.id)}" value="${step.minutes}" step="30" min="30">`)} 분
+        ${minutesField(`<input type="number" class="step-minutes-input" data-field="minutes" data-step-id="${escapeAttr(step.id)}" value="${step.minutes}" step="30" min="30">`)}
         <button type="button" class="sbtn sbtn-sm sbtn-danger" data-action="delete-step" data-step-id="${escapeAttr(step.id)}">삭제</button>
       </div>`;
   }
@@ -39,7 +40,7 @@
       <div class="step-add-form" data-goal-id="${escapeAttr(goalId)}">
         ${textField(`id="new-step-title-${escapeAttr(goalId)}" data-draft="title" data-goal-id="${escapeAttr(goalId)}" value="${escapeAttr(title)}" placeholder="새 중간 단계 제목"`, 'step-title-field')}
         ${loadPickerHtml(key, selected)}
-        ${chipField(`<input type="number" class="step-minutes-input" id="new-step-minutes-${escapeAttr(goalId)}" data-draft="minutes" data-goal-id="${escapeAttr(goalId)}" value="${minutes}" step="30" min="30">`)} 분
+        ${minutesField(`<input type="number" class="step-minutes-input" id="new-step-minutes-${escapeAttr(goalId)}" data-draft="minutes" data-goal-id="${escapeAttr(goalId)}" value="${minutes}" step="30" min="30">`)}
         <button type="button" class="sbtn sbtn-sm sbtn-accent" data-action="add-step" data-goal-id="${escapeAttr(goalId)}">단계 추가</button>
       </div>`;
   }
@@ -170,6 +171,10 @@
     }, dir);
   });
 
+  // 마감일 칸의 기본값: 오늘로부터 7일 뒤. iOS는 빈 날짜 칸을 아무 글자 없는 빈 버튼으로 그려서 기본값을 넣어 둔다
+  const defaultDeadline = () => Placement.addDays(todayStr(), 7);
+  document.getElementById('new-goal-deadline').value = defaultDeadline();
+
   document.getElementById('add-goal-btn').addEventListener('click', () => {
     const titleInput = document.getElementById('new-goal-title');
     const deadlineInput = document.getElementById('new-goal-deadline');
@@ -181,7 +186,7 @@
     state.goals.push({ id: uid('goal'), title, deadline, createdAt: todayStr() });
     saveState();
     titleInput.value = '';
-    deadlineInput.value = '';
+    deadlineInput.value = defaultDeadline();
     renderGoals();
   });
 
@@ -459,7 +464,7 @@
             ${gripHtml}
             ${textField(`data-ai-step="${i}" data-ai-field="title" value="${escapeAttr(s.title)}" placeholder="단계 제목"`, 'step-title-field')}
             ${loadPickerHtml(`ai-${i}`, s.load)}
-            ${chipField(`<input type="number" class="step-minutes-input" data-ai-step="${i}" data-ai-field="minutes" value="${s.minutes}" min="30" step="30">`)} 분
+            ${minutesField(`<input type="number" class="step-minutes-input" data-ai-step="${i}" data-ai-field="minutes" value="${s.minutes}" min="30" step="30">`)}
             <button class="sbtn sbtn-sm sbtn-danger" type="button" data-ai-del="${i}">삭제</button>
             ${s.warn ? `<span class="ai-warn">${escapeHtml(s.warn)}</span>` : ''}
           </div>`).join('')}

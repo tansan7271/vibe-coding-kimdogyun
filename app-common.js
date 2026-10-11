@@ -27,9 +27,10 @@
       root.style.setProperty('--edge-tile', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
     }
     draw();
-    let queued = false;
+    let queued = false, lastW = root.clientWidth;
     window.addEventListener('resize', () => {
-      if (queued) return;
+      if (queued || root.clientWidth === lastW) return; // 폭이 그대로면(모바일 Safari 주소창이 줄고 늘 때) 다시 그리지 않는다
+      lastW = root.clientWidth;
       queued = true;
       requestAnimationFrame(() => { queued = false; draw(); });
     });

@@ -95,6 +95,7 @@ const STAGE_STYLE = {
   dragGhostOpacity: 0.62,      // 마우스를 따라오는 박스 복사본의 투명도
   dragSourceOpacity: 0.35,     // 끄는 동안 원래 박스의 투명도
   dragEdgeWidth: 72,           // 화면 왼쪽·오른쪽 끝의 주 이동 구역 폭(px). 날짜칸 바깥쪽 일부와 겹치고 이 구역이 우선한다
+  dragEdgeScrollSpeed: 650,    // 모바일 판: 끌다가 화면 왼쪽·오른쪽 끝에 대면 날짜 칸이 그 방향으로 스크롤되는 속도(px/s). 끝까지 가서도 머물면 주가 넘어간다
   dragEdgeDwellMs: 700,        // 주 이동 구역에 이만큼 머물면 한 주 넘어간다(ms). 계속 머물면 또 넘어간다
   dragTopExtra: 12,            // 위쪽 취소 구역은 헤더 높이에서 이만큼 더 아래까지(px)
   focusMs: 260,                // 커지고 줄어드는 시간(ms)
@@ -308,9 +309,17 @@ const STAGE_STYLE = {
 
   // 주와 상관없는 배치: 땅 높이, 위로 끌어올리는 양, 부하 1당 높이(unit), 예산선 깊이. 화면 폭·높이·예산이 바뀔 때만 다시 잰다
   let baseKey = '', B = null;
+  // 모바일 Safari는 스크롤하면 주소창·탭 바가 줄고 늘며 innerHeight가 계속 바뀐다. 그때마다 다시 놓으면 연출이 끊기고 요소가 움찔하므로,
+  // 모바일 판에서는 폭이 그대로인 동안 처음 잰 높이를 그대로 쓴다(가로·세로를 돌리면 폭이 바뀌어 다시 잰다)
+  let lockedH = 0, lockedW = 0;
+  function layoutHeight(width) {
+    if (!isMobile()) return window.innerHeight;
+    if (lockedW !== width || !lockedH) { lockedW = width; lockedH = window.innerHeight; }
+    return lockedH;
+  }
   function baseLayout(width) {
     const capacity = state.settings.capacity;
-    const key = `${width},${window.innerHeight},${capacity}`;
+    const key = `${width},${layoutHeight(width)},${capacity}`;
     if (key === baseKey) return B;
     baseKey = key;
     const P = { spacing: S.spacing, coreRadius: S.coreRadius };
@@ -330,7 +339,7 @@ const STAGE_STYLE = {
     const topSpace = lineY - headerBottom;         // 위쪽 여백: 헤더 아랫단 ~ 카펫 선
     // 예산선(맨 아래 가로선): 아래쪽 '할 일' 메모지의 왼쪽 위 꼭짓점보다 조금 아래. 메모지를 못 찾으면 위쪽 여백과 같은 아래 여백
     const corner = noteCornerY();
-    const budgetY = corner === null ? window.innerHeight - topSpace : corner + G.budgetBelowCorner;
+    const budgetY = corner === null ? layoutHeight(width) - topSpace : corner + G.budgetBelowCorner;
     const refSag = Math.max(G.minSag, budgetY - lineY);   // 기준 예산(refCapacity)일 때의 예산선 깊이
     const unit = refSag / G.refCapacity;                  // 부하 1당 높이(px). 예산 설정이 바뀌어도 그대로다
     const rollSize = Math.ceil(2 * (radius0 + S.lineWidth));
@@ -1087,12 +1096,25 @@ const STAGE_STYLE = {
     if (edge !== d.dwellZone) { d.dwellZone = edge; d.dwellStart = performance.now(); dz.style.setProperty('--dz-progress', '0'); }
   }
 
+  // dir 방향으로 날짜 칸 스크롤틀을 밀어 본다. 밀었으면 true, 이미 끝이면 false
+  function scrollEdgeBox(dir, dt) {
+    const max = stage.scrollWidth - stage.clientWidth;
+    const before = stage.scrollLeft;
+    if (!(max > 1) || (dir < 0 ? before <= 0 : before >= max - 1)) return false;
+    stage.scrollLeft = Math.max(0, Math.min(max, before + dir * G.dragEdgeScrollSpeed * dt));
+    return stage.scrollLeft !== before;
+  }
+
   // 주 이동 구역에 머문 시간을 채움 표시로 보이고, 다 차면 한 주 넘긴다. 넘어가는 동안은 다시 재기 시작한다
   function dwellTick(now) {
     const d = boxDrag;
     if (!d || !d.started) return;
+    const dt = Math.min(0.05, (now - (d.lastTick || now)) / 1000); d.lastTick = now;
     if (busy) { d.dwellStart = now; dz.style.setProperty('--dz-progress', '0'); d.wasBusy = true; }
-    else {
+    else if (isMobile() && d.dwellZone && scrollEdgeBox(d.dwellZone === 'next' ? 1 : -1, dt)) { // 모바일 판: 가장자리에 대면 먼저 날짜 칸을 스크롤한다. 끝에 닿은 뒤에야 머무름이 주 넘기기로 이어진다
+      d.dwellStart = now; dz.style.setProperty('--dz-progress', '0');
+      updateBoxDrag(); // 스크롤로 밀려난 칸을 다시 판정한다
+    } else {
       if (d.wasBusy) { d.wasBusy = false; updateBoxDrag(); } // 슬라이드가 끝났으니 새 주의 칸으로 다시 판정한다
       if (d.dwellZone) {
         const p = Math.min(1, (now - d.dwellStart) / G.dragEdgeDwellMs);
@@ -1471,7 +1493,10 @@ const STAGE_STYLE = {
     scrollToToday(false); // 모바일 판은 오늘 칸에서 시작한다
     startBoxes(first, reduceMotion() ? 'instant' : 'drop'); // 첫 입장 때의 떨어지는 연출
     let resizeTimer = 0;
+    let lastW = window.innerWidth;
     window.addEventListener('resize', () => { // 폭·높이가 바뀌면 보이는 주의 선과 박스를 새 크기로 다시 놓는다(연출 없이). 창을 끄는 동안은 기다렸다가 멈추면 한 번만
+      if (isMobile() && window.innerWidth === lastW) return; // 모바일: 주소창·탭 바가 줄고 늘어 높이만 바뀐 것은 무시한다
+      lastW = window.innerWidth;
       clearTimeout(resizeTimer);
       let tries = 0;
       const replace = () => {
