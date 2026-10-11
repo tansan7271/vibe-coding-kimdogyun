@@ -15,6 +15,12 @@
 
   const DEFAULTS = {
     gravity: 2600,          // 중력(px/s²)
+    // 하드 상한: 한 칸에 박스가 아주 많이 쌓이면 카펫 용수철이 한 번에 너무 큰 힘을 받아 카펫이 초당 수만 px로 움직이고, 그 위의 박스가 그 속도를 물려받아 화면 밖으로 날아가
+    // 한참 돌아오지 않는다. 아래 네 값이 속도와 힘을 막는다. 평소 쌓임(수 개)에서는 닿지 않는 값이라 모양은 그대로다
+    maxBoxSpeed: 2400,      // 박스 한 개의 가로·세로 속도 상한(px/s). 올라갈 때 최대 높이는 이 값² / (2 × 중력) ≈ 1100px
+    maxSagSpeed: 1800,      // 카펫이 처지고 올라오는 속도 상한(px/s)
+    maxKick: 500,           // 한 프레임에 한 열의 카펫이 받는 충격(속도로 더해지는 값) 상한(px/s)
+    maxSagError: 450,       // 용수철이 목표 깊이와의 차이를 이 값까지만 세어 힘을 낸다(px). 목표가 아주 멀어도 힘이 끝없이 커지지 않는다
     restitution: 0.28,      // 박스끼리·바닥에 부딪힐 때 튕기는 정도(0~1)
     wallRestitution: 0.3,   // 벽에 부딪힐 때
     restSpeed: 60,          // 부딪히는 상대 속도가 이보다 작으면 튕기지 않고 그냥 얹힌다(px/s)
@@ -99,6 +105,12 @@
     const w = world.columns.map(() => 0);
     world.boxes.forEach(b => { if (b.landed) w[b.col] += b.load; });
     return w;
+  }
+
+  // v를 -limit~limit로 자른다. NaN은 0으로 본다(한 번 NaN이 되면 계속 퍼지므로)
+  function clamp(v, limit) {
+    if (!(v === v)) return 0;
+    return v > limit ? limit : v < -limit ? -limit : v;
   }
 
   function step(world, dt) {
@@ -221,13 +233,17 @@
     const wts = weights(world);
     for (let c = 0; c < world.columns.length; c++) {
       const target = targetSag(world, wts[c]);
-      world.sagVel[c] += world.kick[c];
+      world.sagVel[c] += Math.min(world.kick[c], p.maxKick);
       const lifting = world.lift[c]; // 박스를 뺀 열: 출렁이지 않는 부드러운 용수철로 올라온다
-      const acc = (lifting ? p.liftK : p.springK) * (target - world.sag[c]) - (lifting ? 2 * Math.sqrt(p.liftK) : p.springC) * world.sagVel[c];
-      world.sagVel[c] += acc * dt;
+      const err = Math.max(-p.maxSagError, Math.min(p.maxSagError, target - world.sag[c]));
+      const acc = (lifting ? p.liftK : p.springK) * err - (lifting ? 2 * Math.sqrt(p.liftK) : p.springC) * world.sagVel[c];
+      world.sagVel[c] = clamp(world.sagVel[c] + acc * dt, p.maxSagSpeed);
       world.sag[c] += world.sagVel[c] * dt;
       if (lifting && Math.abs(target - world.sag[c]) < 0.5 && Math.abs(world.sagVel[c]) < p.settleSpeed) world.lift[c] = false;
     }
+
+    // 4-2. 하드 상한: 위 계산들이 어떤 이유로 속도를 키웠어도 박스 속도는 maxBoxSpeed를 넘지 않는다
+    boxes.forEach(b => { b.vx = clamp(b.vx, p.maxBoxSpeed); b.vy = clamp(b.vy, p.maxBoxSpeed); });
 
     // 5. 정착 판정
     let calm = true;

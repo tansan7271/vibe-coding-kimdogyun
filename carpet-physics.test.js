@@ -252,9 +252,9 @@ test('무거운 날이 붙어 있고 박스가 많아도 프레임 간격이 불
   }
 });
 
-test('충격 기준 속도(kickMinSpeed)를 0으로 하면 위 문제가 다시 생긴다(이 테스트가 문제를 잡는지 확인)', () => {
+test('충격 기준 속도와 하드 상한을 모두 풀면 위 문제가 다시 생긴다(이 테스트가 문제를 잡는지 확인)', () => {
   let bad = 0;
-  for (let seed = 1; seed <= 12; seed++) { const r = heavyRun(seed, { kickMinSpeed: 0 }); if (!r.settled || r.after >= 8000) bad++; }
+  for (let seed = 1; seed <= 12; seed++) { const r = heavyRun(seed, { kickMinSpeed: 0, maxBoxSpeed: Infinity, maxSagSpeed: Infinity, maxKick: Infinity, maxSagError: Infinity }); if (!r.settled || r.after >= 8000) bad++; }
   assert.ok(bad >= 1, `기준 속도 0에서도 문제가 안 생겼다(${bad}/12). 위 테스트가 문제를 잡지 못할 수 있다`);
 });
 
@@ -344,4 +344,31 @@ test('열보다 넓은 박스는 열 폭으로 줄여 넣고 정착한다', () =
   assert.equal(b.w, colW);
   assert.ok(b.x >= columns[2].left + b.w / 2 - 1e-9 && b.x <= columns[2].right - b.w / 2 + 1e-9);
   assert.equal(P.settle(w), true);
+});
+
+test('한 날에 너무 많이 몰려도 박스·카펫 속도가 하드 상한을 넘지 않고 박스가 칸 밖으로 날아가지 않는다', () => {
+  for (let seed = 1; seed <= 6; seed++) {
+    const w = P.createWorld({ columns, capacity, maxSag, baseY, params: { restitution: 0.5, capSag: false } });
+    const p = w.p;
+    let s = seed;
+    const rnd = () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
+    const c = columns[3];
+    let now = 0, last = 0, spawned = 0, maxV = 0, maxSagV = 0, escaped = 0;
+    while (now < 15000) {
+      now += 8 + rnd() * 40;
+      while (spawned < 16 && now >= spawned * 130) {
+        let bottom = -120;
+        w.boxes.forEach(b => { if (b.col === 3) bottom = Math.min(bottom, b.y - b.h / 2 - 8); });
+        const h = 5 * unit;
+        P.addBox(w, { id: `h${spawned}`, col: 3, x: (c.left + c.right) / 2 + (rnd() - 0.5) * 30, y: bottom - h / 2, w: 90 + rnd() * 50, h, load: 5, lockX: spawned === 0, vx: (rnd() - 0.5) * 100 });
+        spawned++;
+      }
+      P.advance(w, Math.min(50, now - last)); last = now;
+      w.boxes.forEach(b => { maxV = Math.max(maxV, Math.abs(b.vx), Math.abs(b.vy)); if (b.x < c.left - 1 || b.x > c.right + 1) escaped++; });
+      maxSagV = Math.max(maxSagV, Math.abs(w.sagVel[3]));
+    }
+    assert.ok(maxV <= p.maxBoxSpeed, `시드 ${seed}: 박스 속도 ${Math.round(maxV)}`);
+    assert.ok(maxSagV <= p.maxSagSpeed, `시드 ${seed}: 카펫 속도 ${Math.round(maxSagV)}`);
+    assert.equal(escaped, 0, `시드 ${seed}: 칸 밖으로 나간 횟수`);
+  }
 });
